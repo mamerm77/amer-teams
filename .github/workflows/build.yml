@@ -134,6 +134,10 @@ jobs:
         if: env.APPLE_TEAM_ID == ''
         uses: actions/upload-artifact@v4
         with: {name: amer-teams-ios-unsigned, path: app/build/AmerTeams-unsigned.ipa}
+      - name: Publish IPA to "Latest test build" release
+        if: env.APPLE_TEAM_ID == '' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with: {tag_name: test-latest, name: Latest test build, prerelease: true, make_latest: false, files: app/build/AmerTeams-unsigned.ipa}
       # ---- Signed build + TestFlight upload: runs once the Apple secrets are added ----
       - name: Install signing certificate and profile
         if: env.APPLE_TEAM_ID != ''
