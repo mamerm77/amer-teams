@@ -366,11 +366,21 @@ class _S extends State<ChatScreen> {
     if (e.type == 'com.amerteams.meeting') {
       final id = e.content['meeting_id'] as String?;
       final st = DateTime.tryParse(e.content['start'] as String? ?? '')?.toLocal();
-      return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(leading: const Icon(Icons.event),
-        title: Text(e.content['title'] as String? ?? 'Meeting'),
+      final rsvps = <String, String>{};
+      for (final x in (tl?.events ?? []).reversed) {
+        if (x.type == 'com.amerteams.meeting.rsvp' && x.content['meeting_id'] == (id ?? e.eventId)) rsvps[x.senderId] = x.content['response'] as String? ?? '';
+      }
+      final count = (String k) => rsvps.values.where((v) => v == k).length;
+      Widget rsvp(String k, String label, IconData i) => ChoiceChip(avatar: Icon(i, size: 16), label: Text('$label ${count(k)}'), selected: rsvps[me] == k,
+          onSelected: (_) => room.sendEvent({'meeting_id': id ?? e.eventId, 'response': k, 'body': '${{'yes': '✅', 'maybe': '❔', 'no': '❌'}[k]} $label'}, type: 'com.amerteams.meeting.rsvp'));
+      return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Column(children: [ListTile(leading: const Icon(Icons.event),
+        title: Text('${e.content['title'] as String? ?? 'Meeting'}${(e.content['recurrence'] ?? 'none') != 'none' ? ' · repeats ${e.content['recurrence']}' : ''}'),
         subtitle: Text('${st != null ? DateFormat('EEE d MMM, HH:mm').format(st) : ''} · ${e.content['duration_min']} min${id != null ? '\nID ${MeetingService.format(id)}' : ''}'),
         isThreeLine: id != null,
-        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))));
+        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 10), child: Wrap(spacing: 6, children: [
+          rsvp('yes', 'Accept', Icons.check), rsvp('maybe', 'Maybe', Icons.help_outline), rsvp('no', 'Decline', Icons.close)])),
+      ]));
     }
     if (e.type == PollEventContent.startType && tl != null) {
       final poll = e.parsedPollEventContent.pollStartContent;

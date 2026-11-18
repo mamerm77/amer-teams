@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../services/call_service.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
+import 'whiteboard_screen.dart';
 
 /// Encrypted call or meeting: video grid, participants, in-meeting chat, raise hand, reactions,
 /// screen share, camera switch, on-device captions, waiting room for the host, Amer minutes.
@@ -30,6 +31,82 @@ class _S extends State<CallScreen> {
   Timer? tick; EventsListener<RoomEvent>? ev;
   final chatInput = TextEditingController();
   Future<mx.Timeline>? _chatTl;   // loaded once, updates itself
+  StreamSubscription? _roomEvents;
+  String get me => room.client.userID!;
+  bool get isHost => room.getPowerLevelByUserId(me).level >= 50;
+  bool get attendee => call?.role == 'attendee';
+  String get callId => widget.meeting ? 'meet-${widget.roomId}' : (call?.callId ?? '');
+  Map<String, Object?> get meetingSettings => Map<String, Object?>.from(room.getState('com.amerteams.meeting.settings')?.content ?? {});
+  bool get webinar => meetingSettings['mode'] == 'webinar';
+  bool get locked => room.joinRules == mx.JoinRules.invite;
+  void _snack(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+
+  // ---------- host controls ----------
+  Future<void> _host(String action, {String? identity}) async {
+    try {
+      final r = await context.read<ApiService>().meetingControl(widget.roomId, callId, action, identity: identity);
+      _snack({'mute': 'Muted', 'mute_all': 'Muted ${r['affected']} participant(s)', 'stop_video': 'Video stopped', 'remove': 'Removed', 'end': 'Meeting ended for everyone'}[action] ?? 'Done');
+      if (action == 'end' && mounted) await _leave();
+    } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
+  }
+  Future<void> _setWebinar(bool on) async {
+    final st = meetingSettings..['mode'] = on ? 'webinar' : 'meeting';
+    await room.client.setRoomStateWithKey(room.id, 'com.amerteams.meeting.settings', '', st);
+    _snack(on ? 'Webinar mode on: new attendees can watch, chat and raise hands' : 'Webinar mode off'); setState(() {});
+  }
+  Future<void> _makePresenter(String userId) async {
+    final st = meetingSettings; final pres = ((st['presenters'] as List?) ?? []).cast<String>().toSet()..add(userId);
+    st['presenters'] = pres.toList();
+    await room.client.setRoomStateWithKey(room.id, 'com.amerteams.meeting.settings', '', st);
+    _snack('They can rejoin to speak and share video');
+  }
+  Future<void> _toggleLock() async {
+    await room.setJoinRules(locked ? mx.JoinRules.knock : mx.JoinRules.invite);
+    _snack(locked ? 'Meeting unlocked' : 'Meeting locked: nobody new can ask to join'); setState(() {});
+  }
+  void _shareLink() {
+    final mid = meetings.meetingIdOf(room);
+    final text = 'Join my Amer Teams meeting "${room.getLocalizedDisplayname()}"\n'
+        '${mid != null ? 'Meeting ID: ${MeetingService.format(mid)}\nOpen Amer Teams → Calls → Join with ID' : 'Open the chat in Amer Teams and tap Join'}';
+    Clipboard.setData(ClipboardData(text: text)); _snack('Invitation copied — paste it into an email or message');
+  }
+
+  // ---------- breakout rooms ----------
+  Future<void> _breakouts() async {
+    final members = room.getParticipants().where((u) => u.id != me).toList();
+    if (members.length < 2) { _snack('Breakout rooms need at least two other people in the meeting'); return; }
+    var n = 2;
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Breakout rooms'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('${members.length} participants will be split evenly.'),
+        Row(children: [const Text('Rooms'), Expanded(child: Slider(min: 2, max: members.length.clamp(2, 10).toDouble(), divisions: (members.length.clamp(2, 10) - 2).clamp(1, 8), value: n.toDouble(), label: '$n', onChanged: (v) => set(() => n = v.round()))), Text('$n')]),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Open rooms'))])));
+    if (ok != true) return;
+    final groups = List.generate(n, (_) => <String>[]);
+    for (var i = 0; i < members.length; i++) { groups[i % n].add(members[i].id); }
+    final rooms = <Map<String, Object?>>[];
+    for (var i = 0; i < n; i++) {
+      final (rid, _) = await meetings.create('${room.getLocalizedDisplayname()} · Room ${i + 1}', invite: groups[i]);
+      rooms.add({'room_id': rid, 'title': 'Room ${i + 1}', 'members': groups[i]});
+    }
+    await room.sendEvent({'rooms': rooms, 'body': '🚪 Breakout rooms are open'}, type: 'com.amerteams.breakout');
+    _snack('Breakout rooms opened');
+  }
+  void _onRoomEvent(mx.Event e) async {
+    if (e.roomId != widget.roomId || e.type != 'com.amerteams.breakout' || e.senderId == me) return;
+    final mine = ((e.content['rooms'] as List?) ?? []).cast<Map>().where((r) => (r['members'] as List).contains(me)).firstOrNull;
+    if (mine == null || !mounted) return;
+    final go = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Breakout room'),
+      content: Text('The host has moved you to ${mine['title']}.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Stay')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Join'))]));
+    if (go != true || !mounted) return;
+    final child = room.client.getRoomById(mine['room_id'] as String);
+    if (child != null && child.membership == mx.Membership.invite) await child.join();
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(roomId: mine['room_id'] as String, meeting: true, video: cam)));
+    _snack('Back in the main meeting');
+  }
   mx.Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
   MeetingService get meetings => MeetingService(context.read<MatrixService>());
 
@@ -44,6 +121,7 @@ class _S extends State<CallScreen> {
           : await SecureCall.join(api, room, widget.callId!, video: widget.video);
       call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
+      _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
       setState(() {});
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
   }
@@ -84,7 +162,7 @@ class _S extends State<CallScreen> {
     }
     if (mounted) Navigator.pop(context);
   }
-  @override void dispose() { tick?.cancel(); ev?.dispose(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+  @override void dispose() { tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
 
   // ---------- UI ----------
   @override
@@ -132,18 +210,38 @@ class _S extends State<CallScreen> {
           IconButton(tooltip: 'Participants', icon: Badge(isLabelVisible: waiting.isNotEmpty, label: Text('${waiting.length}'), child: const Icon(Icons.people)),
               onPressed: () => setState(() => panel = panel == _Panel.people ? _Panel.none : _Panel.people)),
           IconButton(tooltip: 'Chat', icon: const Icon(Icons.chat), onPressed: () => setState(() => panel = panel == _Panel.chat ? _Panel.none : _Panel.chat)),
+          PopupMenuButton<String>(tooltip: 'More', onSelected: (v) {
+            switch (v) {
+              case 'wb': Navigator.push(c, MaterialPageRoute(builder: (_) => WhiteboardScreen(roomId: widget.roomId)));
+              case 'share': _shareLink();
+              case 'breakout': _breakouts();
+              case 'muteall': _host('mute_all');
+              case 'lock': _toggleLock();
+              case 'webinar': _setWebinar(!webinar);
+              case 'end': _host('end');
+            }
+          }, itemBuilder: (_) => [
+            const PopupMenuItem(value: 'wb', child: ListTile(leading: Icon(Icons.draw), title: Text('Whiteboard'))),
+            const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share), title: Text('Copy invitation'))),
+            if (isHost && widget.meeting) const PopupMenuItem(value: 'breakout', child: ListTile(leading: Icon(Icons.call_split), title: Text('Breakout rooms'))),
+            if (isHost) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
+            if (isHost && widget.meeting) PopupMenuItem(value: 'lock', child: ListTile(leading: Icon(locked ? Icons.lock_open : Icons.lock), title: Text(locked ? 'Unlock meeting' : 'Lock meeting'))),
+            if (isHost && widget.meeting) PopupMenuItem(value: 'webinar', child: ListTile(leading: const Icon(Icons.campaign), title: Text(webinar ? 'Turn off webinar mode' : 'Webinar mode'))),
+            if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
+          ]),
         ]),
       body: Column(children: [
+        if (attendee) MaterialBanner(content: const Text('You are an attendee in this webinar. Raise your hand to ask to speak.'), actions: [TextButton(onPressed: _toggleHand, child: Text(myHand ? 'Lower hand' : 'Raise hand'))]),
         if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. The on-device transcript goes to the AI engine when you leave.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: const Text('Stop'))]),
         Expanded(child: wide || panel == _Panel.none
             ? Row(children: [Expanded(child: stage), if (panel != _Panel.none) SizedBox(width: 340, child: _panel(people, waiting))])
             : _panel(people, waiting)),
         if (captions) Container(width: double.infinity, padding: const EdgeInsets.all(12), color: cs.surfaceContainerHighest, child: Text(liveCaption.isEmpty ? 'Listening on this device…' : liveCaption)),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
-          _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
-          _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
-          if (cam) _btn(Icons.cameraswitch, 'Switch camera', _switchCamera),
-          _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
+          if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
+          if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
+          if (cam && !attendee) _btn(Icons.cameraswitch, 'Switch camera', _switchCamera),
+          if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
           _btn(Icons.back_hand, myHand ? 'Lower hand' : 'Raise hand', _toggleHand, off: myHand),
           PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
             itemBuilder: (_) => [for (final e in ['👍', '👏', '❤️', '😂', '😮', '🎉']) PopupMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 22)))]),
@@ -204,9 +302,16 @@ class _S extends State<CallScreen> {
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if (hands.contains(p.name)) const Text('✋ '),
             Icon(p.isMuted ? Icons.mic_off : Icons.mic, size: 18), const SizedBox(width: 6),
-            Icon(p.isCameraEnabled() ? Icons.videocam : Icons.videocam_off, size: 18)])),
+            Icon(p.isCameraEnabled() ? Icons.videocam : Icons.videocam_off, size: 18),
+            if (isHost && p is! LocalParticipant) PopupMenuButton<String>(onSelected: (a) => a == 'presenter' ? _makePresenter(p.identity) : _host(a, identity: p.identity),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'mute', child: Text('Mute')),
+                const PopupMenuItem(value: 'stop_video', child: Text('Stop video')),
+                if (webinar) const PopupMenuItem(value: 'presenter', child: Text('Make presenter')),
+                const PopupMenuItem(value: 'remove', child: Text('Remove from meeting'))]),
+          ])),
         const Divider(),
-        ListTile(leading: const Icon(Icons.person_add), title: const Text('Invite people'), subtitle: Text(meetings.meetingIdOf(room) != null ? 'Share meeting ID ${MeetingService.format(meetings.meetingIdOf(room)!)}' : 'Add people to this chat')),
+        ListTile(leading: const Icon(Icons.person_add), title: const Text('Invite people'), onTap: _shareLink, subtitle: Text(meetings.meetingIdOf(room) != null ? 'Share meeting ID ${MeetingService.format(meetings.meetingIdOf(room)!)}' : 'Add people to this chat')),
       ]));
     }
     return Material(child: Column(children: [Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 0), child: head),

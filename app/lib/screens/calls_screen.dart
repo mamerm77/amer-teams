@@ -64,7 +64,7 @@ class _S extends State<CallsScreen> {
   }
 
   Future<void> _schedule() async {
-    final title = TextEditingController(); var date = DateTime.now().add(const Duration(hours: 1)); var minutes = 30; var invite = <String, String>{};
+    final title = TextEditingController(); var date = DateTime.now().add(const Duration(hours: 1)); var minutes = 30; var invite = <String, String>{}; var repeat = 'none';
     final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Schedule a meeting'),
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
@@ -76,6 +76,10 @@ class _S extends State<CallsScreen> {
         }),
         DropdownButtonFormField<int>(value: minutes, decoration: const InputDecoration(labelText: 'Duration'),
           items: [for (final v in [15, 30, 45, 60, 90, 120]) DropdownMenuItem(value: v, child: Text('$v minutes'))], onChanged: (v) => set(() => minutes = v!)),
+        DropdownButtonFormField<String>(value: repeat, decoration: const InputDecoration(labelText: 'Repeats'),
+          items: const [DropdownMenuItem(value: 'none', child: Text('Does not repeat')), DropdownMenuItem(value: 'daily', child: Text('Every day')),
+            DropdownMenuItem(value: 'weekly', child: Text('Every week')), DropdownMenuItem(value: 'monthly', child: Text('Every month'))],
+          onChanged: (v) => set(() => repeat = v!)),
         const SizedBox(height: 8),
         Wrap(spacing: 6, children: [for (final e in invite.entries) Chip(label: Text(e.value), onDeleted: () => set(() => invite.remove(e.key)))]),
         TextButton.icon(icon: const Icon(Icons.person_add), label: const Text('Add people'), onPressed: () async {
@@ -86,7 +90,7 @@ class _S extends State<CallsScreen> {
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Schedule'))])));
     if (ok != true) return;
     try {
-      final (_, id) = await meet.create(title.text.trim().isEmpty ? 'Meeting' : title.text.trim(), invite: invite.keys.toList(), start: date, minutes: minutes);
+      final (_, id) = await meet.create(title.text.trim().isEmpty ? 'Meeting' : title.text.trim(), invite: invite.keys.toList(), start: date, minutes: minutes, recurrence: repeat);
       _err('Scheduled. Invites sent. Meeting ID ${MeetingService.format(id)} — it is in your Calendar.');
     } catch (e) { _err(e); }
   }

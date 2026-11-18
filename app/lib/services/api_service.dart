@@ -36,6 +36,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});
 
+  // ---------- Meeting host controls ----------
+  Future<Map<String, dynamic>> meetingControl(String roomId, String callId, String action, {String? identity}) =>
+      _post('/v1/meetings/control', {'room_id': roomId, 'call_id': callId, 'action': action, 'identity': identity});
+
   // ---------- Phone network ----------
   Future<Map<String, dynamic>> phonePolicy() async => jsonDecode((await http.get(_u('/v1/phone/policy'), headers: _h)).body);
   Future<Map<String, dynamic>> dial(String number) => _post('/v1/phone/dial', {'number': number});

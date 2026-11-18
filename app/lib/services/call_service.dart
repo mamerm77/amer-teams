@@ -21,6 +21,8 @@ class SecureCall {
   SecureCall(this.api, this.room, {required this.callId, this.video = true});
   final bool video;
   bool _caller = false;
+  String role = 'presenter';   // 'attendee' in webinar mode: watch, chat, react, raise hand
+  String? livekitRoom;
   DateTime? _joinedAt;
   final ApiService api;
   final mx.Room room;
@@ -159,11 +161,15 @@ class SecureCall {
   Future<void> _join() async {
     final t = await api.callToken(room.id, callId, _me);
     if (t['e2ee'] != 'required') throw StateError('Server did not confirm the encryption policy');
-    lk = Room(roomOptions: RoomOptions(adaptiveStream: true, dynacast: true, e2eeOptions: E2EEOptions(keyProvider: _keys)));
+    role = (t['role'] as String?) ?? 'presenter'; livekitRoom = t['livekit_room'] as String?;
+    lk = Room(roomOptions: RoomOptions(adaptiveStream: true, dynacast: true, e2eeOptions: E2EEOptions(keyProvider: _keys),
+        defaultAudioCaptureOptions: const AudioCaptureOptions(noiseSuppression: true, echoCancellation: true, autoGainControl: true, highPassFilter: true)));
     await lk.connect(t['url'], t['token']);
     await lk.e2eeManager?.setKeyIndex(keyIndex);
-    await lk.localParticipant?.setCameraEnabled(video);
-    await lk.localParticipant?.setMicrophoneEnabled(true);
+    if (role != 'attendee') {
+      await lk.localParticipant?.setCameraEnabled(video);
+      await lk.localParticipant?.setMicrophoneEnabled(true);
+    }
     _joinedAt = DateTime.now();
     lk.createListener().on<ParticipantDisconnectedEvent>((_) => _shareNewKey());
     _joined = true;

@@ -15,7 +15,7 @@ class MeetingService {
   static String clean(String id) => id.replaceAll(RegExp(r'[^0-9]'), '');
 
   /// Create a meeting room. Returns (roomId, meetingId).
-  Future<(String, String)> create(String title, {List<String> invite = const [], DateTime? start, int minutes = 30}) async {
+  Future<(String, String)> create(String title, {List<String> invite = const [], DateTime? start, int minutes = 30, String recurrence = 'none'}) async {
     final r = Random.secure();
     for (var attempt = 0; attempt < 5; attempt++) {
       final id = (100000000 + r.nextInt(900000000)).toString();
@@ -32,7 +32,7 @@ class MeetingService {
         final room = c.getRoomById(roomId)!;
         await room.sendEvent({
           'meeting_id': id, 'title': title.isEmpty ? 'Meeting ${format(id)}' : title,
-          'start': (start ?? DateTime.now()).toUtc().toIso8601String(), 'duration_min': minutes,
+          'start': (start ?? DateTime.now()).toUtc().toIso8601String(), 'duration_min': minutes, 'recurrence': recurrence,
           'body': '📅 ${title.isEmpty ? 'Meeting' : title} · ID ${format(id)}',
         }, type: 'com.amerteams.meeting');
         return (roomId, id);

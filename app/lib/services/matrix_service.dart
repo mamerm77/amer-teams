@@ -126,7 +126,15 @@ class MatrixService extends ChangeNotifier {
       final tl = await r.getTimeline();
       for (final e in tl.events.where((e) => e.type == 'com.amerteams.meeting')) {
         final st = DateTime.tryParse(e.content['start'] as String? ?? '');
-        if (st != null) out.add(Meeting(e.content['title'] as String? ?? 'Meeting', st.toLocal(), (e.content['duration_min'] as num?)?.toInt() ?? 30, r));
+        if (st == null) continue;
+        final title = e.content['title'] as String? ?? 'Meeting', mins = (e.content['duration_min'] as num?)?.toInt() ?? 30;
+        final rec = e.content['recurrence'] as String? ?? 'none';
+        var t = st.toLocal(); final horizon = DateTime.now().add(const Duration(days: 60));
+        for (var n = 0; n < (rec == 'none' ? 1 : 30) && t.isBefore(horizon); n++) {      // expand repeats for the next 60 days
+          out.add(Meeting(rec == 'none' ? title : '$title ↻', t, mins, r));
+          t = switch (rec) { 'daily' => t.add(const Duration(days: 1)), 'weekly' => t.add(const Duration(days: 7)),
+              'monthly' => DateTime(t.year, t.month + 1, t.day, t.hour, t.minute), _ => horizon };
+        }
       }
       tl.cancelSubscriptions();
     }

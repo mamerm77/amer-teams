@@ -4,12 +4,13 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest
 import asyncio
-from . import auth, livekit_token, agents, config, ops, db, admin, sip
+from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings
 
 app = FastAPI(title="Amer Teams Orchestrator", version="0.5.0")
 
 app.include_router(admin.router)
 app.include_router(sip.router)
+app.include_router(meetings.router)
 
 @app.on_event("startup")
 async def _start():
@@ -40,11 +41,12 @@ class CallReq(BaseModel):
 async def call_token(req: CallReq, user=Depends(auth.matrix_user)):
     await auth.assert_room_member(user, req.room_id)
     room = livekit_token.room_name(req.room_id, req.call_id)
-    tok = livekit_token.sign(user["user_id"], req.display_name or user["user_id"], room)
+    can_pub = await meetings.publish_allowed(user, req.room_id)      # webinar attendees cannot publish media
+    tok = livekit_token.sign(user["user_id"], req.display_name or user["user_id"], room, can_publish=can_pub)
     await audit(user["user_id"], "call.join", req.call_id)
     await db.call_session(req.call_id, room, req.room_id, user["user_id"])
     return {"url": config.LIVEKIT_PUBLIC_URL, "token": tok, "livekit_room": room,
-            "call_id": req.call_id, "e2ee": "required"}
+            "call_id": req.call_id, "e2ee": "required", "role": "presenter" if can_pub else "attendee"}
 
 # ---------- AI engine ----------
 class AskReq(BaseModel):
