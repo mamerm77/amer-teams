@@ -36,6 +36,11 @@ if ($hsText -match "registration_shared_secret_path") {
   ($hsText -replace "(?m)^registration_shared_secret_path:.*\r?\n", "") | Set-Content -Encoding ascii $hsPath
   Write-Host "Repaired Synapse config (removed duplicate registration secret)."
 }
+$hsText = Get-Content $hsPath -Raw
+if ($hsText -notmatch "(?m)^user_directory") {
+  Add-Content -Encoding ascii $hsPath "`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}"
+  Write-Host "Enabled the people directory (everyone can find each other)."
+}
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.local.yml restart synapse | Out-Null
 Start-Sleep 15
