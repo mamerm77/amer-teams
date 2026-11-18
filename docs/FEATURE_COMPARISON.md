@@ -2,6 +2,8 @@
 
 Research: November 2026, from current vendor and review sources. ✓ available · ◐ partial · ✗ not available · — not offered by that product.
 
+> **Status of the Amer Teams column (corrected 19 Nov 2026):** these features are written in the app code and their server side passes automated tests, but **none has yet been verified by using the app on a real device**. Treat every Amer Teams ✓ as "built, not yet verified in use" until the on-device UI test run with screenshots is complete.
+
 ## Chat
 | Feature | Teams | Zoom | WhatsApp | Telegram | Amer Teams |
 |---|---|---|---|---|---|
