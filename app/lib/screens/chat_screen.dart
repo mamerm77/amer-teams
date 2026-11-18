@@ -96,12 +96,12 @@ class _S extends State<ChatScreen> {
   }
 
   Future<void> _attachMenu() async {
-    final a = await showModalBottomSheet<String>(context: context, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    final a = await showModalBottomSheet<String>(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       ListTile(leading: const Icon(Icons.photo), title: const Text('Photo or file'), onTap: () => Navigator.pop(s, 'file')),
       ListTile(leading: const Icon(Icons.poll), title: const Text('Poll'), onTap: () => Navigator.pop(s, 'poll')),
       ListTile(leading: const Icon(Icons.checklist), title: const Text('Checklist'), onTap: () => Navigator.pop(s, 'check')),
       ListTile(leading: const Icon(Icons.schedule_send), title: const Text('Schedule a message'), onTap: () => Navigator.pop(s, 'later')),
-    ])));
+    ]))));
     if (a == 'file') await attach();
     if (a == 'poll') await _newPoll();
     if (a == 'check') await _newChecklist();
@@ -221,7 +221,12 @@ class _S extends State<ChatScreen> {
 
   Future<void> _actions(Event e) async {
     final mine = e.senderId == me;
-    final a = await showModalBottomSheet<String>(context: context, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    // Rules (docs/FEATURE_LOGIC.md): edit own text within 24 h; delete own within 2 days; moderators (power >= 50) any message.
+    final age = DateTime.now().difference(e.originServerTs);
+    final moderator = room.getPowerLevelByUserId(me).level >= 50;
+    final canEdit = mine && e.messageType == MessageTypes.Text && age < const Duration(hours: 24);
+    final canDelete = e.canRedact && ((mine && age < const Duration(days: 2)) || (!mine && moderator));
+    final a = await showModalBottomSheet<String>(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       Padding(padding: const EdgeInsets.all(12), child: Wrap(spacing: 8, children: [
         for (final r in ['👍', '❤️', '😂', '😮', '😢', '🙏']) ActionChip(label: Text(r, style: const TextStyle(fontSize: 22)), onPressed: () => Navigator.pop(s, 'react:$r'))])),
       ListTile(leading: const Icon(Icons.reply), title: const Text('Reply'), onTap: () => Navigator.pop(s, 'reply')),
@@ -232,9 +237,10 @@ class _S extends State<ChatScreen> {
       if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
       if (!mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.auto_awesome), title: const Text('Suggest a reply (Amer)'), onTap: () => Navigator.pop(s, 'suggest')),
       ListTile(leading: const Icon(Icons.copy), title: const Text('Copy'), onTap: () => Navigator.pop(s, 'copy')),
-      if (mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.edit), title: const Text('Edit'), onTap: () => Navigator.pop(s, 'edit')),
-      if (e.canRedact) ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: const Text('Delete for everyone'), onTap: () => Navigator.pop(s, 'delete')),
-    ])));
+      if (canEdit) ListTile(leading: const Icon(Icons.edit), title: const Text('Edit'), onTap: () => Navigator.pop(s, 'edit')),
+      if (canDelete) ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: Text(mine ? 'Delete for everyone' : 'Delete for everyone (moderator)'), onTap: () => Navigator.pop(s, 'delete')),
+      if (mine && !canEdit && e.messageType == MessageTypes.Text) const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Messages can be edited for 24 hours')),
+    ]))));
     if (a == null) return;
     if (a.startsWith('react:')) await room.sendReaction(e.eventId, a.substring(6));
     if (a == 'reply') setState(() { replyTo = e; editing = null; });
@@ -459,7 +465,8 @@ class _S extends State<ChatScreen> {
     }
     if (e.redacted) {
       return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Text('🚫 Message deleted', style: TextStyle(fontStyle: FontStyle.italic, color: cs.outline))));
+        child: Text(e.redactedBecause != null && e.redactedBecause!.senderId != e.senderId
+            ? '🚫 Deleted by ${e.redactedBecause!.senderFromMemoryOrFallback.calcDisplayname()}' : '🚫 This message was deleted', style: TextStyle(fontStyle: FontStyle.italic, color: cs.outline))));
     }
     final shown = tl == null ? e : e.getDisplayEvent(tl!);
     final edited = shown.eventId != e.eventId;
