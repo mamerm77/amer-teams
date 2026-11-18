@@ -19,31 +19,11 @@ if "ios" in sys.argv:
 	<key>UIBackgroundModes</key><array><string>audio</string><string>voip</string><string>remote-notification</string></array>
 """
     p.write_text(s.replace("<dict>", "<dict>\n" + add, 1))
-    pod = pathlib.Path("ios/Podfile")          # newer Flutter creates it only at first build
+    pod = pathlib.Path("ios/Podfile")          # Flutter generates it at first build; patch only if present
     if pod.exists():
-        t = pod.read_text(); t = re.sub(r"^#?\s*platform :ios, '[\d.]+'", "platform :ios, '14.0'", t, flags=re.M); pod.write_text(t)
-    else:
-        pod.write_text("platform :ios, '14.0'\n" + "\n".join([
-            "ENV['COCOAPODS_DISABLE_STATS'] = 'true'",
-            "project 'Runner', {'Debug' => :debug, 'Profile' => :release, 'Release' => :release}",
-            "def flutter_root",
-            "  generated = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)",
-            "  File.foreach(generated) { |l| m = l.match(/FLUTTER_ROOT\\=(.*)/); return m[1].strip if m }",
-            "end",
-            "require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)",
-            "flutter_ios_podfile_setup",
-            "target 'Runner' do",
-            "  use_frameworks!",
-            "  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))",
-            "end",
-            "post_install do |installer|",
-            "  installer.pods_project.targets.each do |t|",
-            "    flutter_additional_ios_build_settings(t)",
-            "    t.build_configurations.each { |c| c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0' }",
-            "  end",
-            "end", ""]))
+        t = pod.read_text(); t = re.sub(r"^#?\s*platform :ios, '[\d.]+'", "platform :ios, '15.0'", t, flags=re.M); pod.write_text(t)
     pbx = pathlib.Path("ios/Runner.xcodeproj/project.pbxproj"); t = pbx.read_text()
-    t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [\d.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 14.0;", t)
+    t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [\d.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 15.0;", t)
     t = t.replace("PRODUCT_BUNDLE_IDENTIFIER = com.amerteams.amerTeams;", "PRODUCT_BUNDLE_IDENTIFIER = com.amerteams.app;")
     pbx.write_text(t)
 if "windows" in sys.argv:

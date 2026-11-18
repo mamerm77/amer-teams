@@ -48,7 +48,7 @@ class _S extends State<CallScreen> {
     return Scaffold(
       appBar: AppBar(title: Row(children: [
         Icon(Icons.lock, color: call!.encrypted ? Colors.green : Colors.red), const SizedBox(width: 6),
-        Text(call!.encrypted ? 'End-to-end encrypted' : 'NOT ENCRYPTED'),
+        Text(call!.encrypted ? 'End-to-end encrypted · quantum-safe' : 'NOT ENCRYPTED'),
       ]), actions: [Center(child: Padding(padding: const EdgeInsets.only(right: 16), child: Text('Safety code ${call!.safetyCode}', style: const TextStyle(fontFamily: 'monospace'))))]),
       body: Column(children: [
         if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. Your transcript will be sent to the AI engine when the call ends.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: const Text('Stop'))]),

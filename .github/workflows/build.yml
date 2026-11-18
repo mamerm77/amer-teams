@@ -97,6 +97,8 @@ jobs:
         if: env.APPLE_TEAM_ID == ''
         working-directory: app
         run: |
+          flutter build ios --release --no-codesign --config-only
+          (cd ios && pod install --repo-update)
           flutter build ios --release --no-codesign
           mkdir -p build/unsigned/Payload && cp -R build/ios/iphoneos/Runner.app build/unsigned/Payload/
           cd build/unsigned && zip -qr ../AmerTeams-unsigned.ipa Payload
@@ -153,6 +155,7 @@ jobs:
         run: |
           flutter create . --org com.amerteams --project-name amer_teams --platforms=linux
           flutter pub get
+          flutter test          # includes ML-KEM / hybrid key vectors shared with the Python reference
           flutter build linux --release
       - uses: actions/upload-artifact@v4
         with: {name: amer-teams-linux, path: app/build/linux/x64/release/bundle/}

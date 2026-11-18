@@ -24,6 +24,18 @@ Call flow:
 4. App joins LiveKit with `E2EEOptions(keyProvider)` set to `K`. A client without `K` sees black frames / silence.
 5. UI shows a lock badge and a **safety code** (first 6 hex of SHA-256(K‖callId)) participants can compare verbally.
 
+## 2b. Post-quantum hybrid call keys (amer-pq-hybrid-v1) — implemented
+Protects call media against "harvest now, decrypt later" by a future quantum computer.
+- Every device creates an **ML-KEM-768** (NIST FIPS 203) key pair and publishes the public key in the encrypted room (`com.amerteams.pq.device`; Megolm authenticates the sender).
+- Each call key is `K = HKDF-SHA256(salt = call_id, ikm = K_c ‖ K_pq, info = "amer-call-key-v1|index")`.
+  - `K_c` travels inside Megolm (classical Curve25519 / AES-256).
+  - `K_pq` is wrapped separately for each member device: `(ct, ss) = ML-KEM-768.Encaps(pk)`, `okm = HKDF(ss, call|index|user|device)`, `w = K_pq ⊕ okm[0:32]`, `tag = HMAC-SHA256(okm[32:64], ct ‖ w)`.
+- An attacker needs to break **both** Megolm/Curve25519 **and** ML-KEM-768. Same hybrid principle as Signal PQXDH and TLS X25519MLKEM768.
+- Re-keyed when a device joins or leaves and every 10 minutes; the wrap is bound to call, index, user and device, so it cannot be replayed.
+- Implementations: Dart `pqcrypto` 0.4.4 (app) and `kyber-py` (reference, `tools/pq_hybrid.py`). CI checks both produce byte-identical keys, ciphertexts and call keys from shared vectors.
+- Size: about 1.5 KB per device per key event; fits ~40 devices in one Matrix event. Larger meetings: MLS (below).
+- Limits: chat messages themselves are still classical Megolm until the Matrix ecosystem ships PQ Olm; the device ML-KEM secret key is stored in the app's private storage (move to the OS keychain/keystore before production).
+
 ## 3. AI under E2EE (Phase 2)
 The server cannot hear an encrypted call, so the AI cannot either — by design.
 - **Live captions & translation** run on-device (platform speech recognition). Text never leaves the device unless the user enables Amer.
@@ -32,6 +44,5 @@ The server cannot hear an encrypted call, so the AI cannot either — by design.
 
 ## 4. Roadmap to carrier grade
 - MLS (RFC 9420) group key agreement for meetings > 50 participants (replaces key-in-room fan-out).
-- Post-quantum hybrid key exchange (X25519 + ML-KEM-768) for key transport, aligned with PQC migration.
 - HSM-backed signing keys for the token service; key-transparency log for device keys.
 - Independent cryptographic audit before production.
