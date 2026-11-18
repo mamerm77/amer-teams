@@ -1,10 +1,16 @@
-# Amer Teams — Test Report (v0.5)
+# Amer Teams — Test Report (v0.6)
 Date: 18 Nov 2026 · Live servers, no mocks: Synapse on **PostgreSQL 16**, LiveKit 1.8.0 on **Redis 7**, orchestrator on **PostgreSQL 16**, all behind **Caddy 2.8 TLS**.
 Re-run: `tests/protocol_conformance.py`, `tests/e2e_real.py`, `tests/registration_test.py`.
 
 ## Summary
+All suites run back to back by `tools/run_all_tests.sh` on live servers: **122/122 checks + 5/5 unit tests**.
+
 | Suite | Result |
 |---|---|
+| Post-quantum hybrid call keys (ML-KEM-768 + Megolm) | **14/14 PASS** |
+| Monitoring and alerting (real outages, tamper detection) | **18/18 PASS** |
+| High availability (replica crash, rolling restart, DB failover) | **9/9 PASS** |
+| Phone network (SIP trunks, policy, dial-out path) | **12/12 PASS** |
 | Protocol conformance (TLS, Matrix, Olm, Megolm, JWT, WSS, ICE, DTLS-SRTP, frame E2EE, PostgreSQL, audit) | **29/29 PASS** |
 | User creation and registration (invite codes, password policy, admin) | **26/26 PASS** |
 | Functional end-to-end (chat, calls, teams, files, meetings, telemetry) | **14/14 PASS** |
@@ -113,6 +119,81 @@ How accounts are created:
 | 25. Deactivation recorded in PostgreSQL: flag set, password and devices removed | PASS | flag=1, devices=0 |
 | 26. All admin actions in the audit log | PASS | ['admin.invite.create', 'admin.user.create', 'admin.user.deactivate',  |
 
+## Phase 3–4 detail
+
+### Post-quantum hybrid call keys
+| Check | Result | Evidence |
+|---|---|---|
+| A1. ML-KEM-768 sizes per FIPS 203 (pk 1184, sk 2400, ct 1088) | PASS |  |
+| A2. Each member device derives the same call key | PASS |  |
+| A3. Another device's secret key cannot open a wrap | PASS |  |
+| A4. Tampered ciphertext is rejected | PASS |  |
+| A5. Wrap cannot be replayed into another key index | PASS |  |
+| A6. Breaking only the classical layer (K_c) is not enough | PASS |  |
+| A7. Breaking only ML-KEM (K_pq) is not enough | PASS |  |
+| A8. Key changes with rotation index | PASS |  |
+| B1. Deterministic vectors written for the Dart client | PASS | 3 vectors |
+| C1. Device ML-KEM public keys exchanged inside encrypted room | PASS | 2 devices |
+| C2. Hybrid key event is 3 KB for 2 devices (Megolm-encrypted) | PASS |  |
+| C3. Recipient derives identical hybrid call key | PASS |  |
+| C4. Live call with hybrid key: member hears audio | PASS | tone energy 0.96 |
+| C5. Attacker holding only the classical secret hears nothing | PASS | tone energy 0.00 |
+
+Plus in CI: the Dart client (`pqcrypto`) reproduces the Python reference (`kyber-py`) vectors byte for byte (`flutter test`).
+
+### Monitoring and alerting
+| Check | Result | Evidence |
+|---|---|---|
+| 1. All 6 targets scraped | PASS | ai-engine=up, chat=up, media=up, postgres=up, prometheus=up, redis=up |
+| 2. AI engine reports 3/3 services up | PASS |  |
+| 3. Chat server metrics present | PASS |  |
+| 4. Media server metrics present | PASS | 299 series |
+| 5. PostgreSQL and Redis exporters report up | PASS |  |
+| 6. Audit-integrity metric is 1 | PASS |  |
+| 7. 8 alert rules loaded | PASS |  |
+| 8. Media outage: ServiceDown alert fires | PASS | after 21 s |
+| 9. Media outage: ProbeFailing alert fires | PASS |  |
+| 10. Alertmanager received the alerts | PASS |  |
+| 11. Alert written to tamper-evident audit log | PASS |  |
+| 12. App Health screen API lists the alert | PASS | ['ServiceDown', 'ProbeFailing'] |
+| 13. Media restored: alerts resolve | PASS |  |
+| 14. Resolution recorded in audit log | PASS |  |
+| 15. Redis outage: RedisDown alert fires | PASS |  |
+| 16. Redis restored: alert resolves | PASS |  |
+| 17. Tampered audit row: AuditLogTampered alert fires | PASS |  |
+| 18. Restored row: integrity metric back to 1 | PASS |  |
+
+### High availability
+| Check | Result | Evidence |
+|---|---|---|
+| C0. Standby streaming in synchronous mode | PASS | [('standby1', 'sync')] |
+| A0. 3 AI-engine replicas started | PASS |  |
+| A1. Load balancer up | PASS |  |
+| A2. Replica crash + rolling restart: zero failed requests | PASS | 1467 ok, 0 failed [] |
+| B1. Agent switched off on one replica is off on all 3 | PASS |  |
+| C1. Standby promoted to primary | PASS | in 0.2 s |
+| C2. RPO 0: every acknowledged write survived the crash | PASS | 117 acknowledged, 0 lost |
+| C3. Writes resumed on the new primary | PASS | 67 writes after failover |
+| C4. AI engine works against the new primary (multi-host connection) | PASS | 200/200 |
+
+Kubernetes manifests (`deploy/k8s`, 35 resources) pass strict schema validation for Kubernetes 1.31, CloudNativePG and Prometheus Operator.
+
+### Phone network (SIP)
+| Check | Result | Evidence |
+|---|---|---|
+| 1. Phone calls are off by default | PASS | Phone calls are switched off by your administrator |
+| 2. Only admins can change phone policy | PASS |  |
+| 3. Admin enables phone calls for +971 and +20 | PASS |  |
+| 4. Dialling without a phone line gives a clear error | PASS | No phone line (SIP trunk) is configured yet |
+| 5. Admin creates outbound + inbound trunk and inbound routing rule | PASS | {'outbound_trunk_id': 'ST_hKyGXDXrqmTa', 'inbound_trunk_id': 'ST_uknz9 |
+| 6. Outbound trunk uses SIP over TLS | PASS | SIP_TRANSPORT_TLS |
+| 7. Both trunks require encrypted media (SRTP) | PASS |  |
+| 8. Inbound calls routed to their own phone room | PASS |  |
+| 9. Trunk numbers must be E.164 | PASS |  |
+| 10. Local format, premium, satellite and non-allowed countries refused | PASS | {'0501234567': 400, '+1900555123': 403, '+9719001234': 403, '+44791112 |
+| 11. Allowed number accepted and sent to the SIP gateway | PASS | gateway not running here: The phone gateway could not place the call ( |
+| 12. Phone actions audited, numbers masked | PASS | ['phone.dial.failed: +971•••••••67 ServerError', 'phone.trunk.create:  |
+
 ## Databases
 | Database | Engine | Holds | Verified |
 |---|---|---|---|
@@ -122,6 +203,14 @@ How accounts are created:
 | Media files | Synapse media store | **encrypted** attachments | ciphertext only |
 | Phone/PC | SQLite (Matrix SDK) | local keys and message cache | — (app build pending) |
 Daily `pg_dump` of both databases, 14-day retention (`backup` service). No message text, transcripts or call keys are stored by the AI engine.
+
+## Defects found and fixed in v0.6
+1. **Replicas crashed when starting together** (simultaneous schema migration). Migrations now take a PostgreSQL advisory lock.
+2. **First request failed after a database failover** (stale pooled connection). Pool now validates connections before use.
+3. **Agent on/off applied to one replica only.** Every replica now reloads settings from PostgreSQL every 5 s.
+4. **Alertmanager would not start on a single server** (cluster mode). Clustering disabled for single-node deployments.
+5. **Deleting a phone line left it configured as the outbound line.** Fixed.
+6. **CI build fixes for current toolchains:** Matrix SDK 17, file_picker 13 (Android compileSdk 36), Firebase under CMake 4 (Windows), iOS package resolution.
 
 ## Defects found and fixed in v0.5
 1. **Sign-up would have failed in the app.** The server requires two auth stages (invite code, then a confirmation stage); the app completed only the first. Fixed in `matrix_service.dart` to complete every stage the server asks for.

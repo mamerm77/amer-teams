@@ -18,8 +18,8 @@ End-to-end encryption (E2EE) is the base of the product, not an option. There is
 The SFU forwards encrypted frames it cannot decrypt. The orchestrator issues LiveKit join tokens but **never sees the media key**.
 
 Call flow:
-1. Caller's app generates `K = random(32)` and `callId`.
-2. App posts `com.amerteams.call.key {callId, key: base64(K), keyIndex}` to the encrypted room → each member device receives it via Megolm.
+1. Caller's app generates `callId` and fresh key material (K_c, K_pq).
+2. App posts `com.amerteams.call.key` (protocol amer-pq-hybrid-v1, section 2b) to the encrypted room → each member device receives it via Megolm and derives K with its ML-KEM key.
 3. App asks orchestrator `POST /v1/calls/token` with its Matrix access token. Orchestrator verifies identity with Synapse `/whoami` and room membership, then signs a LiveKit JWT.
 4. App joins LiveKit with `E2EEOptions(keyProvider)` set to `K`. A client without `K` sees black frames / silence.
 5. UI shows a lock badge and a **safety code** (first 6 hex of SHA-256(K‖callId)) participants can compare verbally.
