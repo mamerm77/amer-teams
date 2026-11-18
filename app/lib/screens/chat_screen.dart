@@ -20,14 +20,17 @@ class _S extends State<ChatScreen> {
     await context.read<MatrixService>().sendText(room, t);
   }
   Future<void> attach() async {
-    final r = await FilePicker.platform.pickFiles(withData: true);
-    final f = r?.files.single; if (f?.bytes == null) return;
-    await context.read<MatrixService>().sendFile(room, f!.name, f.bytes!);
+    final files = await FilePicker.pickFiles();
+    if (files.isEmpty) return;
+    final f = files.first;
+    final bytes = await f.xFile.readAsBytes();
+    if (!mounted) return;
+    await context.read<MatrixService>().sendFile(room, f.name, bytes);   // encrypted before upload
   }
   Future<void> download(Event e) async {
     final file = await e.downloadAndDecryptAttachment();   // decrypts locally
-    final path = await FilePicker.platform.saveFile(fileName: file.name, bytes: file.bytes);
-    if (mounted && path != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved ${file.name}')));
+    final saved = await FilePicker.saveFile(fileName: file.name, bytes: file.bytes);
+    if (mounted && saved != null) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Saved ${file.name}')));
   }
   Future<void> summarise() async {
     final text = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(80).toList().reversed
