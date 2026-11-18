@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:io';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -20,6 +24,9 @@ class _S extends State<ChatScreen> {
   Timeline? tl; final input = TextEditingController(); final searchCtl = TextEditingController();
   Event? replyTo, editing; bool searching = false; Timer? typingOff; bool typing = false;
   final _thumbs = <String, Future<Uint8List?>>{};
+  final _rec = AudioRecorder(); DateTime? _recStart; String? _recPath;
+  final _player = AudioPlayer(); String? _playing;
+  Future<CachedPresence>? _presence;
   Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
   String get me => room.client.userID!;
 
@@ -27,10 +34,63 @@ class _S extends State<ChatScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       tl = await room.getTimeline(onUpdate: () { if (mounted) setState(() {}); _markRead(); });
+      final dm = room.directChatMatrixID; if (dm != null) _presence = room.client.fetchCurrentPresence(dm);
       _markRead(); setState(() {});
     });
   }
-  @override void dispose() { tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) room.setTyping(false); super.dispose(); }
+  @override void dispose() { tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) room.setTyping(false); _rec.dispose(); _player.dispose(); super.dispose(); }
+
+  // ---------- voice messages ----------
+  Future<void> _toggleRecord() async {
+    if (_recStart == null) {
+      if (!await _rec.hasPermission()) { _snack('Allow microphone access to record voice messages'); return; }
+      _recPath = '${(await getTemporaryDirectory()).path}/voice-${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _rec.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: _recPath!);
+      setState(() => _recStart = DateTime.now());
+      Timer.periodic(const Duration(seconds: 1), (t) { if (_recStart == null || !mounted) { t.cancel(); } else { setState(() {}); } });
+    } else {
+      final ms = DateTime.now().difference(_recStart!).inMilliseconds;
+      final path = await _rec.stop(); setState(() => _recStart = null);
+      if (path == null || ms < 700) return;
+      final bytes = await File(path).readAsBytes();
+      await room.sendFileEvent(MatrixAudioFile(bytes: bytes, name: 'Voice message.m4a', mimeType: 'audio/mp4', duration: ms),
+          extraContent: {'org.matrix.msc3245.voice': {}, 'org.matrix.msc1767.audio': {'duration': ms}});   // encrypted before upload
+    }
+  }
+  Future<void> _cancelRecord() async { await _rec.cancel(); setState(() => _recStart = null); }
+  Future<void> _play(Event e) async {
+    if (_playing == e.eventId) { await _player.stop(); setState(() => _playing = null); return; }
+    final f = await e.downloadAndDecryptAttachment();
+    setState(() => _playing = e.eventId);
+    await _player.play(BytesSource(f.bytes, mimeType: f.mimeType));
+    _player.onPlayerComplete.first.then((_) { if (mounted) setState(() => _playing = null); });
+  }
+
+  // ---------- polls ----------
+  Future<void> _newPoll() async {
+    final q = TextEditingController(); final opts = [TextEditingController(), TextEditingController()];
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Create poll'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: q, decoration: const InputDecoration(labelText: 'Question')),
+        for (var i = 0; i < opts.length; i++) TextField(controller: opts[i], decoration: InputDecoration(labelText: 'Option ${i + 1}')),
+        if (opts.length < 10) TextButton.icon(onPressed: () => set(() => opts.add(TextEditingController())), icon: const Icon(Icons.add), label: const Text('Add option')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send poll'))])));
+    final answers = opts.map((o) => o.text.trim()).where((t) => t.isNotEmpty).toList();
+    if (ok != true || q.text.trim().isEmpty || answers.length < 2) return;
+    await room.startPoll(question: q.text.trim(), kind: PollKind.disclosed,
+        answers: [for (var i = 0; i < answers.length; i++) PollAnswer(id: 'a$i', mText: answers[i])]);
+  }
+
+  Future<void> _attachMenu() async {
+    final a = await showModalBottomSheet<String>(context: context, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      ListTile(leading: const Icon(Icons.photo), title: const Text('Photo or file'), onTap: () => Navigator.pop(s, 'file')),
+      ListTile(leading: const Icon(Icons.poll), title: const Text('Poll'), onTap: () => Navigator.pop(s, 'poll')),
+    ])));
+    if (a == 'file') await attach();
+    if (a == 'poll') await _newPoll();
+  }
+  void _snack(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
 
   void _markRead() { final last = tl?.events.firstOrNull; if (last != null && last.senderId != me) tl!.setReadMarker(eventId: last.eventId); }
 
@@ -96,7 +156,7 @@ class _S extends State<ChatScreen> {
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    const shownTypes = {EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting'};
+    const shownTypes = {EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType};
     var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit).toList();
     final q = searchCtl.text.trim().toLowerCase();
     if (searching && q.isNotEmpty) evs = evs.where((e) => e.type == EventTypes.Message && e.body.toLowerCase().contains(q)).toList();
@@ -109,8 +169,14 @@ class _S extends State<ChatScreen> {
             ? TextField(controller: searchCtl, autofocus: true, decoration: const InputDecoration(hintText: 'Search messages', border: InputBorder.none), onChanged: (_) => setState(() {}))
             : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
-                Text(typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…' : '🔒 End-to-end encrypted · $members member${members == 1 ? '' : 's'}',
-                    style: Theme.of(c).textTheme.labelSmall?.copyWith(color: typers.isNotEmpty ? cs.primary : null)),
+                FutureBuilder<CachedPresence>(future: _presence, builder: (_, p) {
+                  final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
+                  final status = p.data?.statusMsg;
+                  final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
+                      : room.isDirectChat ? '${online ? 'Online' : 'Offline'}${status != null && status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
+                      : '🔒 End-to-end encrypted · $members member${members == 1 ? '' : 's'}';
+                  return Text(line, style: Theme.of(c).textTheme.labelSmall?.copyWith(color: typers.isNotEmpty || online ? cs.primary : null));
+                }),
               ]),
         actions: [
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
@@ -131,11 +197,19 @@ class _S extends State<ChatScreen> {
           Icon(editing != null ? Icons.edit : Icons.reply, size: 18), const SizedBox(width: 8),
           Expanded(child: Text(editing != null ? 'Editing message' : 'Replying to ${replyTo!.senderFromMemoryOrFallback.calcDisplayname()}: ${_text(replyTo!)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
           IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() { replyTo = null; editing = null; input.clear(); }))])),
-        SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
-          IconButton(tooltip: 'Share encrypted file or photo', icon: const Icon(Icons.add_circle_outline), onPressed: attach),
-          Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: _onTyping, textInputAction: TextInputAction.send,
-              decoration: const InputDecoration(hintText: 'Message', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => send())),
-          IconButton.filled(icon: Icon(editing != null ? Icons.check : Icons.send), onPressed: send)]))),
+        SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: _recStart != null
+          ? Row(children: [
+              IconButton(tooltip: 'Cancel', icon: const Icon(Icons.delete_outline), onPressed: _cancelRecord),
+              const Icon(Icons.fiber_manual_record, color: Colors.red), const SizedBox(width: 8),
+              Expanded(child: Text('Recording ${DateTime.now().difference(_recStart!).inSeconds}s · tap send to share (encrypted)')),
+              IconButton.filled(icon: const Icon(Icons.send), onPressed: _toggleRecord)])
+          : Row(children: [
+              IconButton(tooltip: 'Photo, file or poll', icon: const Icon(Icons.add_circle_outline), onPressed: _attachMenu),
+              Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: (t) { _onTyping(t); setState(() {}); }, textInputAction: TextInputAction.send,
+                  decoration: const InputDecoration(hintText: 'Message', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => send())),
+              input.text.trim().isEmpty && editing == null
+                  ? IconButton.filledTonal(tooltip: 'Record voice message', icon: const Icon(Icons.mic), onPressed: _toggleRecord)
+                  : IconButton.filled(icon: Icon(editing != null ? Icons.check : Icons.send), onPressed: send)]))),
       ]),
     );
   }
@@ -160,6 +234,22 @@ class _S extends State<ChatScreen> {
         isThreeLine: id != null,
         trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))));
     }
+    if (e.type == PollEventContent.startType && tl != null) {
+      final poll = e.parsedPollEventContent.pollStartContent;
+      final votes = e.getPollResponses(tl!); final mineVote = votes[me] ?? {};
+      final total = votes.length;
+      return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [const Icon(Icons.poll, size: 18), const SizedBox(width: 6), Expanded(child: Text(poll.question.mText, style: Theme.of(c).textTheme.titleSmall))]),
+        const SizedBox(height: 8),
+        for (final a in poll.answers) () {
+          final n = votes.values.where((v) => v.contains(a.id)).length;
+          return InkWell(onTap: () => e.answerPoll([a.id]), child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [Icon(mineVote.contains(a.id) ? Icons.radio_button_checked : Icons.radio_button_off, size: 18), const SizedBox(width: 6), Expanded(child: Text(a.mText)), Text('$n')]),
+            const SizedBox(height: 4), LinearProgressIndicator(value: total == 0 ? 0 : n / total)])));
+        }(),
+        Text('$total vote${total == 1 ? '' : 's'} · ${e.senderFromMemoryOrFallback.calcDisplayname()}', style: Theme.of(c).textTheme.labelSmall),
+      ])));
+    }
     if (e.redacted) {
       return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Text('🚫 Message deleted', style: TextStyle(fontStyle: FontStyle.italic, color: cs.outline))));
@@ -177,13 +267,19 @@ class _S extends State<ChatScreen> {
       body = FutureBuilder<Uint8List?>(future: _thumb(e), builder: (_, s) => s.data == null
           ? const SizedBox(width: 220, height: 160, child: Center(child: CircularProgressIndicator()))
           : GestureDetector(onTap: () => download(e), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(s.data!, width: 260, fit: BoxFit.cover))));
-    } else if (e.messageType == MessageTypes.File || e.messageType == MessageTypes.Video || e.messageType == MessageTypes.Audio) {
+    } else if (e.messageType == MessageTypes.Audio) {
+      final ms = (e.content.tryGetMap<String, Object?>('info')?['duration'] as num?)?.toInt() ?? 0;
+      body = Row(mainAxisSize: MainAxisSize.min, children: [
+        IconButton(icon: Icon(_playing == e.eventId ? Icons.stop_circle : Icons.play_circle, size: 34), onPressed: () => _play(e)),
+        const Icon(Icons.graphic_eq), const SizedBox(width: 8),
+        Text(ms > 0 ? '${ms ~/ 60000}:${((ms ~/ 1000) % 60).toString().padLeft(2, '0')}' : 'Voice message')]);
+    } else if (e.messageType == MessageTypes.File || e.messageType == MessageTypes.Video) {
       body = InkWell(onTap: () => download(e), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.insert_drive_file), const SizedBox(width: 8),
         Flexible(child: Text(e.body)), const SizedBox(width: 8), const Icon(Icons.download, size: 18)]));
     } else {
       body = Text(_text(e));
     }
-    final replyId = e.relationshipType == null ? e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String? : null;
+    final replyId = e.relationshipType == null ? (e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String?) : null;
     final replied = replyId == null || tl == null ? null : tl!.events.where((x) => x.eventId == replyId).firstOrNull;
 
     return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: GestureDetector(
