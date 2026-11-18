@@ -126,7 +126,7 @@ class CallManager {
         ]));
     });
     vib.cancel();
-    if (listener != null) c.removeListener(listener);   // the dialog is gone; never touch its context again
+    final l0 = listener; if (l0 != null) c.removeListener(l0);   // the dialog is gone; never touch its context again
     if (c.ended) {
       final msg = switch (c.sig.outcome) { CallOutcome.answeredElsewhere => 'Answered on another device', CallOutcome.missed => 'Missed call from ${c.peerName}', _ => null };
       if (msg != null && navigator.currentContext != null) ScaffoldMessenger.of(navigator.currentContext!).showSnackBar(SnackBar(content: Text(msg)));
