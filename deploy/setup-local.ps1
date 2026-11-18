@@ -58,6 +58,12 @@ $login = Invoke-RestMethod -Method Post -Uri "http://localhost/_matrix/client/v3
   -Body (@{type="m.login.password"; identifier=@{type="m.id.user"; user="admin"}; password=$pw; initial_device_display_name="Amer AI engine"} | ConvertTo-Json)
 Add-Content -Encoding ascii .env "SYNAPSE_ADMIN_TOKEN=$($login.access_token)"
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d orchestrator
-Write-Host "Admin created. Sign in to the app as 'admin', open Users and create invite codes for your team."
+Start-Sleep 8
+try {
+  $inv = Invoke-RestMethod -Method Post -Uri "http://localhost/api/v1/admin/invites" -ContentType "application/json" `
+    -Headers @{Authorization = "Bearer $($login.access_token)"} -Body '{"uses_allowed": 10, "expiry_days": 30}'
+  Write-Host "`nFirst invite code (10 sign-ups, valid 30 days):  $($inv.token)" -ForegroundColor Green
+} catch { Write-Host "Could not create an invite code yet; sign in as admin and use Users > New invite code." }
+Write-Host "Admin created. Sign in to the app as 'admin'. More invite codes: Users > New invite code."
 Write-Host "`nServer ready. In the app, sign in with server  http://$ip"
 Write-Host "Allow Windows Firewall: TCP 80, 7881 and UDP 50000-50100 if prompted."

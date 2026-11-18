@@ -11,4 +11,8 @@ TOKEN=$(curl -fsS -XPOST "https://${DOMAIN}/_matrix/client/v3/login" -H 'Content
   | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
 sed -i '/^SYNAPSE_ADMIN_TOKEN=/d' .env; echo "SYNAPSE_ADMIN_TOKEN=$TOKEN" >> .env
 docker compose up -d orchestrator
-echo "Done. Sign in to the app as '$U', open Users, and create invite codes for your team."
+sleep 8
+CODE=$(curl -fsS -XPOST "https://${DOMAIN}/api/v1/admin/invites" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"uses_allowed": 10, "expiry_days": 30}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])' || true)
+[ -n "$CODE" ] && echo "First invite code (10 sign-ups, valid 30 days): $CODE"
+echo "Done. Sign in to the app as '$U'. More invite codes: Users > New invite code."

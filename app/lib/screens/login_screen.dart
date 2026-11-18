@@ -31,7 +31,7 @@ class _S extends State<LoginScreen> {
         final p = pwProblem(pass.text);
         if (p != null) throw Exception(p);
         if (pass.text != pass2.text) throw Exception('Passwords do not match');
-        if (invite.text.trim().isEmpty) throw Exception('Enter the invite code from your administrator');
+        if (invite.text.trim().isEmpty) throw Exception('Enter an invite code. Your administrator creates one in Users → New invite code.');
         await m.register(server.text.trim(), user.text.trim().toLowerCase(), pass.text, invite.text, displayName: name.text.trim());
       } else {
         await m.login(server.text.trim(), user.text.trim(), pass.text);
@@ -55,7 +55,8 @@ class _S extends State<LoginScreen> {
       TextField(controller: pass, obscureText: true, decoration: InputDecoration(labelText: 'Password',
           helperText: signup ? '10+ characters with upper, lower, number and symbol' : null), onSubmitted: (_) => signup ? null : go()),
       if (signup) TextField(controller: pass2, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm password')),
-      if (signup) TextField(controller: invite, decoration: const InputDecoration(labelText: 'Invite code'), autocorrect: false),
+      if (signup) TextField(controller: invite, autocorrect: false, decoration: const InputDecoration(labelText: 'Invite code',
+          helperMaxLines: 3, helperText: 'Ask your administrator for a code. Administrators: sign in as admin and open Users → New invite code.')),
       if (err != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(err!, style: TextStyle(color: Theme.of(c).colorScheme.error))),
       const SizedBox(height: 20),
       FilledButton(onPressed: busy ? null : go, child: Text(busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in')),
