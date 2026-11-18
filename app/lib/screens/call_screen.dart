@@ -194,7 +194,11 @@ class _S extends State<CallScreen> {
     } catch (_) {}
   }
   Future<void> _send(Map<String, dynamic> m) => call!.lk.localParticipant!.publishData(utf8.encode(jsonEncode(m)), reliable: true, topic: 'meeting');
-  Future<void> _toggleHand() async { myHand = !myHand; await _send({'t': 'hand', 'up': myHand}); setState(() {}); }
+  Future<void> _toggleHand() async {
+    setState(() => myHand = !myHand);                       // immediate feedback, like Teams
+    try { await _send({'t': 'hand', 'up': myHand}); }
+    catch (e) { setState(() => myHand = !myHand); _snack('Could not raise your hand: check your connection'); }
+  }
   Future<void> _react(String e) async { await _send({'t': 'react', 'e': e}); setState(() => floating.add(('You', e, DateTime.now()))); }
 
   Future<void> _toggleCaptions() async {
@@ -247,7 +251,7 @@ class _S extends State<CallScreen> {
         for (final f in floating) Container(margin: const EdgeInsets.only(top: 4), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(color: cs.surface.withValues(alpha: .9), borderRadius: BorderRadius.circular(20)), child: Text('${f.$2}  ${f.$1}', style: const TextStyle(fontSize: 18))),
       ])),
-      if (hands.isNotEmpty) Positioned(left: 12, top: 12, child: Chip(avatar: const Text('✋'), label: Text(hands.join(', ')))),
+      if (hands.isNotEmpty || myHand) Positioned(left: 12, top: 12, child: Chip(avatar: const Text('✋'), label: Text([if (myHand) 'You', ...hands].join(', ')))),
       if (waiting.isNotEmpty) Positioned(left: 12, right: 12, top: 56, child: Card(color: cs.tertiaryContainer, child: Column(children: [
         for (final u in waiting) ListTile(leading: const Icon(Icons.hourglass_top), title: Text('${u.calcDisplayname()} is in the waiting room'),
           trailing: Wrap(spacing: 6, children: [
