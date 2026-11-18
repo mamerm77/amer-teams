@@ -26,7 +26,7 @@ if (-not (Test-Path synapse/homeserver.yaml)) {
   $hs = Get-Content synapse/homeserver.yaml -Raw
   $hs = $hs -replace "(?ms)^database:.*?(?=^\S)", "database:`n  name: psycopg2`n  args: {user: synapse, password: $($envs.POSTGRES_PASSWORD), database: synapse, host: postgres, cp_min: 5, cp_max: 10}`n"
   $hs = $hs -replace "listeners:`n", "listeners:`n  - port: 9000`n    type: metrics`n    bind_addresses: ['0.0.0.0']`n"
-  $hs = $hs.TrimEnd() + "`n"; $hs += "`nencryption_enabled_by_default_for_room_type: all`nenable_registration: true`nregistration_requires_token: true`npassword_config:`n  enabled: true`n  policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}`npublic_baseurl: http://$ip/`nenable_metrics: true`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}`n"
+  $hs = $hs.TrimEnd() + "`n"; $hs += "`nencryption_enabled_by_default_for_room_type: all`nenable_registration: true`nregistration_requires_token: true`npassword_config:`n  enabled: true`n  policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}`npublic_baseurl: http://$ip/`nenable_metrics: true`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}`nretention: {enabled: true, purge_jobs: [{interval: 1h}]}`n"
   Set-Content -Encoding ascii synapse/homeserver.yaml $hs
 }
 # Repair configs made by earlier versions: Synapse generates its own registration secret
@@ -40,6 +40,10 @@ $hsText = Get-Content $hsPath -Raw
 if ($hsText -notmatch "(?m)^user_directory") {
   Add-Content -Encoding ascii $hsPath "`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}"
   Write-Host "Enabled the people directory (everyone can find each other)."
+}
+if ((Get-Content $hsPath -Raw) -notmatch "(?m)^retention") {
+  Add-Content -Encoding ascii $hsPath "`nretention: {enabled: true, purge_jobs: [{interval: 1h}]}"
+  Write-Host "Enabled disappearing messages."
 }
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.local.yml restart synapse | Out-Null

@@ -34,6 +34,7 @@ public_baseurl: https://%s/
 max_upload_size: 200M
 enable_metrics: true
 user_directory: {enabled: true, search_all_users: true, prefer_local_users: true}
+retention: {enabled: true, purge_jobs: [{interval: 1h}]}
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY

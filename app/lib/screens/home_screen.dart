@@ -9,16 +9,17 @@ import 'calendar_screen.dart';
 import 'ops_screen.dart';
 import 'admin_screen.dart';
 import 'calls_screen.dart';
+import 'activity_screen.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> {
   int i = 0;
   static const _dest = [
-    (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),
+    (Icons.notifications_none, 'Activity'), (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),
     (Icons.auto_awesome, 'Amer'), (Icons.tune, 'Control'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users')];
   @override
   Widget build(BuildContext c) {
-    final pages = [const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const ControlScreen(), const OpsScreen(), const AdminScreen()];
+    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const ControlScreen(), const OpsScreen(), const AdminScreen()];
     final wide = MediaQuery.sizeOf(c).width > 720;
     final body = pages[i];
     if (wide) {
@@ -29,7 +30,7 @@ class _S extends State<HomeScreen> {
         const VerticalDivider(width: 1), Expanded(child: body)]));
     }
     // Phones: first four tabs plus "More" for Control, Health and Users.
-    const main = 4;
+    const main = 4;   // Activity, Chat, Calls, Teams
     return Scaffold(body: body, bottomNavigationBar: NavigationBar(
       selectedIndex: i < main ? i : main,
       onDestinationSelected: (v) async {

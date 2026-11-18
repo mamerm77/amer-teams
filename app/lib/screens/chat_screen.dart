@@ -16,10 +16,17 @@ import '../services/call_manager.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'call_screen.dart';
+import 'chat_info_screen.dart';
+import '../services/chat_extras.dart';
 
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
-class ChatScreen extends StatefulWidget { const ChatScreen({super.key, required this.roomId}); final String roomId; @override State<ChatScreen> createState() => _S(); }
+/// [threadRootId]: show one thread. [filesOnly]: show only shared files, photos and voice.
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key, required this.roomId, this.threadRootId, this.filesOnly = false});
+  final String roomId; final String? threadRootId; final bool filesOnly;
+  @override State<ChatScreen> createState() => _S();
+}
 class _S extends State<ChatScreen> {
   Timeline? tl; final input = TextEditingController(); final searchCtl = TextEditingController();
   Event? replyTo, editing; bool searching = false; Timer? typingOff; bool typing = false;
@@ -86,9 +93,13 @@ class _S extends State<ChatScreen> {
     final a = await showModalBottomSheet<String>(context: context, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
       ListTile(leading: const Icon(Icons.photo), title: const Text('Photo or file'), onTap: () => Navigator.pop(s, 'file')),
       ListTile(leading: const Icon(Icons.poll), title: const Text('Poll'), onTap: () => Navigator.pop(s, 'poll')),
+      ListTile(leading: const Icon(Icons.checklist), title: const Text('Checklist'), onTap: () => Navigator.pop(s, 'check')),
+      ListTile(leading: const Icon(Icons.schedule_send), title: const Text('Schedule a message'), onTap: () => Navigator.pop(s, 'later')),
     ])));
     if (a == 'file') await attach();
     if (a == 'poll') await _newPoll();
+    if (a == 'check') await _newChecklist();
+    if (a == 'later') await _sendLater();
   }
   void _snack(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
 
@@ -104,9 +115,83 @@ class _S extends State<ChatScreen> {
     final t = input.text.trim(); if (t.isEmpty) return; input.clear();
     typing = false; room.setTyping(false);
     if (!room.encrypted) throw StateError('Refusing to send in an unencrypted room');
-    if (editing != null) { await room.sendTextEvent(t, editEventId: editing!.eventId); }
-    else { await room.sendTextEvent(t, inReplyTo: replyTo); }
+    var text = t;
+    _mentions.forEach((name, id) => text = text.replaceAll('@$name', mentionMarkdown(name, id)));   // @Name -> pill
+    _mentions.clear();
+    if (editing != null) { await room.sendTextEvent(text, editEventId: editing!.eventId); }
+    else if (widget.threadRootId != null) {
+      final last = (tl?.events ?? []).where((e) => _inThread(e)).firstOrNull?.eventId ?? widget.threadRootId;
+      await room.sendTextEvent(text, threadRootEventId: widget.threadRootId, threadLastEventId: last, inReplyTo: replyTo);
+    } else { await room.sendTextEvent(text, inReplyTo: replyTo); }
     setState(() { replyTo = null; editing = null; });
+  }
+
+  // ---------- threads ----------
+  String? _threadOf(Event e) {
+    final r = e.content.tryGetMap<String, Object?>('m.relates_to');
+    return r?['rel_type'] == RelationshipTypes.thread ? r!['event_id'] as String? : null;
+  }
+  bool _inThread(Event e) => _threadOf(e) == widget.threadRootId;
+  int _replyCount(Event root) => (tl?.events ?? []).where((e) => _threadOf(e) == root.eventId).length;
+
+  // ---------- @mentions ----------
+  final _mentions = <String, String>{};   // display name -> user id
+  List<User> _mentionCandidates() {
+    final m = RegExp(r'@(\w*)$').firstMatch(input.text.substring(0, input.selection.baseOffset < 0 ? input.text.length : input.selection.baseOffset));
+    if (m == null) return [];
+    final q = m.group(1)!.toLowerCase();
+    return room.getParticipants().where((u) => u.id != me && (u.calcDisplayname().toLowerCase().contains(q) || u.id.toLowerCase().contains(q))).take(6).toList();
+  }
+  void _insertMention(User u) {
+    final name = u.calcDisplayname().replaceAll(' ', '_');
+    input.text = input.text.replaceFirst(RegExp(r'@\w*$'), '@$name ');
+    input.selection = TextSelection.collapsed(offset: input.text.length);
+    _mentions[name] = u.id; setState(() {});
+  }
+
+  // ---------- formatting ----------
+  void _wrap(String l, [String? r]) {
+    final sel = input.selection; final t = input.text;
+    final a = sel.start < 0 ? t.length : sel.start, b = sel.end < 0 ? t.length : sel.end;
+    input.text = t.substring(0, a) + l + t.substring(a, b) + (r ?? l) + t.substring(b);
+    input.selection = TextSelection.collapsed(offset: b + l.length);
+    setState(() {});
+  }
+  bool _format = false;
+
+  // ---------- send later ----------
+  Future<void> _sendLater() async {
+    final t = input.text.trim(); if (t.isEmpty) return;
+    final d = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 30)));
+    if (d == null || !mounted) return;
+    final tm = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(DateTime.now().add(const Duration(minutes: 5))));
+    if (tm == null) return;
+    final at = DateTime(d.year, d.month, d.day, tm.hour, tm.minute);
+    ScheduledSender.instance.add(room, t, at); input.clear();
+    _snack('Will send at ${DateFormat('d MMM HH:mm').format(at)} (keep the app open)');
+  }
+
+  // ---------- checklist ----------
+  Future<void> _newChecklist() async {
+    final title = TextEditingController(); final items = [TextEditingController(), TextEditingController()];
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Checklist'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
+        for (var i = 0; i < items.length; i++) TextField(controller: items[i], decoration: InputDecoration(labelText: 'Task ${i + 1}')),
+        TextButton.icon(onPressed: () => set(() => items.add(TextEditingController())), icon: const Icon(Icons.add), label: const Text('Add task'))])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))])));
+    final list = items.map((i) => i.text.trim()).where((t) => t.isNotEmpty).toList();
+    if (ok != true || list.isEmpty) return;
+    await room.sendEvent({'title': title.text.trim().isEmpty ? 'Checklist' : title.text.trim(), 'items': list,
+        'body': '☑ ${title.text.trim()}\n${list.map((t) => '☐ $t').join('\n')}'}, type: kChecklistEvent);
+  }
+  Map<int, bool> _ticks(Event cl) {
+    final out = <int, bool>{};
+    for (final e in (tl?.events ?? []).reversed) {
+      if (e.type == kChecklistTick && e.content['checklist'] == cl.eventId) out[(e.content['item'] as num).toInt()] = e.content['done'] == true;
+    }
+    return out;
+  }
   }
 
   Future<void> attach() async {
@@ -135,6 +220,12 @@ class _S extends State<ChatScreen> {
       Padding(padding: const EdgeInsets.all(12), child: Wrap(spacing: 8, children: [
         for (final r in ['👍', '❤️', '😂', '😮', '😢', '🙏']) ActionChip(label: Text(r, style: const TextStyle(fontSize: 22)), onPressed: () => Navigator.pop(s, 'react:$r'))])),
       ListTile(leading: const Icon(Icons.reply), title: const Text('Reply'), onTap: () => Navigator.pop(s, 'reply')),
+      if (widget.threadRootId == null) ListTile(leading: const Icon(Icons.forum_outlined), title: const Text('Reply in thread'), onTap: () => Navigator.pop(s, 'thread')),
+      ListTile(leading: const Icon(Icons.shortcut), title: const Text('Forward'), onTap: () => Navigator.pop(s, 'forward')),
+      ListTile(leading: Icon(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? Icons.bookmark_remove : Icons.bookmark_add_outlined),
+        title: Text(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? 'Remove from saved' : 'Save'), onTap: () => Navigator.pop(s, 'star')),
+      if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
+      if (!mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.auto_awesome), title: const Text('Suggest a reply (Amer)'), onTap: () => Navigator.pop(s, 'suggest')),
       ListTile(leading: const Icon(Icons.copy), title: const Text('Copy'), onTap: () => Navigator.pop(s, 'copy')),
       if (mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.edit), title: const Text('Edit'), onTap: () => Navigator.pop(s, 'edit')),
       if (e.canRedact) ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: const Text('Delete for everyone'), onTap: () => Navigator.pop(s, 'delete')),
@@ -145,19 +236,47 @@ class _S extends State<ChatScreen> {
     if (a == 'copy') await Clipboard.setData(ClipboardData(text: _text(e)));
     if (a == 'edit') setState(() { editing = e; replyTo = null; input.text = _text(e); });
     if (a == 'delete') await room.redactEvent(e.eventId);
+    if (a == 'thread' && mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId)));
+    if (a == 'star' && mounted) { await StarService(context.read<MatrixService>()).toggle(room.id, e.eventId); _snack('Saved messages updated'); }
+    if (a == 'forward' && mounted) {
+      final rooms = context.read<MatrixService>().chats;
+      final to = await showDialog<Room>(context: context, builder: (d) => SimpleDialog(title: const Text('Forward to'), children: [
+        for (final r in rooms) SimpleDialogOption(onPressed: () => Navigator.pop(d, r), child: Text(r.getLocalizedDisplayname()))]));
+      if (to != null) {
+        final content = Map<String, Object?>.from(e.content)..remove('m.relates_to')..remove('m.new_content');
+        await to.sendEvent(content, type: e.type == EventTypes.Encrypted ? EventTypes.Message : e.type);   // file keys travel inside, re-encrypted
+        _snack('Forwarded to ${to.getLocalizedDisplayname()}');
+      }
+    }
+    if ((a == 'translate' || a == 'suggest') && mounted) {
+      try {
+        final r = await context.read<ApiService>().ask(a == 'translate' ? 'Translate to ${Localizations.localeOf(context).languageCode == 'ar' ? 'English' : 'Arabic'}' : 'Suggest a short, polite reply to this message',
+            context: plainMentions(_text(e)), agent: a == 'translate' ? 'trans' : 'assist');
+        if (!mounted) return;
+        if (a == 'suggest') { setState(() => input.text = r['answer'] as String); } else {
+          showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SelectableText(r['answer'] as String)));
+        }
+      } catch (err) { _snack('$err'); }
+    }
   }
 
   /// Text without the quoted reply fallback.
   String _text(Event e) {
     final shown = tl == null ? e : e.getDisplayEvent(tl!);
-    return shown.body.split('\n').skipWhile((l) => l.startsWith('> ')).join('\n').trim();
+    return plainMentions(shown.body.split('\n').skipWhile((l) => l.startsWith('> ')).join('\n').trim());
   }
 
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    const shownTypes = {EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType};
-    var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit).toList();
+    const shownTypes = {EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
+    final lifetime = (room.getState('m.room.retention')?.content['max_lifetime'] as num?)?.toInt();
+    var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit
+        && (lifetime == null || DateTime.now().difference(e.originServerTs).inMilliseconds < lifetime)).toList();
+    evs = widget.threadRootId != null
+        ? evs.where((e) => e.eventId == widget.threadRootId || _inThread(e)).toList()
+        : evs.where((e) => _threadOf(e) == null).toList();
+    if (widget.filesOnly) evs = evs.where((e) => {MessageTypes.Image, MessageTypes.File, MessageTypes.Audio, MessageTypes.Video}.contains(e.messageType)).toList();
     final q = searchCtl.text.trim().toLowerCase();
     if (searching && q.isNotEmpty) evs = evs.where((e) => e.type == EventTypes.Message && e.body.toLowerCase().contains(q)).toList();
     final typers = room.typingUsers.where((u) => u.id != me).map((u) => u.calcDisplayname()).toList();
@@ -168,7 +287,7 @@ class _S extends State<ChatScreen> {
         title: searching
             ? TextField(controller: searchCtl, autofocus: true, decoration: const InputDecoration(hintText: 'Search messages', border: InputBorder.none), onChanged: (_) => setState(() {}))
             : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
+                Text(widget.threadRootId != null ? 'Thread' : widget.filesOnly ? 'Files and media' : room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
                 FutureBuilder<CachedPresence>(future: _presence, builder: (_, p) {
                   final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
                   final status = p.data?.statusMsg;
@@ -182,7 +301,14 @@ class _S extends State<ChatScreen> {
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
           IconButton(tooltip: 'Video call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
-          PopupMenuButton<String>(onSelected: (v) { if (v == 'sum') summarise(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
+          PopupMenuButton<String>(onSelected: (v) {
+            if (v == 'sum') summarise();
+            if (v == 'info') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatInfoScreen(roomId: room.id)));
+            if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
+          }, itemBuilder: (_) => const [
+            PopupMenuItem(value: 'info', child: Text('Chat info')),
+            PopupMenuItem(value: 'files', child: Text('Files and media')),
+            PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
@@ -197,6 +323,17 @@ class _S extends State<ChatScreen> {
           Icon(editing != null ? Icons.edit : Icons.reply, size: 18), const SizedBox(width: 8),
           Expanded(child: Text(editing != null ? 'Editing message' : 'Replying to ${replyTo!.senderFromMemoryOrFallback.calcDisplayname()}: ${_text(replyTo!)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
           IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() { replyTo = null; editing = null; input.clear(); }))])),
+        if (_mentionCandidates().isNotEmpty) Material(elevation: 2, child: Column(children: [for (final u in _mentionCandidates()) ListTile(dense: true,
+          leading: CircleAvatar(radius: 14, child: Text(u.calcDisplayname().characters.first.toUpperCase())), title: Text(u.calcDisplayname()), subtitle: Text(u.id), onTap: () => _insertMention(u))])),
+        if (_format) Row(children: [
+          IconButton(tooltip: 'Bold', icon: const Icon(Icons.format_bold), onPressed: () => _wrap('**')),
+          IconButton(tooltip: 'Italic', icon: const Icon(Icons.format_italic), onPressed: () => _wrap('_')),
+          IconButton(tooltip: 'Strikethrough', icon: const Icon(Icons.format_strikethrough), onPressed: () => _wrap('~~')),
+          IconButton(tooltip: 'Code', icon: const Icon(Icons.code), onPressed: () => _wrap('`')),
+          IconButton(tooltip: 'Quote', icon: const Icon(Icons.format_quote), onPressed: () => _wrap('> ', '')),
+          IconButton(tooltip: 'List', icon: const Icon(Icons.format_list_bulleted), onPressed: () => _wrap('- ', '')),
+        ]),
+        if (widget.filesOnly) const SizedBox.shrink() else
         SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: _recStart != null
           ? Row(children: [
               IconButton(tooltip: 'Cancel', icon: const Icon(Icons.delete_outline), onPressed: _cancelRecord),
@@ -204,12 +341,14 @@ class _S extends State<ChatScreen> {
               Expanded(child: Text('Recording ${DateTime.now().difference(_recStart!).inSeconds}s · tap send to share (encrypted)')),
               IconButton.filled(icon: const Icon(Icons.send), onPressed: _toggleRecord)])
           : Row(children: [
-              IconButton(tooltip: 'Photo, file or poll', icon: const Icon(Icons.add_circle_outline), onPressed: _attachMenu),
+              IconButton(tooltip: 'Photo, file, poll or checklist', icon: const Icon(Icons.add_circle_outline), onPressed: _attachMenu),
+              IconButton(tooltip: 'Formatting', icon: Icon(Icons.text_format, color: _format ? Theme.of(c).colorScheme.primary : null), onPressed: () => setState(() => _format = !_format)),
               Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: (t) { _onTyping(t); setState(() {}); }, textInputAction: TextInputAction.send,
                   decoration: const InputDecoration(hintText: 'Message', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => send())),
               input.text.trim().isEmpty && editing == null
                   ? IconButton.filledTonal(tooltip: 'Record voice message', icon: const Icon(Icons.mic), onPressed: _toggleRecord)
-                  : IconButton.filled(icon: Icon(editing != null ? Icons.check : Icons.send), onPressed: send)]))),
+                  : GestureDetector(onLongPress: editing == null ? _sendLater : null,
+                      child: IconButton.filled(tooltip: 'Send (long-press to schedule)', icon: Icon(editing != null ? Icons.check : Icons.send), onPressed: send))]))),
       ]),
     );
   }
@@ -250,6 +389,16 @@ class _S extends State<ChatScreen> {
         Text('$total vote${total == 1 ? '' : 's'} · ${e.senderFromMemoryOrFallback.calcDisplayname()}', style: Theme.of(c).textTheme.labelSmall),
       ])));
     }
+    if (e.type == kChecklistEvent) {
+      final items = (e.content['items'] as List? ?? []).cast<String>(); final ticks = _ticks(e);
+      return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ListTile(dense: true, leading: const Icon(Icons.checklist), title: Text(e.content['title'] as String? ?? 'Checklist'),
+          subtitle: Text('${ticks.values.where((v) => v).length}/${items.length} done · ${e.senderFromMemoryOrFallback.calcDisplayname()}')),
+        for (var i = 0; i < items.length; i++) CheckboxListTile(dense: true, value: ticks[i] ?? false, title: Text(items[i],
+            style: TextStyle(decoration: (ticks[i] ?? false) ? TextDecoration.lineThrough : null)),
+          onChanged: (v) => room.sendEvent({'checklist': e.eventId, 'item': i, 'done': v == true, 'body': '${v == true ? '☑' : '☐'} ${items[i]}'}, type: kChecklistTick)),
+      ])));
+    }
     if (e.redacted) {
       return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Text('🚫 Message deleted', style: TextStyle(fontStyle: FontStyle.italic, color: cs.outline))));
@@ -277,7 +426,8 @@ class _S extends State<ChatScreen> {
       body = InkWell(onTap: () => download(e), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.insert_drive_file), const SizedBox(width: 8),
         Flexible(child: Text(e.body)), const SizedBox(width: 8), const Icon(Icons.download, size: 18)]));
     } else {
-      body = Text(_text(e));
+      final mentioned = mentionsMe(e, me);
+      body = Container(color: mentioned && !mine ? cs.tertiaryContainer : null, child: Text(_text(e)));
     }
     final replyId = e.relationshipType == null ? (e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String?) : null;
     final replied = replyId == null || tl == null ? null : tl!.events.where((x) => x.eventId == replyId).firstOrNull;
@@ -300,6 +450,9 @@ class _S extends State<ChatScreen> {
             Text(DateFormat('HH:mm').format(e.originServerTs), style: Theme.of(c).textTheme.labelSmall),
             if (mine) Padding(padding: const EdgeInsets.only(left: 4), child: Icon(seen ? Icons.done_all : Icons.done, size: 14, color: seen ? cs.primary : null)),
           ]),
+          if (widget.threadRootId == null && _replyCount(e) > 0) TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+            onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId))),
+            icon: const Icon(Icons.forum_outlined, size: 16), label: Text('${_replyCount(e)} repl${_replyCount(e) == 1 ? 'y' : 'ies'}')),
           if (reactions.isNotEmpty) Wrap(spacing: 4, children: [for (final r in reactions.entries) Chip(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero,
             label: Text('${r.key} ${r.value}'))]),
         ]))));

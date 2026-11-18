@@ -1,0 +1,98 @@
+import 'dart:async';
+import 'package:matrix/matrix.dart';
+import 'call_manager.dart';
+import 'matrix_service.dart';
+import '../config.dart';
+
+const kStarredType = 'com.amerteams.starred';
+const kChecklistEvent = 'com.amerteams.checklist';
+const kChecklistTick = 'com.amerteams.checklist.tick';
+
+/// @mentions are sent as Matrix pills: [Name](https://matrix.to/#/@user:server) plus m.mentions.
+final mentionLink = RegExp(r'\[([^\]]+)\]\(https://matrix\.to/#/(@[^)]+)\)');
+String mentionMarkdown(String name, String userId) => '[$name](https://matrix.to/#/$userId)';
+String plainMentions(String body) => body.replaceAllMapped(mentionLink, (m) => '@${m[1]}');
+bool mentionsMe(Event e, String me) {
+  final ids = (e.content.tryGetMap<String, Object?>('m.mentions')?['user_ids'] as List?)?.cast<String>() ?? const [];
+  return ids.contains(me) || e.body.contains(me);
+}
+
+/// Saved / starred messages, kept in the user's (server-side, per-account) account data.
+class StarService {
+  StarService(this.m);
+  final MatrixService m;
+  Map<String, List<String>> get all {
+    final c = m.client.accountData[kStarredType]?.content ?? {};
+    return {for (final e in c.entries) e.key: (e.value as List).cast<String>()};
+  }
+  bool isStarred(String roomId, String eventId) => all[roomId]?.contains(eventId) ?? false;
+  Future<void> toggle(String roomId, String eventId) async {
+    final a = all; final l = a[roomId] ?? [];
+    l.contains(eventId) ? l.remove(eventId) : l.add(eventId);
+    a[roomId] = l;
+    await m.client.setAccountData(m.client.userID!, kStarredType, a);
+  }
+  Future<List<Event>> load() async {
+    final out = <Event>[];
+    for (final e in all.entries) {
+      final r = m.client.getRoomById(e.key); if (r == null) continue;
+      for (final id in e.value) { final ev = await r.getEventById(id); if (ev != null) out.add(ev); }
+    }
+    out.sort((a, b) => b.originServerTs.compareTo(a.originServerTs));
+    return out;
+  }
+}
+
+/// One line in the Activity feed.
+class Activity {
+  Activity(this.kind, this.room, this.event, this.text);
+  final String kind;   // mention, reply, reaction, missed_call
+  final Room room; final Event event; final String text;
+}
+
+class ActivityService {
+  ActivityService(this.m);
+  final MatrixService m;
+  Future<List<Activity>> load({int perRoom = 80}) async {
+    final me = m.client.userID!; final out = <Activity>[];
+    for (final r in m.rooms) {
+      final tl = await r.getTimeline();
+      try {
+        final mine = tl.events.where((e) => e.senderId == me).map((e) => e.eventId).toSet();
+        final joined = tl.events.where((e) => e.type == kCallJoinedEvent && e.senderId == me).map((e) => e.content['call_id']).toSet();
+        for (final e in tl.events.take(perRoom)) {
+          if (e.senderId == me) continue;
+          final who = e.senderFromMemoryOrFallback.calcDisplayname();
+          final rel = e.content.tryGetMap<String, Object?>('m.relates_to');
+          if (e.type == EventTypes.Reaction && mine.contains(rel?['event_id'])) {
+            out.add(Activity('reaction', r, e, '$who reacted ${rel?['key']}'));
+          } else if (e.type == kCallInviteEvent && !joined.contains(e.content['call_id'])) {
+            out.add(Activity('missed_call', r, e, 'Missed ${e.content['media'] == 'audio' ? 'voice' : 'video'} call from $who'));
+          } else if (e.type == EventTypes.Message) {
+            final replyTo = rel?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'];
+            if (mentionsMe(e, me)) { out.add(Activity('mention', r, e, '$who mentioned you: ${plainMentions(e.body)}')); }
+            else if (replyTo != null && mine.contains(replyTo)) { out.add(Activity('reply', r, e, '$who replied: ${plainMentions(e.body).split('\n').where((l) => !l.startsWith('> ')).join(' ')}')); }
+          }
+        }
+      } finally { tl.cancelSubscriptions(); }
+    }
+    out.sort((a, b) => b.event.originServerTs.compareTo(a.event.originServerTs));
+    return out.take(200).toList();
+  }
+}
+
+/// Send later: queued messages go out at their time while the app is open (checked every 15 s).
+class ScheduledSender {
+  ScheduledSender._();
+  static final instance = ScheduledSender._();
+  final queue = <(Room, String, DateTime)>[];
+  Timer? _t;
+  void add(Room r, String text, DateTime at) {
+    queue.add((r, text, at));
+    _t ??= Timer.periodic(const Duration(seconds: 15), (_) => _flush());
+  }
+  void _flush() {
+    final now = DateTime.now();
+    for (final q in queue.where((q) => !q.$3.isAfter(now)).toList()) { q.$1.sendTextEvent(q.$2); queue.remove(q); }
+  }
+}
