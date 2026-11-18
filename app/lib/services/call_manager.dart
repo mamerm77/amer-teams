@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:matrix/matrix.dart';
+import 'package:matrix/matrix.dart' hide CallState;
 import '../config.dart';
 import '../screens/call_screen.dart';
 import 'api_service.dart';

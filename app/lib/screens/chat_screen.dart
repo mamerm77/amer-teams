@@ -28,11 +28,11 @@ class ChatScreen extends StatefulWidget {
   @override State<ChatScreen> createState() => _S();
 }
 class _S extends State<ChatScreen> {
-  final _presence = <String, (Future<int>, DateTime)>{};
+  final _meetLive = <String, (Future<int>, DateTime)>{};
   Future<int> _live(String callId) {
-    final c = _presence[callId];
+    final c = _meetLive[callId];
     if (c != null && DateTime.now().difference(c.$2).inSeconds < 15) return c.$1;
-    final f = context.read<ApiService>().presence(room.id, callId); _presence[callId] = (f, DateTime.now()); return f;
+    final f = context.read<ApiService>().presence(room.id, callId); _meetLive[callId] = (f, DateTime.now()); return f;
   }
   Timeline? tl; final input = TextEditingController(); final searchCtl = TextEditingController();
   Event? replyTo, editing; bool searching = false; Timer? typingOff; bool typing = false;
@@ -506,6 +506,9 @@ class _S extends State<ChatScreen> {
             if (edited) Text('edited · ', style: Theme.of(c).textTheme.labelSmall),
             Text(DateFormat('HH:mm').format(e.originServerTs), style: Theme.of(c).textTheme.labelSmall),
             if (mine) Padding(padding: const EdgeInsets.only(left: 4), child: _status(c, e, read)),
+            const SizedBox(width: 6),
+            InkWell(key: ValueKey('msg-options-${e.eventId}'), borderRadius: BorderRadius.circular(10), onTap: () => _actions(e),
+              child: Tooltip(message: 'Reply, react, forward, edit, delete…', child: Icon(Icons.more_horiz, size: 18, color: cs.onSurfaceVariant))),
           ]),
           if (widget.threadRootId == null && _replyCount(e) > 0) TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId))),

@@ -26,6 +26,7 @@ class _S extends State<HomeScreen> {
     if (wide) {
       return Scaffold(body: Row(children: [
         NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all,
+          leading: const Tooltip(message: 'Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', child: Text('b${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')}', style: TextStyle(fontSize: 10))),
           trailing: IconButton(icon: const Icon(Icons.logout), onPressed: () => c.read<MatrixService>().logout()),
           destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(d.$2))]),
         const VerticalDivider(width: 1), Expanded(child: body)]));
@@ -38,6 +39,8 @@ class _S extends State<HomeScreen> {
         if (v < main) { setState(() => i = v); return; }
         final pick = await showModalBottomSheet<int>(context: c, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
           for (var k = main; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(_dest[k].$2), onTap: () => Navigator.pop(s, k)),
+          const ListTile(leading: Icon(Icons.info_outline), title: Text('About Amer Teams'),
+            subtitle: Text('Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}')),
           ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () { Navigator.pop(s); c.read<MatrixService>().logout(); }),
         ])));
         if (pick != null) setState(() => i = pick);
