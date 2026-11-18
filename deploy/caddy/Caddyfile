@@ -1,0 +1,27 @@
+{$DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	# Matrix client-server API
+	handle /_matrix/* {
+		reverse_proxy synapse:8008
+	}
+	handle /_synapse/client/* {
+		reverse_proxy synapse:8008
+	}
+	handle /.well-known/matrix/client {
+		header Content-Type application/json
+		respond `{"m.homeserver":{"base_url":"https://{$DOMAIN}"},"org.amerteams.api":{"base_url":"https://{$DOMAIN}/api"}}`
+	}
+	# Push gateway (APNs / FCM)
+	handle /_matrix/push/* {
+		reverse_proxy sygnal:5000
+	}
+	# LiveKit signalling (media itself goes over UDP 50000-50100)
+	handle_path /livekit/* {
+		reverse_proxy livekit:7880
+	}
+	# AI engine + call token service
+	handle_path /api/* {
+		reverse_proxy orchestrator:8080
+	}
+}

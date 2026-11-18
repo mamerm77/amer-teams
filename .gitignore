@@ -1,0 +1,9 @@
+deploy/.env
+deploy/synapse/*
+!deploy/synapse/.keep
+__pycache__/
+.pytest_cache/
+app/build/
+app/.dart_tool/
+installer/stage/
+installer/*.exe

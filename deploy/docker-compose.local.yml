@@ -1,0 +1,12 @@
+# LAN test mode: no domain, plain HTTP for signalling. Media is still end-to-end encrypted
+# (AES-GCM frame encryption) and DTLS-SRTP; only the API hop is unencrypted on your Wi-Fi.
+services:
+  livekit:
+    command: --config /etc/livekit.yaml --node-ip ${LAN_IP}
+  orchestrator:
+    environment:
+      LIVEKIT_PUBLIC_URL: ws://${LAN_IP}/livekit
+  caddy:
+    ports: !override ["80:80"]
+    volumes: !override
+      - ./local/Caddyfile:/etc/caddy/Caddyfile:ro

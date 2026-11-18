@@ -1,0 +1,14 @@
+# Push gateway. Fill in after creating your Apple and Firebase credentials (see docs/PUSH.md).
+http: {bind_addresses: ['0.0.0.0'], port: 5000}
+apps:
+  com.amerteams.app.ios:
+    type: apns
+    keyfile: /secrets/AuthKey.p8
+    key_id: YOUR_KEY_ID
+    team_id: YOUR_TEAM_ID
+    topic: com.amerteams.app
+  com.amerteams.app.android:
+    type: gcm
+    api_version: v1
+    project_id: YOUR_FIREBASE_PROJECT_ID
+    service_account_file: /secrets/fcm-service-account.json

@@ -1,0 +1,93 @@
+name: Build Amer Teams apps
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r services/orchestrator/requirements.txt && cd services/orchestrator && pytest -q
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: subosito/flutter-action@v2
+        with: {channel: stable}
+      - working-directory: app
+        run: |
+          flutter create . --org com.amerteams --project-name amer_teams --platforms=android
+          python3 ../tools/patch_native.py android
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with: {name: amer-teams-android, path: app/build/app/outputs/flutter-apk/app-release.apk}
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: {channel: stable}
+      - name: Build Windows app
+        working-directory: app
+        shell: bash
+        run: |
+          flutter create . --org com.amerteams --project-name amer_teams --platforms=windows
+          python ../tools/patch_native.py windows
+          flutter pub get
+          flutter build windows --release
+      - name: Add Visual C++ runtime next to the app
+        shell: pwsh
+        run: |
+          $rel = "app/build/windows/x64/runner/Release"
+          foreach ($d in "msvcp140.dll","vcruntime140.dll","vcruntime140_1.dll") { Copy-Item "$env:WINDIR\System32\$d" $rel }
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          bash installer/stage_server.sh
+          $v = (Select-String -Path app/pubspec.yaml -Pattern '^version: (\S+?)\+').Matches[0].Groups[1].Value
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /DVERSION=$v /DAPPDIR=..\app\build\windows\x64\runner\Release /DSERVERDIR=stage\server installer\amer-teams.nsi
+          "INSTALLER=installer/AmerTeams-Setup-$v.exe" | Out-File -Append $env:GITHUB_ENV
+      - name: Test installer (silent install, launch, uninstall)
+        shell: pwsh
+        run: |
+          Start-Process $env:INSTALLER -ArgumentList "/S" -Wait
+          $dir = "$env:ProgramFiles\Amer Teams"
+          if (-not (Test-Path "$dir\amer_teams.exe")) { throw "app not installed" }
+          if (-not (Test-Path "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Amer Teams\Amer Teams.lnk")) { throw "Start menu shortcut missing" }
+          $reg = Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\AmerTeams"
+          if ($reg.DisplayName -ne "Amer Teams") { throw "Installed-apps entry missing" }
+          $p = Start-Process "$dir\amer_teams.exe" -PassThru; Start-Sleep 15
+          if ($p.HasExited) { throw "app exited on launch with code $($p.ExitCode)" }
+          Stop-Process $p -Force
+          Start-Process "$dir\Uninstall.exe" -ArgumentList "/S" -Wait; Start-Sleep 5
+          if (Test-Path "$dir\amer_teams.exe") { throw "uninstall left files behind" }
+          Write-Host "Installer test passed: install, shortcuts, registry, launch, uninstall"
+      - uses: actions/upload-artifact@v4
+        with: {name: AmerTeams-Setup-windows, path: installer/AmerTeams-Setup-*.exe}
+      - name: Attach installer to release (tags v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with: {files: installer/AmerTeams-Setup-*.exe}
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev libjsoncpp-dev
+      - uses: subosito/flutter-action@v2
+        with: {channel: stable}
+      - working-directory: app
+        run: |
+          flutter create . --org com.amerteams --project-name amer_teams --platforms=linux
+          flutter pub get
+          flutter build linux --release
+      - uses: actions/upload-artifact@v4
+        with: {name: amer-teams-linux, path: app/build/linux/x64/release/bundle/}

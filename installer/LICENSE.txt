@@ -1,0 +1,8 @@
+Amer Teams
+Copyright (c) 2026 Amer Telecom. All rights reserved.
+
+This software is provided for evaluation and internal use. It includes open-source
+components under their own licences, including Flutter (BSD-3-Clause), the Matrix
+Dart SDK (AGPL-3.0), Synapse (AGPL-3.0), LiveKit (Apache-2.0) and Caddy (Apache-2.0).
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.

@@ -1,0 +1,15 @@
+:80 {
+	handle /_matrix/* {
+		reverse_proxy synapse:8008
+	}
+	handle /_synapse/client/* {
+		reverse_proxy synapse:8008
+	}
+	handle_path /livekit/* {
+		reverse_proxy livekit:7880
+	}
+	handle_path /api/* {
+		reverse_proxy orchestrator:8080
+	}
+	respond "Amer Teams local server is running" 200
+}
