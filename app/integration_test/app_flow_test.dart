@@ -120,7 +120,9 @@ void main() {
       await tap(find.text('Save'), 'Save');
     });
     await step('Create a poll', () async {
+      await wait(2);
       await tap(find.byTooltip('Photo, file, poll or checklist'), 'attach menu');
+      if (!await waitFor(find.text('Poll'), secs: 3)) await tap(find.byTooltip('Photo, file, poll or checklist'), 'attach menu (again)');
       await tap(find.text('Poll'), 'Poll');
       await type(field('Question'), 'Lunch at 1pm?', 'question');
       await type(field('Option 1'), 'Yes', 'option 1'); await type(field('Option 2'), 'No', 'option 2');

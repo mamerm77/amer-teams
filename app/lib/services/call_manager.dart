@@ -109,10 +109,12 @@ class CallManager {
   Future<void> _ring(CallController c) async {
     final ctx = navigator.currentContext; if (ctx == null) return;
     final vib = Timer.periodic(const Duration(seconds: 2), (_) => HapticFeedback.heavyImpact());
+    VoidCallback? listener;
     final accept = await showDialog<bool>(context: ctx, barrierDismissible: false, builder: (d) {
       // closes itself when the call ends without us (caller cancelled, timeout, answered on another device)
-      void l() { if (c.ended && Navigator.of(d).canPop()) Navigator.pop(d, false); }
+      void l() { if (d.mounted && c.ended && Navigator.of(d).canPop()) Navigator.pop(d, false); }
       c.addListener(l);
+      listener = l;
       return PopScope(canPop: false, child: AlertDialog(
         icon: Icon(c.video ? Icons.videocam : Icons.call, size: 40),
         title: Text(c.peerName ?? 'Incoming call'),
@@ -124,6 +126,7 @@ class CallManager {
         ]));
     });
     vib.cancel();
+    if (listener != null) c.removeListener(listener);   // the dialog is gone; never touch its context again
     if (c.ended) {
       final msg = switch (c.sig.outcome) { CallOutcome.answeredElsewhere => 'Answered on another device', CallOutcome.missed => 'Missed call from ${c.peerName}', _ => null };
       if (msg != null && navigator.currentContext != null) ScaffoldMessenger.of(navigator.currentContext!).showSnackBar(SnackBar(content: Text(msg)));
