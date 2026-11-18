@@ -1,0 +1,16 @@
+# Where alerts go. Replace the webhook with Teams/Slack/e-mail/SMS as needed.
+route:
+  receiver: ops
+  group_by: [alertname, severity]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: ops
+      repeat_interval: 30m
+receivers:
+  - name: ops
+    webhook_configs:
+      - url: http://orchestrator:8080/v1/ops/alert-webhook
+        send_resolved: true

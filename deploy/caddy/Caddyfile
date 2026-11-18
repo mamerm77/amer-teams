@@ -20,6 +20,10 @@
 	handle_path /livekit/* {
 		reverse_proxy livekit:7880
 	}
+	# Grafana dashboards (sign in with GRAFANA_ADMIN_PASSWORD)
+	handle /grafana/* {
+		reverse_proxy grafana:3000
+	}
 	# AI engine + call token service
 	handle_path /api/* {
 		reverse_proxy orchestrator:8080

@@ -18,6 +18,7 @@ async def _start():
     asyncio.create_task(ops.loop())
 REQ = Counter("amer_agent_requests_total", "Agent requests", ["agent"])
 LAT = Histogram("amer_agent_latency_seconds", "Agent latency", ["agent"])
+ERR = Counter("amer_agent_errors_total", "Agent requests that failed", ["agent"])
 
 async def audit(user, action, detail=""):
     await db.audit(user, action, detail)
@@ -60,6 +61,7 @@ async def ask(req: AskReq, user=Depends(auth.matrix_user)):
         res = await agents.run(req.prompt, req.context, req.labels, req.agent)
     REQ.labels(res["agent"]).inc()
     status = "blocked" if res.get("blocked") else "error" if res.get("error") else "ok"
+    if status == "error": ERR.labels(res["agent"]).inc()
     await db.ai_request(user["user_id"], res["agent"], status, int((time.perf_counter() - t0) * 1000))
     await audit(user["user_id"], "ai.ask", f'{res["agent"]}:{status}')
     return res
@@ -95,6 +97,26 @@ async def ops_status(user=Depends(auth.matrix_user)):
             "history": [{"ts": h["ts"], "latency": {p["service"]: p["latency_ms"] for p in h["services"]},
                          "calls": h["media"].get("active_calls"), "participants": h["media"].get("participants")}
                         for h in list(ops.HISTORY)[-120:]]}
+
+@app.get("/v1/ops/alerts")
+async def ops_alerts(user=Depends(auth.matrix_user)):
+    """Firing alerts from Alertmanager, for the app's Health screen."""
+    if not config.ALERTMANAGER_URL: return []
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=4) as c:
+            r = await c.get(f"{config.ALERTMANAGER_URL}/api/v2/alerts", params={"active": "true", "silenced": "false"})
+        return [{"name": a["labels"].get("alertname"), "severity": a["labels"].get("severity", "warning"),
+                 "summary": a["annotations"].get("summary", ""), "since": a.get("startsAt")} for a in r.json()]
+    except Exception as e:
+        return [{"name": "MonitoringUnreachable", "severity": "warning", "summary": f"Alertmanager not reachable: {type(e).__name__}", "since": None}]
+
+@app.post("/v1/ops/alert-webhook")
+async def alert_webhook(payload: dict):
+    """Alertmanager notifications: recorded in the tamper-evident audit log."""
+    for a in payload.get("alerts", []):
+        await db.audit("alertmanager", f"alert.{a.get('status', 'firing')}", f"{a['labels'].get('alertname')}: {a['annotations'].get('summary', '')}"[:300])
+    return {"ok": True}
 
 # ---------- Scheduler (structured meeting intent) ----------
 class SchedReq(BaseModel):

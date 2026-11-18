@@ -1,3 +1,4 @@
+prometheus_port: 6789
 port: 7880
 rtc:
   tcp_port: 7881

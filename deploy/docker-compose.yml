@@ -46,6 +46,7 @@ services:
       LIVEKIT_PUBLIC_URL: wss://${DOMAIN}/livekit
       LIVEKIT_HTTP_URL: http://livekit:7880
       DATABASE_URL: postgresql://synapse:${POSTGRES_PASSWORD}@postgres:5432/amer
+      ALERTMANAGER_URL: http://alertmanager:9093
     depends_on:
       postgres: {condition: service_healthy}
       synapse: {condition: service_started}
@@ -58,6 +59,31 @@ services:
     environment: {PGPASSWORD: "${POSTGRES_PASSWORD}"}
     volumes: [./backups:/backups]
     entrypoint: ["/bin/sh", "-c", "while true; do for db in synapse amer; do pg_dump -h postgres -U synapse -Fc $$db > /backups/$$db-$$(date +%F).dump; done; find /backups -name '*.dump' -mtime +14 -delete; sleep 86400; done"]
+    restart: unless-stopped
+
+  # ---------------- monitoring ----------------
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=30d", "--web.enable-lifecycle"]
+    volumes: [./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro, ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro, promdata:/prometheus]
+    restart: unless-stopped
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--cluster.listen-address="]   # single node
+    volumes: [./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment: {GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:-change-me}", GF_SERVER_ROOT_URL: "https://${DOMAIN}/grafana/", GF_SERVER_SERVE_FROM_SUB_PATH: "true"}
+    volumes: [./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro, ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro, grafanadata:/var/lib/grafana]
+    restart: unless-stopped
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    environment: {DATA_SOURCE_NAME: "postgresql://synapse:${POSTGRES_PASSWORD}@postgres:5432/synapse?sslmode=disable"}
+    restart: unless-stopped
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.66.0
+    environment: {REDIS_ADDR: "redis://redis:6379"}
     restart: unless-stopped
 
   sygnal:
@@ -78,4 +104,4 @@ services:
     depends_on: [synapse, livekit, orchestrator, sygnal]
     restart: unless-stopped
 
-volumes: {pgdata: {}, redisdata: {}, caddydata: {}}
+volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}}

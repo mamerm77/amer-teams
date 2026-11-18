@@ -6,10 +6,10 @@ import '../services/api_service.dart';
 /// Performance and high availability from live probes of every service (orchestrator /v1/ops/status).
 class OpsScreen extends StatefulWidget { const OpsScreen({super.key}); @override State<OpsScreen> createState() => _S(); }
 class _S extends State<OpsScreen> {
-  Map<String, dynamic>? d; String? err; Timer? t;
+  Map<String, dynamic>? d; List alerts = []; String? err; Timer? t;
   @override void initState() { super.initState(); _load(); t = Timer.periodic(const Duration(seconds: 5), (_) => _load()); }
   @override void dispose() { t?.cancel(); super.dispose(); }
-  Future<void> _load() async { try { final r = await context.read<ApiService>().ops(); setState(() { d = r; err = null; }); } catch (e) { setState(() => err = '$e'); } }
+  Future<void> _load() async { try { final api = context.read<ApiService>(); final r = await api.ops(); final a = await api.alerts(); setState(() { d = r; alerts = a; err = null; }); } catch (e) { setState(() => err = '$e'); } }
 
   @override Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
@@ -21,6 +21,11 @@ class _S extends State<OpsScreen> {
         _kpi(c, 'In calls now', '${now['media']['participants'] ?? '–'}'),
         for (final a in avail.entries) _kpi(c, '${a.key} availability', '${a.value}%'),
       ]),
+      const SizedBox(height: 16), Text('Alerts', style: Theme.of(c).textTheme.titleMedium),
+      if (alerts.isEmpty) const ListTile(leading: Icon(Icons.verified, color: Colors.green), title: Text('No active alerts')),
+      for (final a in alerts) Card(color: a['severity'] == 'critical' ? cs.errorContainer : cs.tertiaryContainer, child: ListTile(
+        leading: Icon(a['severity'] == 'critical' ? Icons.report : Icons.warning_amber),
+        title: Text(a['name'] ?? 'Alert'), subtitle: Text(a['summary'] ?? ''), trailing: Text((a['severity'] ?? '').toString().toUpperCase()))),
       const SizedBox(height: 16), Text('Services', style: Theme.of(c).textTheme.titleMedium),
       for (final s in now['services']) Card(child: ListTile(
         leading: Icon(s['up'] ? Icons.check_circle : Icons.error, color: s['up'] ? Colors.green : cs.error),

@@ -32,6 +32,8 @@ class ApiService {
 
   Future<Map<String, dynamic>> ops() async => jsonDecode((await http.get(_u('/v1/ops/status'), headers: _h)).body);
 
+  Future<List<dynamic>> alerts() async => jsonDecode((await http.get(_u('/v1/ops/alerts'), headers: _h)).body);
+
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});
 
   // ---------- Administration (server admins only) ----------

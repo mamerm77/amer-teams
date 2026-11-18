@@ -4,7 +4,15 @@ import asyncio, time
 from collections import deque
 import httpx
 from livekit import api as lkapi
+from prometheus_client import Gauge
 from . import config, agents, db
+
+G_UP = Gauge("amer_service_up", "1 if the service answered its health probe", ["service"])
+G_LAT = Gauge("amer_service_probe_latency_ms", "Health probe round-trip time", ["service"])
+G_CALLS = Gauge("amer_active_calls", "Calls currently running on the media server")
+G_PART = Gauge("amer_call_participants", "People currently in calls")
+G_AGENT_ON = Gauge("amer_agent_enabled", "1 if the AI agent is enabled", ["agent"])
+G_AUDIT = Gauge("amer_audit_chain_intact", "1 if the audit log hash chain verifies")
 
 HISTORY: deque = deque(maxlen=360)   # 30 min at 5 s
 TARGETS = {
@@ -37,6 +45,14 @@ async def sample():
          "agents": [{"id": a.id, "name": a.name, "enabled": a.enabled, "calls": a.calls,
                      "errors": a.errors, "latency_ms": round(a.latency_ms)} for a in agents.AGENTS.values()]}
     HISTORY.append(s)
+    for p in probes:
+        G_UP.labels(p["service"]).set(1 if p["up"] else 0)
+        if p["latency_ms"] is not None: G_LAT.labels(p["service"]).set(p["latency_ms"])
+    if s["media"].get("active_calls") is not None:
+        G_CALLS.set(s["media"]["active_calls"]); G_PART.set(s["media"]["participants"])
+    for a in agents.AGENTS.values(): G_AGENT_ON.labels(a.id).set(1 if a.enabled else 0)
+    try: G_AUDIT.set(1 if (await db.audit_verify())[0] else 0)
+    except Exception: pass
     try: await db.ops_sample(s)
     except Exception: pass
     return s

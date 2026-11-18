@@ -20,6 +20,7 @@ s=re.sub(r"database:\n(  .*\n)+", f"""database:
   name: psycopg2
   args: {{user: synapse, password: {pw}, database: synapse, host: postgres, cp_min: 5, cp_max: 10}}
 """, s)
+s=s.replace("listeners:\n", "listeners:\n  - port: 9000\n    type: metrics\n    bind_addresses: ['0.0.0.0']\n", 1)
 s=s.rstrip("\n")+"\n"
 s+="""
 # --- Amer Teams policy: encryption is mandatory ---
@@ -32,6 +33,7 @@ password_config:
 registration_shared_secret_path: /data/registration.secret
 public_baseurl: https://%s/
 max_upload_size: 200M
+enable_metrics: true
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY

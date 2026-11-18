@@ -25,7 +25,8 @@ if (-not (Test-Path synapse/homeserver.yaml)) {
   docker run --rm -v "${PWD}/synapse:/data" -e SYNAPSE_SERVER_NAME=$ip -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:v1.120.0 generate
   $hs = Get-Content synapse/homeserver.yaml -Raw
   $hs = $hs -replace "(?ms)^database:.*?(?=^\S)", "database:`n  name: psycopg2`n  args: {user: synapse, password: $($envs.POSTGRES_PASSWORD), database: synapse, host: postgres, cp_min: 5, cp_max: 10}`n"
-  $hs = $hs.TrimEnd() + "`n"; $hs += "`nencryption_enabled_by_default_for_room_type: all`nenable_registration: true`nregistration_requires_token: true`npassword_config:`n  enabled: true`n  policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}`nregistration_shared_secret_path: /data/registration.secret`npublic_baseurl: http://$ip/`n"
+  $hs = $hs -replace "listeners:`n", "listeners:`n  - port: 9000`n    type: metrics`n    bind_addresses: ['0.0.0.0']`n"
+  $hs = $hs.TrimEnd() + "`n"; $hs += "`nencryption_enabled_by_default_for_room_type: all`nenable_registration: true`nregistration_requires_token: true`npassword_config:`n  enabled: true`n  policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}`nregistration_shared_secret_path: /data/registration.secret`npublic_baseurl: http://$ip/`nenable_metrics: true`n"
   Set-Content -Encoding ascii synapse/homeserver.yaml $hs
   Rand 64 | Set-Content -Encoding ascii synapse/registration.secret
 }

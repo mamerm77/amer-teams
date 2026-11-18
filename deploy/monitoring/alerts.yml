@@ -1,0 +1,47 @@
+groups:
+- name: amer-teams-availability
+  rules:
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels: {severity: critical}
+    annotations: {summary: "{{ $labels.job }} is not answering ({{ $labels.instance }})"}
+  - alert: ProbeFailing
+    expr: amer_service_up == 0
+    for: 1m
+    labels: {severity: critical}
+    annotations: {summary: "{{ $labels.service }} failed its health probe"}
+  - alert: SlowChatServer
+    expr: amer_service_probe_latency_ms{service="chat (Synapse)"} > 500
+    for: 5m
+    labels: {severity: warning}
+    annotations: {summary: "Chat server responds in {{ $value | humanize }} ms (target < 500 ms)"}
+- name: amer-teams-security
+  rules:
+  - alert: AuditLogTampered
+    expr: amer_audit_chain_intact == 0
+    for: 0m
+    labels: {severity: critical}
+    annotations: {summary: "Audit log hash chain no longer verifies — investigate immediately"}
+  - alert: AIAgentErrors
+    expr: sum by (agent) (increase(amer_agent_errors_total[10m])) > 5
+    for: 0m
+    labels: {severity: warning}
+    annotations: {summary: "AI agent {{ $labels.agent }} failed {{ $value | humanize }} times in 10 minutes"}
+- name: amer-teams-data
+  rules:
+  - alert: PostgresDown
+    expr: pg_up == 0
+    for: 1m
+    labels: {severity: critical}
+    annotations: {summary: "PostgreSQL is down — chat and audit data unavailable"}
+  - alert: PostgresConnectionsHigh
+    expr: sum(pg_stat_activity_count) / max(pg_settings_max_connections) > 0.8
+    for: 5m
+    labels: {severity: warning}
+    annotations: {summary: "PostgreSQL connections above 80 % of the limit"}
+  - alert: RedisDown
+    expr: redis_up == 0
+    for: 1m
+    labels: {severity: critical}
+    annotations: {summary: "Redis is down — media server routing affected"}
