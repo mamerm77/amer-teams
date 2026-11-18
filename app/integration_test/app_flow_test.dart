@@ -216,6 +216,8 @@ void main() {
     await step('Meeting: leave', () async { await tap(find.text('Leave'), 'Leave'); await wait(3); });
 
     // ---------------- other areas ----------------
+    // back to the main screen whatever the meeting steps left open
+    for (var i = 0; i < 4 && find.text('Activity').evaluate().isEmpty; i++) { await t.pageBack(); await wait(1); }
     for (final tab in ['Activity', 'Teams', 'Calendar', 'Amer', 'Control', 'Health', 'Security']) {
       await step('$tab screen', () async { await tap(find.text(tab), '$tab tab'); await wait(3); });
     }

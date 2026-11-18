@@ -136,6 +136,9 @@ class _S extends State<CallScreen> {
       call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
+      cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
+      mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
+      for (final w in call!.deviceWarnings) { _snack(w); }
       setState(() {});
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
   }
@@ -147,6 +150,9 @@ class _S extends State<CallScreen> {
       call = c.media; call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
+      cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
+      mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
+      for (final w in call!.deviceWarnings) { WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _snack(w); }); }
     }
     if (c.ended && !_closing) {
       _closing = true; call = null;
@@ -222,7 +228,9 @@ class _S extends State<CallScreen> {
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    if (err != null) return Scaffold(appBar: AppBar(), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Could not join: $err', textAlign: TextAlign.center))));
+    if (err != null) return Scaffold(appBar: AppBar(), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text('Could not join: $err', textAlign: TextAlign.center), const SizedBox(height: 16),
+      FilledButton(onPressed: () => Navigator.of(c).maybePop(), child: const Text('Back'))]))));
     if (ctl != null && (call == null || ctl!.ended)) return _status(c);
     if (call == null) return Scaffold(body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const CircularProgressIndicator(), const SizedBox(height: 16), Text(widget.meeting ? 'Joining meeting…' : 'Connecting securely…')])));
     final lk = call!.lk;

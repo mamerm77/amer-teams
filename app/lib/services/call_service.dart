@@ -77,6 +77,7 @@ class SecureCall {
     await _join();
   }
   void Function()? onRemoteMedia;
+  final deviceWarnings = <String>[];
   /// This device's ML-KEM-768 public key, sent inside the invite / answer.
   Map<String, Object?> get pqAdvert => {'pq_alg': 'ML-KEM-768', 'pq_pk': base64.encode(_pq.pk)};
   final _peerKeys = <String, (String, String, Uint8List)>{};
@@ -231,8 +232,9 @@ class SecureCall {
     await lk.connect(t['url'], t['token']);
     await lk.e2eeManager?.setKeyIndex(keyIndex);
     if (role != 'attendee') {
-      await lk.localParticipant?.setCameraEnabled(video);
-      await lk.localParticipant?.setMicrophoneEnabled(true);
+      // A missing or busy camera/microphone must not stop the call: join with what works and tell the user.
+      try { await lk.localParticipant?.setMicrophoneEnabled(true); } catch (e) { deviceWarnings.add('No microphone available: others cannot hear you'); }
+      if (video) { try { await lk.localParticipant?.setCameraEnabled(true); } catch (e) { deviceWarnings.add('No camera available: joined with audio only'); } }
     }
     _joinedAt = DateTime.now();
     lk.createListener()
