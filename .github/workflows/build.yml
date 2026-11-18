@@ -31,6 +31,8 @@ jobs:
         with: {name: amer-teams-android, path: app/build/app/outputs/flutter-apk/app-release.apk}
   windows:
     runs-on: windows-latest
+    env:
+      CMAKE_POLICY_VERSION_MINIMUM: '3.5'   # Firebase C++ SDK still declares an old CMake minimum
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

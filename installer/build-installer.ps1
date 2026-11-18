@@ -1,6 +1,7 @@
 # Builds AmerTeams-Setup-<version>.exe on your Windows 11 PC.
 # Needs: Flutter (stable), Visual Studio 2022 with "Desktop development with C++", NSIS (winget install NSIS.NSIS), Python.
 $ErrorActionPreference = "Stop"
+$env:CMAKE_POLICY_VERSION_MINIMUM = "3.5"   # Firebase C++ SDK declares an old CMake minimum
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location "$root\app"
 if (-not (Test-Path windows)) { flutter create . --org com.amerteams --project-name amer_teams --platforms=windows }
