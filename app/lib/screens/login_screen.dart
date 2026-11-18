@@ -3,6 +3,17 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../services/matrix_service.dart';
 
+/// Client-side copy of the server password policy (server enforces it too).
+class LoginScreenPolicy {
+  static String? check(String p) {
+    if (p.length < 10) return 'Use at least 10 characters';
+    if (!RegExp(r'[A-Z]').hasMatch(p) || !RegExp(r'[a-z]').hasMatch(p)) return 'Use upper- and lower-case letters';
+    if (!RegExp(r'\d').hasMatch(p)) return 'Include a number';
+    if (!RegExp(r'[^A-Za-z0-9]').hasMatch(p)) return 'Include a symbol';
+    return null;
+  }
+}
+
 /// Sign in, or create an account with an invite code from your administrator.
 class LoginScreen extends StatefulWidget { const LoginScreen({super.key}); @override State<LoginScreen> createState() => _S(); }
 class _S extends State<LoginScreen> {
@@ -10,13 +21,7 @@ class _S extends State<LoginScreen> {
       pass2 = TextEditingController(), name = TextEditingController(), invite = TextEditingController();
   bool busy = false, signup = false; String? err;
 
-  static String? pwProblem(String p) {
-    if (p.length < 10) return 'Use at least 10 characters';
-    if (!RegExp(r'[A-Z]').hasMatch(p) || !RegExp(r'[a-z]').hasMatch(p)) return 'Use upper- and lower-case letters';
-    if (!RegExp(r'\d').hasMatch(p)) return 'Include a number';
-    if (!RegExp(r'[^A-Za-z0-9]').hasMatch(p)) return 'Include a symbol';
-    return null;
-  }
+  static String? pwProblem(String p) => LoginScreenPolicy.check(p);
 
   Future<void> go() async {
     setState(() { busy = true; err = null; });

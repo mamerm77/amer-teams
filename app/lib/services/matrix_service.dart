@@ -1,6 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';  // also provides Uint8List
 import 'package:matrix/matrix.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
@@ -62,13 +61,15 @@ class MatrixService extends ChangeNotifier {
         final done = e.completedAuthenticationFlows;
         final next = e.authenticationFlows!.first.stages.firstWhere((s) => !done.contains(s), orElse: () => '');
         if (next.isEmpty || (step > 0 && done.isEmpty)) throw Exception('Invite code was not accepted');
-        auth = next == AuthenticationTypes.token || next == 'm.login.registration_token'
+        auth = next == 'm.login.registration_token'
             ? AuthenticationData.fromJson({'type': next, 'token': inviteCode.trim(), 'session': session})
             : AuthenticationData(type: next, session: session);
       }
     }
     if (!client.isLogged()) throw Exception('Registration did not complete');
-    if (displayName != null && displayName.isNotEmpty) await client.setDisplayName(client.userID!, displayName);
+    if (displayName != null && displayName.isNotEmpty) {
+      await client.setProfileField(client.userID!, 'displayname', {'displayname': displayName});
+    }
     await PushService.register(client, gateway: Uri.parse(server));
     notifyListeners();
   }

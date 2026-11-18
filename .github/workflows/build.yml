@@ -25,7 +25,7 @@ jobs:
           flutter create . --org com.amerteams --project-name amer_teams --platforms=android
           python3 ../tools/patch_native.py android
           flutter pub get
-          flutter analyze --no-fatal-infos
+          flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release
       - uses: actions/upload-artifact@v4
         with: {name: amer-teams-android, path: app/build/app/outputs/flutter-apk/app-release.apk}

@@ -18,11 +18,12 @@ class SecureCall {
   final ApiService api;
   final mx.Room room;
   final String callId;
-  final lk = Room();
+  late final Room lk;
   late final BaseKeyProvider _keys;
   Uint8List? _key;
   int keyIndex = 0;
   Timer? _rotate;
+  bool _joined = false;
   StreamSubscription? _sub;
 
   /// 6-character code participants can read aloud to verify they share the same key.
@@ -47,7 +48,7 @@ class SecureCall {
   static Future<SecureCall> join(ApiService api, mx.Room room, String callId) async {
     final c = SecureCall(api, room, callId: callId);
     await c._setup();
-    final latest = c._latestKeyEvent();
+    final latest = await c._latestKeyEvent();
     if (latest == null) throw StateError('Call key not received yet — wait for sync and retry');
     await c._applyKey(latest);
     await c._join();
@@ -63,12 +64,14 @@ class SecureCall {
     });
   }
 
-  Map<String, dynamic>? _latestKeyEvent() {
-    final evs = room.timeline?.events ?? [];
-    for (final e in evs) {
-      if (e.type == kCallKeyEvent && e.content['call_id'] == callId) return e.content;
-    }
-    return null;
+  Future<Map<String, dynamic>?> _latestKeyEvent() async {
+    final tl = await room.getTimeline();
+    try {
+      for (final e in tl.events) {          // newest first
+        if (e.type == kCallKeyEvent && e.content['call_id'] == callId) return e.content;
+      }
+      return null;
+    } finally { tl.cancelSubscriptions(); }
   }
 
   Future<void> _applyKey(Map<String, dynamic> c) async {
@@ -78,7 +81,7 @@ class SecureCall {
     await _keys.setSharedKey(base64.encode(k), keyIndex: keyIndex);
     // Installing a key is not enough: switch outgoing encryption to the new index,
     // otherwise frames keep using the old key and a departed member can still decrypt.
-    await lk.e2eeManager?.setKeyIndex(keyIndex);
+    if (_joined) await lk.e2eeManager?.setKeyIndex(keyIndex);
   }
 
   Future<void> _shareNewKey() async {
@@ -93,16 +96,19 @@ class SecureCall {
   Future<void> _join() async {
     final t = await api.callToken(room.id, callId, room.client.userID ?? '');
     if (t['e2ee'] != 'required') throw StateError('Server did not confirm E2EE policy');
-    await lk.connect(t['url'], t['token'],
-        roomOptions: RoomOptions(adaptiveStream: true, dynacast: true,
-            e2eeOptions: E2EEOptions(keyProvider: _keys)));
+    lk = Room(roomOptions: RoomOptions(adaptiveStream: true, dynacast: true,
+        e2eeOptions: E2EEOptions(keyProvider: _keys)));
+    await lk.connect(t['url'], t['token']);
+    await lk.e2eeManager?.setKeyIndex(keyIndex);
     await lk.localParticipant?.setCameraEnabled(true);
     await lk.localParticipant?.setMicrophoneEnabled(true);
     lk.createListener().on<ParticipantDisconnectedEvent>((_) => _shareNewKey());
+    _joined = true;
     _rotate = Timer.periodic(kCallKeyRotation, (_) => _shareNewKey());
   }
 
-  bool get encrypted => lk.isE2EEEnabled;
+  /// True once the frame cryptor is active for this call.
+  bool get encrypted => _joined && lk.e2eeManager != null;
 
-  Future<void> leave() async { _rotate?.cancel(); await _sub?.cancel(); await lk.disconnect(); }
+  Future<void> leave() async { _rotate?.cancel(); await _sub?.cancel(); if (_joined) await lk.disconnect(); }
 }

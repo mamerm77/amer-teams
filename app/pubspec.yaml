@@ -3,13 +3,13 @@ description: Amer Teams — end-to-end encrypted collaboration with an AI agent 
 publish_to: none
 version: 0.5.0+5
 environment:
-  sdk: ">=3.4.0 <4.0.0"
+  sdk: ">=3.11.0 <4.0.0"
 dependencies:
   flutter: {sdk: flutter}
-  matrix: ^0.33.0                 # Matrix SDK with E2EE (Olm/Megolm via vodozemac)
-  flutter_vodozemac: ^0.2.0       # native crypto for matrix
+  matrix: ^17.0.0                 # Matrix SDK with E2EE (Olm/Megolm via vodozemac)
+  flutter_vodozemac: ^0.9.1       # native crypto for matrix
   sqflite: ^2.4.0
-  sqflite_common_ffi: ^2.3.4      # desktop SQLite
+  sqflite_common_ffi: ^2.4.2      # desktop SQLite
   path_provider: ^2.1.4
   livekit_client: ^2.3.0          # WebRTC + E2EE frame encryption
   http: ^1.2.2
@@ -21,5 +21,8 @@ dependencies:
   permission_handler: ^11.3.1
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
+dev_dependencies:
+  flutter_test: {sdk: flutter}
+  flutter_lints: ^5.0.0
 flutter:
   uses-material-design: true
