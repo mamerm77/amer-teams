@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/matrix_service.dart';
 import 'call_screen.dart';
+import '../services/meeting_service.dart';
 
 /// Meetings are encrypted events inside chats. The Scheduler agent turns plain language into a meeting.
 class CalendarScreen extends StatefulWidget { const CalendarScreen({super.key}); @override State<CalendarScreen> createState() => _S(); }
@@ -42,6 +43,7 @@ class _S extends State<CalendarScreen> {
       return ListView(children: [for (final m in up) ListTile(
         leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(DateFormat('EEE').format(m.start)), Text(DateFormat('d MMM').format(m.start), style: Theme.of(c).textTheme.labelSmall)]),
         title: Text(m.title), subtitle: Text('${DateFormat('HH:mm').format(m.start)} · ${m.minutes} min · ${m.room.getLocalizedDisplayname()}'),
-        trailing: FilledButton.tonal(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: m.room.id)))))]);
+        trailing: FilledButton.tonal(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: m.room.id,
+          meeting: MeetingService(context.read<MatrixService>()).meetingIdOf(m.room) != null)))))]);
     }));
 }

@@ -6,6 +6,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:matrix/matrix.dart' as mx;
 import '../config.dart';
 import 'api_service.dart';
+import 'call_manager.dart';
 import 'pq_service.dart';
 
 const kPqDeviceEvent = 'com.amerteams.pq.device';
@@ -17,7 +18,10 @@ const kPqDeviceEvent = 'com.amerteams.pq.device';
 /// - Frames are AES-GCM encrypted (LiveKit E2EE). The SFU and orchestrator never see K.
 /// - Re-key when someone joins or leaves and every [kCallKeyRotation]; every member switches index.
 class SecureCall {
-  SecureCall(this.api, this.room, {required this.callId});
+  SecureCall(this.api, this.room, {required this.callId, this.video = true});
+  final bool video;
+  bool _caller = false;
+  DateTime? _joinedAt;
   final ApiService api;
   final mx.Room room;
   final String callId;
@@ -38,27 +42,50 @@ class SecureCall {
       : sha256.convert([..._key!, ...utf8.encode(callId)]).toString().substring(0, 6).toUpperCase();
   bool get quantumSafe => _key != null;
 
-  static Future<SecureCall> start(ApiService api, mx.Room room) async {
+  static Future<SecureCall> start(ApiService api, mx.Room room, {bool video = true, String? callId}) async {
     if (!room.encrypted) throw StateError('Calls require an end-to-end encrypted room');
-    final id = base64Url.encode(PqHybrid.random(9));
-    final c = SecureCall(api, room, callId: id);
+    final id = callId ?? base64Url.encode(PqHybrid.random(9));
+    final c = SecureCall(api, room, callId: id, video: video).._caller = true;
     await c._setup();
     await c._shareNewKey();
-    await room.sendEvent({'call_id': id, 'body': '📞 Encrypted call started (quantum-safe)'}, type: kCallInviteEvent);
+    await room.sendEvent({'call_id': id, 'media': video ? 'video' : 'audio',
+        'body': video ? '📹 Video call (end-to-end encrypted)' : '📞 Voice call (end-to-end encrypted)'}, type: kCallInviteEvent);
     await c._join();
     return c;
   }
 
-  static Future<SecureCall> join(ApiService api, mx.Room room, String callId) async {
-    final c = SecureCall(api, room, callId: callId);
-    await c._setup();
-    final latest = await c._latestKeyEventForMe();
-    if (latest == null) {
-      throw StateError('Waiting for the caller to include this device. Your device key was just published; try Join again in a few seconds.');
+  static Future<SecureCall> join(ApiService api, mx.Room room, String callId, {bool video = true}) async {
+    final c = SecureCall(api, room, callId: callId, video: video);
+    await c._setup();              // publishes this device's key; members in the call re-key to include it
+    Map<String, dynamic>? latest;
+    for (var i = 0; i < 30 && latest == null; i++) {      // wait up to 30 s for a key that includes this device
+      latest = await c._latestKeyEventForMe();
+      if (latest == null) await Future.delayed(const Duration(seconds: 1));
     }
+    if (latest == null) throw StateError('Nobody in the call has added this device yet. Ask someone in the call to keep it open, then try again.');
     await c._applyKey(latest);
     await c._join();
+    await room.sendEvent({'call_id': callId, 'body': 'joined the call'}, type: kCallJoinedEvent);
     return c;
+  }
+
+  /// Join a meeting's call, or start it if nobody is in it yet.
+  static Future<SecureCall> joinOrStart(ApiService api, mx.Room room, String callId, {bool video = true}) async {
+    final c = SecureCall(api, room, callId: callId, video: video);
+    final existing = await c._anyKeyEvent();
+    if (existing == null) return start(api, room, video: video, callId: callId);
+    return join(api, room, callId, video: video);
+  }
+
+  Future<bool?> _anyKeyEvent() async {
+    final tl = await room.getTimeline();
+    try {
+      for (final e in tl.events) {
+        if (e.type == kCallKeyEvent && e.content['call_id'] == callId &&
+            DateTime.now().difference(e.originServerTs).inHours < 12) return true;
+      }
+      return null;
+    } finally { tl.cancelSubscriptions(); }
   }
 
   /// Publish this device's ML-KEM-768 public key to the room (encrypted, authenticated by Megolm).
@@ -135,8 +162,9 @@ class SecureCall {
     lk = Room(roomOptions: RoomOptions(adaptiveStream: true, dynacast: true, e2eeOptions: E2EEOptions(keyProvider: _keys)));
     await lk.connect(t['url'], t['token']);
     await lk.e2eeManager?.setKeyIndex(keyIndex);
-    await lk.localParticipant?.setCameraEnabled(true);
+    await lk.localParticipant?.setCameraEnabled(video);
     await lk.localParticipant?.setMicrophoneEnabled(true);
+    _joinedAt = DateTime.now();
     lk.createListener().on<ParticipantDisconnectedEvent>((_) => _shareNewKey());
     _joined = true;
     _rotate = Timer.periodic(kCallKeyRotation, (_) => _shareNewKey());
@@ -144,5 +172,17 @@ class SecureCall {
 
   bool get encrypted => _joined && lk.e2eeManager != null && _key != null;
 
-  Future<void> leave() async { _rotate?.cancel(); await _sub?.cancel(); if (_joined) await lk.disconnect(); }
+  Duration get elapsed => _joinedAt == null ? Duration.zero : DateTime.now().difference(_joinedAt!);
+
+  Future<void> leave() async {
+    _rotate?.cancel(); await _sub?.cancel();
+    if (_joined) {
+      final alone = lk.remoteParticipants.isEmpty;
+      await lk.disconnect();
+      if (_caller || alone) {        // record the call for everyone's history
+        await room.sendEvent({'call_id': callId, 'duration_s': elapsed.inSeconds, 'reason': 'hangup',
+            'body': '${video ? '📹' : '📞'} Call ended · ${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}'}, type: kCallEndEvent);
+      }
+    }
+  }
 }

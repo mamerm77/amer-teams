@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/matrix_service.dart';
 import 'chat_screen.dart';
+import 'people_picker.dart';
 
 class RoomsScreen extends StatelessWidget {
   const RoomsScreen({super.key});
@@ -21,13 +22,16 @@ class RoomsScreen extends StatelessWidget {
     );
   }
   Future<void> _new(BuildContext c, MatrixService m) async {
-    final name = TextEditingController(), ids = TextEditingController();
-    final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: const Text('New encrypted chat'), content: Column(mainAxisSize: MainAxisSize.min, children: [
-      TextField(controller: name, decoration: const InputDecoration(labelText: 'Name (groups only)')),
-      TextField(controller: ids, decoration: const InputDecoration(labelText: 'Matrix IDs, comma-separated', hintText: '@sara:example.com'))]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Create'))]));
-    if (ok != true) return;
-    final list = ids.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    await m.createRoom(name: name.text, invite: list, direct: name.text.isEmpty);
+    final people = await pickPeople(c, multiple: true, title: 'New encrypted chat');
+    if (people == null || people.isEmpty || !c.mounted) return;
+    var name = '';
+    if (people.length > 1) {
+      final ctl = TextEditingController();
+      await showDialog(context: c, builder: (d) => AlertDialog(title: const Text('Group name'), content: TextField(controller: ctl, autofocus: true),
+        actions: [FilledButton(onPressed: () => Navigator.pop(d), child: const Text('Create'))]));
+      name = ctl.text.trim().isEmpty ? people.map((p) => p.displayName ?? p.userId).join(', ') : ctl.text.trim();
+    }
+    final id = await m.createRoom(name: name, invite: people.map((p) => p.userId).toList(), direct: people.length == 1);
+    if (c.mounted) Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: id)));
   }
 }

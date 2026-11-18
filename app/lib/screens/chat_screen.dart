@@ -46,14 +46,17 @@ class _S extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(title: Row(children: [const Icon(Icons.lock, size: 16), const SizedBox(width: 6), Flexible(child: Text(room.getLocalizedDisplayname()))]), actions: [
         IconButton(tooltip: 'Summarise with Amer', icon: const Icon(Icons.auto_awesome), onPressed: summarise),
-        IconButton(tooltip: 'Encrypted call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
+        IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
+        IconButton(tooltip: 'Video call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
       ]),
       body: Column(children: [
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
           if (e.type == kCallInviteEvent) {
-            return ListTile(leading: const Icon(Icons.videocam), title: const Text('Encrypted call'),
-              trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, callId: e.content['call_id'] as String)))));
+            final v = e.content['media'] != 'audio';
+            return ListTile(leading: Icon(v ? Icons.videocam : Icons.call), title: Text(v ? 'Video call' : 'Voice call'),
+              subtitle: Text('${e.senderFromMemoryOrFallback.calcDisplayname()} · end-to-end encrypted'),
+              trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, callId: e.content['call_id'] as String, video: v)))));
           }
           if (e.type == 'com.amerteams.meeting') {
             return ListTile(leading: const Icon(Icons.event), title: Text(e.content['title'] as String? ?? 'Meeting'), subtitle: Text('${e.content['start']} · ${e.content['duration_min']} min'));
