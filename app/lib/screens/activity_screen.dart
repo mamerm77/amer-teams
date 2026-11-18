@@ -11,7 +11,7 @@ class ActivityScreen extends StatefulWidget { const ActivityScreen({super.key});
 class _S extends State<ActivityScreen> {
   Future<List<Activity>>? f; String filter = 'all';
   @override void initState() { super.initState(); _load(); }
-  void _load() => setState(() => f = ActivityService(context.read<MatrixService>()).load());
+  void _load() => setState(() { f = ActivityService(context.read<MatrixService>()).load(); });
   static const icons = {'mention': Icons.alternate_email, 'reply': Icons.reply, 'reaction': Icons.emoji_emotions_outlined, 'missed_call': Icons.call_missed};
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: const Text('Activity'), actions: [

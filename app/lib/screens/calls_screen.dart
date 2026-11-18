@@ -13,7 +13,7 @@ class CallsScreen extends StatefulWidget { const CallsScreen({super.key}); @over
 class _S extends State<CallsScreen> {
   Future<List<CallRecord>>? hist;
   @override void initState() { super.initState(); _load(); }
-  void _load() => setState(() => hist = context.read<CallManager>().history());
+  void _load() => setState(() { hist = context.read<CallManager>().history(); });
   MatrixService get m => context.read<MatrixService>();
   MeetingService get meet => MeetingService(m);
   void _err(Object e) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'.replaceFirst('Exception: ', ''))));

@@ -29,7 +29,10 @@ void main() {
     }
     Future<void> step(String name, Future<void> Function() body) async {
       final sw = Stopwatch()..start(); String? err;
-      try { await body(); } catch (e) { err = '$e'.split('\n').first; }
+      try { await body(); } catch (e) {
+        final seen = find.byType(Text).evaluate().map((el) => (el.widget as Text).data ?? '').where((x) => x.trim().isNotEmpty).take(60).join(' | ');
+        err = '${'$e'.split('\n').first}  ON SCREEN: $seen';
+      }
       await shot(name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-'));
       results.add({'step': name, 'pass': err == null, 'error': err, 'ms': sw.elapsedMilliseconds, 'shot': n});
       // ignore: avoid_print
@@ -53,6 +56,11 @@ void main() {
       await tap(find.text('Bob Tester'), 'chat with Bob in the list');
     }
 
+    // record app errors as findings instead of aborting the whole run
+    final appErrors = <String>[];
+    final prevOnError = FlutterError.onError;
+    FlutterError.onError = (d) { appErrors.add(d.exceptionAsString().split('\n').first); // ignore: avoid_print
+      print('APP ERROR  ${d.exceptionAsString().split('\n').first}'); };
     app.main();
     await wait(3);
 
@@ -214,6 +222,9 @@ void main() {
       await wait(1); await t.pageBack(); await wait(1); await t.pageBack();
     });
 
+    FlutterError.onError = prevOnError;
+    results.add({'step': 'No app errors during the run', 'pass': appErrors.isEmpty, 'error': appErrors.toSet().join(' || ')});
+    File('$shots/results.json').writeAsStringSync(const JsonEncoder.withIndent(' ').convert(results));
     final failed = results.where((r) => r['pass'] != true).length;
     // ignore: avoid_print
     print('IN-USE RESULT: ${results.length - failed}/${results.length} steps passed');
