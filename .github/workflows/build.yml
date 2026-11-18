@@ -223,7 +223,7 @@ jobs:
       - name: Collect logs
         if: always()
         run: |
-          cp peer.log peer.out shots/ 2>/dev/null || true
+          mkdir -p shots; cp peer.log peer.out shots/ 2>/dev/null || true
           cd deploy && docker compose -f docker-compose.yml -f docker-compose.local.yml logs --no-color orchestrator livekit synapse > ../shots/server.log 2>&1 || true
       - uses: actions/upload-artifact@v4
         if: always()

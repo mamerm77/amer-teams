@@ -13,6 +13,8 @@ s=re.sub(r"keys:\n(  #.*\n)?  .*\n","keys:\n  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_
 PY2
 if [ ! -f synapse/homeserver.yaml ]; then
   docker run --rm -v "$PWD/synapse:/data" -e SYNAPSE_SERVER_NAME="$SERVER_NAME" -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:v1.120.0 generate
+  # the container writes the files as its own user (991); take ownership to edit, and hand them back afterwards
+  docker run --rm -v "$PWD/synapse:/data" alpine:3.20 chown -R "$(id -u):$(id -g)" /data
   python3 - "$POSTGRES_PASSWORD" <<'PY'
 import sys,re
 p="synapse/homeserver.yaml"; s=open(p).read(); pw=sys.argv[1]
@@ -38,6 +40,7 @@ retention: {enabled: true, purge_jobs: [{interval: 1h}]}
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY
+  docker run --rm -v "$PWD/synapse:/data" alpine:3.20 chown -R 991:991 /data
 fi
 echo "Setup complete. Next:"
 echo "  docker compose up -d"
