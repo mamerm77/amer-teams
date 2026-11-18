@@ -27,8 +27,24 @@ jobs:
           flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings
           flutter build apk --release
+      - name: Name the APK
+        run: cp app/build/app/outputs/flutter-apk/app-release.apk amer-teams-android.apk
       - uses: actions/upload-artifact@v4
-        with: {name: amer-teams-android, path: app/build/app/outputs/flutter-apk/app-release.apk}
+        with: {name: amer-teams-android, path: amer-teams-android.apk}
+      - name: Publish to "Latest test build" release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-latest
+          name: Latest test build
+          prerelease: true
+          make_latest: false
+          body: |
+            Latest successful build of `main`, for testing.
+            - **Windows:** AmerTeams-Setup-*.exe — if Windows shows "Windows protected your PC", choose More info → Run anyway (not code-signed yet).
+            - **Android:** amer-teams-android.apk — open on the phone and allow "Install unknown apps".
+            - **iPhone:** see docs/IOS.md (free install with Sideloadly).
+          files: amer-teams-android.apk
   windows:
     runs-on: windows-latest
     env:
@@ -75,6 +91,20 @@ jobs:
           Write-Host "Installer test passed: install, shortcuts, registry, launch, uninstall"
       - uses: actions/upload-artifact@v4
         with: {name: AmerTeams-Setup-windows, path: installer/AmerTeams-Setup-*.exe}
+      - name: Publish to "Latest test build" release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: test-latest
+          name: Latest test build
+          prerelease: true
+          make_latest: false
+          body: |
+            Latest successful build of `main`, for testing.
+            - **Windows:** AmerTeams-Setup-*.exe — if Windows shows "Windows protected your PC", choose More info → Run anyway (not code-signed yet).
+            - **Android:** amer-teams-android.apk — open on the phone and allow "Install unknown apps".
+            - **iPhone:** see docs/IOS.md (free install with Sideloadly).
+          files: installer/AmerTeams-Setup-*.exe
       - name: Attach installer to release (tags v*)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

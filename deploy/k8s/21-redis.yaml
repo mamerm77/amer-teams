@@ -1,0 +1,82 @@
+# Redis with Sentinel: 3 data pods (1 primary + 2 replicas) and 3 sentinels; Sentinel promotes a replica on failure.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: redis-config, namespace: amer-teams}
+data:
+  init.sh: |
+    #!/bin/sh
+    ORD=${HOSTNAME##*-}
+    cp /cfg/redis.conf /data/redis.conf
+    if [ "$ORD" != "0" ]; then echo "replicaof redis-0.redis 6379" >> /data/redis.conf; fi
+  redis.conf: |
+    appendonly yes
+    protected-mode no
+    replica-announce-hostname-enabled yes
+  sentinel.conf: |
+    sentinel resolve-hostnames yes
+    sentinel announce-hostnames yes
+    sentinel monitor amer redis-0.redis 6379 2
+    sentinel down-after-milliseconds amer 5000
+    sentinel failover-timeout amer 30000
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis, namespace: amer-teams}
+spec: {clusterIP: None, selector: {app: redis}, ports: [{name: redis, port: 6379}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: redis, namespace: amer-teams}
+spec:
+  serviceName: redis
+  replicas: 3
+  selector: {matchLabels: {app: redis}}
+  template:
+    metadata: {labels: {app: redis}}
+    spec:
+      topologySpreadConstraints: [{maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: {matchLabels: {app: redis}}}]
+      initContainers:
+        - {name: init, image: "redis:7.4-alpine", command: ["sh", "/cfg/init.sh"], volumeMounts: [{name: cfg, mountPath: /cfg}, {name: data, mountPath: /data}]}
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          command: ["redis-server", "/data/redis.conf"]
+          ports: [{containerPort: 6379}]
+          readinessProbe: {exec: {command: ["redis-cli", "ping"]}, periodSeconds: 5}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 1Gi}}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes: [{name: cfg, configMap: {name: redis-config}}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 10Gi}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redis-sentinel, namespace: amer-teams}
+spec: {selector: {app: redis-sentinel}, ports: [{name: sentinel, port: 26379}]}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: redis-sentinel, namespace: amer-teams}
+spec:
+  serviceName: redis-sentinel
+  replicas: 3
+  selector: {matchLabels: {app: redis-sentinel}}
+  template:
+    metadata: {labels: {app: redis-sentinel}}
+    spec:
+      initContainers:
+        - {name: init, image: "redis:7.4-alpine", command: ["sh", "-c", "cp /cfg/sentinel.conf /data/sentinel.conf"], volumeMounts: [{name: cfg, mountPath: /cfg}, {name: data, mountPath: /data}]}
+      containers:
+        - name: sentinel
+          image: redis:7.4-alpine
+          command: ["redis-sentinel", "/data/sentinel.conf"]
+          ports: [{containerPort: 26379}]
+          resources: {requests: {cpu: 50m, memory: 64Mi}}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes: [{name: cfg, configMap: {name: redis-config}}, {name: data, emptyDir: {}}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: redis, namespace: amer-teams}
+spec: {minAvailable: 2, selector: {matchLabels: {app: redis}}}

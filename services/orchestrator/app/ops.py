@@ -38,6 +38,11 @@ async def livekit_stats():
         return {"active_calls": None, "participants": None, "error": type(e).__name__}
 
 async def sample():
+    # HA: several replicas run; agent on/off lives in PostgreSQL, so every replica re-reads it
+    try:
+        for aid, en in (await db.load_agent_config()).items():
+            if aid in agents.AGENTS: agents.AGENTS[aid].enabled = en
+    except Exception: pass
     async with httpx.AsyncClient() as c:
         probes = await asyncio.gather(*[probe(c, n, u()) for n, u in TARGETS.items()])
     probes.append({"service": "AI engine (orchestrator)", "up": True, "latency_ms": 0.0})

@@ -1,0 +1,21 @@
+# Zero-trust inside the namespace: deny everything, then allow only the paths the system needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: amer-teams}
+spec: {podSelector: {}, policyTypes: [Ingress]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-ingress-controller, namespace: amer-teams}
+spec:
+  podSelector: {matchExpressions: [{key: app, operator: In, values: [synapse, orchestrator, livekit, sygnal]}]}
+  ingress: [{from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: ingress-nginx}}}]}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-internal, namespace: amer-teams}
+spec:
+  podSelector: {}
+  ingress:
+    - from: [{podSelector: {}}]                                            # services talk to each other
+    - from: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: monitoring}}}]   # Prometheus scrapes

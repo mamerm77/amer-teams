@@ -8,12 +8,17 @@ MIGRATIONS = pathlib.Path(__file__).resolve().parent.parent / "migrations"
 
 async def connect():
     global pool
-    pool = AsyncConnectionPool(config.DATABASE_URL, min_size=2, max_size=10, open=False)
+    # check= validates each connection before use, so after a database failover stale connections
+    # to the old primary are dropped instead of failing the first requests
+    pool = AsyncConnectionPool(config.DATABASE_URL, min_size=2, max_size=10, open=False, check=AsyncConnectionPool.check_connection)
     await pool.open(wait=True)
     await migrate()
 
 async def migrate():
+    # Several replicas start at once: a cluster-wide advisory lock makes exactly one apply migrations.
     async with pool.connection() as c:
+      async with c.transaction():
+        await c.execute("SELECT pg_advisory_xact_lock(7740315)")
         await c.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version int PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())")
         done = {r[0] for r in await (await c.execute("SELECT version FROM schema_migrations")).fetchall()}
         for f in sorted(MIGRATIONS.glob("*.sql")):

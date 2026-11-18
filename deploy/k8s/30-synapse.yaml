@@ -1,0 +1,80 @@
+# Chat: Synapse main process (singleton by Synapse's design, restarts in seconds) plus 3 stateless workers that
+# serve sync and client traffic. Workers keep chats flowing while the main process restarts.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: synapse-workers, namespace: amer-teams}
+data:
+  shared.yaml: |
+    redis: {enabled: true, host: redis-0.redis, port: 6379}
+    instance_map:
+      main: {host: synapse-main, port: 9093}
+  worker.yaml: |
+    worker_app: synapse.app.generic_worker
+    worker_listeners:
+      - {type: http, port: 8008, resources: [{names: [client, federation]}]}
+      - {type: metrics, port: 9000}
+    worker_log_config: /data/log.config
+---
+apiVersion: v1
+kind: Service
+metadata: {name: synapse-main, namespace: amer-teams, labels: {app: synapse, role: main}}
+spec:
+  selector: {app: synapse, role: main}
+  ports: [{name: http, port: 8008}, {name: replication, port: 9093}, {name: metrics, port: 9000}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: synapse-main, namespace: amer-teams}
+spec:
+  serviceName: synapse-main
+  replicas: 1
+  selector: {matchLabels: {app: synapse, role: main}}
+  template:
+    metadata: {labels: {app: synapse, role: main}}
+    spec:
+      containers:
+        - name: synapse
+          image: matrixdotorg/synapse:v1.120.0
+          env: [{name: SYNAPSE_CONFIG_PATH, value: "/data/homeserver.yaml,/workers/shared.yaml"}]
+          ports: [{containerPort: 8008}, {containerPort: 9093}, {containerPort: 9000}]
+          readinessProbe: {httpGet: {path: /health, port: 8008}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: 8008}, initialDelaySeconds: 60, periodSeconds: 10}
+          resources: {requests: {cpu: "1", memory: 2Gi}, limits: {memory: 6Gi}}
+          volumeMounts: [{name: data, mountPath: /data}, {name: workers, mountPath: /workers}]
+      volumes: [{name: workers, configMap: {name: synapse-workers}}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec: {accessModes: [ReadWriteOnce], resources: {requests: {storage: 200Gi}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: synapse-worker, namespace: amer-teams, labels: {app: synapse, role: worker}}
+spec: {selector: {app: synapse, role: worker}, ports: [{name: http, port: 8008}, {name: metrics, port: 9000}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: synapse-worker, namespace: amer-teams}
+spec:
+  replicas: 3
+  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app: synapse, role: worker}}
+  template:
+    metadata: {labels: {app: synapse, role: worker}}
+    spec:
+      topologySpreadConstraints: [{maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: {matchLabels: {app: synapse, role: worker}}}]
+      containers:
+        - name: worker
+          image: matrixdotorg/synapse:v1.120.0
+          command: ["sh", "-c", "echo worker_name: $HOSTNAME > /tmp/name.yaml && exec python -m synapse.app.generic_worker --config-path /data/homeserver.yaml --config-path /workers/shared.yaml --config-path /workers/worker.yaml --config-path /tmp/name.yaml"]
+          ports: [{containerPort: 8008}, {containerPort: 9000}]
+          readinessProbe: {httpGet: {path: /health, port: 8008}, periodSeconds: 5}
+          resources: {requests: {cpu: 500m, memory: 1Gi}, limits: {memory: 3Gi}}
+          volumeMounts: [{name: config, mountPath: /data, readOnly: true}, {name: workers, mountPath: /workers}]
+      volumes:
+        - {name: config, secret: {secretName: synapse-config}}      # homeserver.yaml + signing key, created by setup
+        - {name: workers, configMap: {name: synapse-workers}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: synapse-worker, namespace: amer-teams}
+spec: {minAvailable: 2, selector: {matchLabels: {app: synapse, role: worker}}}

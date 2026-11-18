@@ -1,0 +1,75 @@
+# AI engine + call-token service: stateless, 3-10 replicas spread across zones, zero-downtime rolling upgrades.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: orchestrator, namespace: amer-teams}
+spec:
+  replicas: 3
+  strategy: {rollingUpdate: {maxUnavailable: 0, maxSurge: 1}}
+  selector: {matchLabels: {app: orchestrator}}
+  template:
+    metadata: {labels: {app: orchestrator}}
+    spec:
+      topologySpreadConstraints: [{maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: {matchLabels: {app: orchestrator}}}]
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: orchestrator
+          image: ghcr.io/mamerm77/amer-teams-orchestrator:0.5.0
+          ports: [{containerPort: 8080}]
+          envFrom: [{secretRef: {name: amer-secrets}}]
+          env:
+            - {name: SYNAPSE_URL, value: "http://synapse-main:8008"}
+            - {name: LIVEKIT_HTTP_URL, value: "http://livekit:7880"}
+            - {name: LIVEKIT_PUBLIC_URL, value: "wss://teams.example.com/livekit"}
+            - {name: SERVER_NAME, value: "example.com"}
+            - {name: ALERTMANAGER_URL, value: "http://alertmanager-operated.monitoring:9093"}
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: amer-pg-app, key: uri}}     # created by CloudNativePG, points at primary
+          readinessProbe: {httpGet: {path: /healthz, port: 8080}, periodSeconds: 5, failureThreshold: 2}
+          livenessProbe: {httpGet: {path: /healthz, port: 8080}, initialDelaySeconds: 10, periodSeconds: 10}
+          lifecycle: {preStop: {exec: {command: ["sleep", "5"]}}}        # drain from load balancer before exit
+          resources: {requests: {cpu: 250m, memory: 256Mi}, limits: {memory: 1Gi}}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: orchestrator, namespace: amer-teams, labels: {app: orchestrator}}
+spec: {selector: {app: orchestrator}, ports: [{name: http, port: 8080}]}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: orchestrator, namespace: amer-teams}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: orchestrator}
+  minReplicas: 3
+  maxReplicas: 10
+  metrics: [{type: Resource, resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: orchestrator, namespace: amer-teams}
+spec: {minAvailable: 2, selector: {matchLabels: {app: orchestrator}}}
+---
+# Push gateway (2 replicas)
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: sygnal, namespace: amer-teams}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: sygnal}}
+  template:
+    metadata: {labels: {app: sygnal}}
+    spec:
+      containers:
+        - name: sygnal
+          image: matrixdotorg/sygnal:v0.15.1
+          env: [{name: SYGNAL_CONF, value: /config/sygnal.yaml}]
+          ports: [{containerPort: 5000}]
+          readinessProbe: {tcpSocket: {port: 5000}, periodSeconds: 10}
+          resources: {requests: {cpu: 50m, memory: 128Mi}}
+          volumeMounts: [{name: config, mountPath: /config}]
+      volumes: [{name: config, secret: {secretName: sygnal-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: sygnal, namespace: amer-teams}
+spec: {selector: {app: sygnal}, ports: [{port: 5000}]}

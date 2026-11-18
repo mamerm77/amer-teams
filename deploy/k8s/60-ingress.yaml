@@ -1,0 +1,26 @@
+# Public entry: TLS via cert-manager; sync/client traffic to workers, everything else to the main process.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: amer-teams
+  namespace: amer-teams
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: 200m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Strict-Transport-Security: max-age=63072000; includeSubDomains; preload";
+spec:
+  ingressClassName: nginx
+  tls: [{hosts: [teams.example.com], secretName: amer-teams-tls}]
+  rules:
+    - host: teams.example.com
+      http:
+        paths:
+          - {path: /_matrix/client/v3/sync, pathType: Prefix, backend: {service: {name: synapse-worker, port: {number: 8008}}}}
+          - {path: /_matrix/client/r0/sync, pathType: Prefix, backend: {service: {name: synapse-worker, port: {number: 8008}}}}
+          - {path: /_matrix/push, pathType: Prefix, backend: {service: {name: sygnal, port: {number: 5000}}}}
+          - {path: /_matrix, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
+          - {path: /_synapse/client, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
+          - {path: /api, pathType: Prefix, backend: {service: {name: orchestrator, port: {number: 8080}}}}
+          - {path: /livekit, pathType: Prefix, backend: {service: {name: livekit, port: {number: 7880}}}}

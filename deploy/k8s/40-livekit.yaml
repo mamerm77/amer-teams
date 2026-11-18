@@ -1,0 +1,56 @@
+# Media: 3 LiveKit nodes (one per host, host networking for UDP media), shared state in Redis via Sentinel.
+# A call lives on one node; if that node fails, clients reconnect automatically and are placed on a healthy node.
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: livekit-config, namespace: amer-teams}
+data:
+  livekit.yaml: |
+    port: 7880
+    prometheus_port: 6789
+    rtc: {tcp_port: 7881, port_range_start: 50000, port_range_end: 60000, use_external_ip: true}
+    redis:
+      sentinel_master_name: amer
+      sentinel_addresses: [redis-sentinel:26379]
+    room: {empty_timeout: 300, max_participants: 300}
+    turn: {enabled: true, domain: turn.teams.example.com, tls_port: 5349, udp_port: 3478, external_tls: true}
+    logging: {level: info}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: livekit, namespace: amer-teams}
+spec:
+  replicas: 3
+  strategy: {rollingUpdate: {maxUnavailable: 1, maxSurge: 0}}
+  selector: {matchLabels: {app: livekit}}
+  template:
+    metadata: {labels: {app: livekit}}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 3600          # let running calls finish during upgrades
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution: [{topologyKey: kubernetes.io/hostname, labelSelector: {matchLabels: {app: livekit}}}]
+      containers:
+        - name: livekit
+          image: livekit/livekit-server:v1.8.0
+          args: ["--config", "/etc/livekit/livekit.yaml"]
+          env:
+            - name: LIVEKIT_KEYS
+              valueFrom: {secretKeyRef: {name: amer-secrets, key: LIVEKIT_KEYS}}
+          ports: [{containerPort: 7880}, {containerPort: 7881}, {containerPort: 6789}]
+          readinessProbe: {httpGet: {path: /, port: 7880}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /, port: 7880}, initialDelaySeconds: 20, periodSeconds: 10}
+          resources: {requests: {cpu: "2", memory: 2Gi}, limits: {memory: 4Gi}}
+          volumeMounts: [{name: config, mountPath: /etc/livekit}]
+      volumes: [{name: config, configMap: {name: livekit-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: livekit, namespace: amer-teams, labels: {app: livekit}}
+spec: {selector: {app: livekit}, ports: [{name: http, port: 7880}, {name: metrics, port: 6789}]}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: livekit, namespace: amer-teams}
+spec: {minAvailable: 2, selector: {matchLabels: {app: livekit}}}
