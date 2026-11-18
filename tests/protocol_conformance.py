@@ -199,7 +199,7 @@ async def main():
         await h.post(f"{ORCH}/v1/agents/trans", headers=H, json={"enabled": False})
     subprocess.run(["pkill", "-f", "bin/uvicorn app.main"]); await asyncio.sleep(1)
     subprocess.Popen("exec >/dev/null 2>&1 </dev/null; cd /home/claude/amer-teams/services/orchestrator && . /opt/amer/venv/bin/activate && "
-                     "SYNAPSE_URL=http://127.0.0.1:8008 LIVEKIT_HTTP_URL=http://127.0.0.1:7880 LIVEKIT_API_KEY=APIamer SYNAPSE_ADMIN_TOKEN=$(cat /opt/amer/admin.token) "
+                     "SYNAPSE_URL=http://127.0.0.1:8008 LIVEKIT_HTTP_URL=http://127.0.0.1:7880 LIVEKIT_API_KEY=APIamer SYNAPSE_ADMIN_TOKEN=$(cat /opt/amer/admin.token) ALERTMANAGER_URL=http://127.0.0.1:9093 "
                      f"LIVEKIT_API_SECRET={LK_SECRET} LIVEKIT_PUBLIC_URL={wss} setsid uvicorn app.main:app --port 8080 >> /opt/amer/orch.log 2>&1 &",
                      shell=True, executable="/bin/bash")
     await asyncio.sleep(6)

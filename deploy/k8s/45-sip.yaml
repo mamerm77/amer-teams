@@ -1,0 +1,42 @@
+# Phone network gateway (optional). Needs a carrier SIP trunk; see docs/PHONE.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: livekit-sip, namespace: amer-teams}
+spec:
+  replicas: 2
+  selector: {matchLabels: {app: livekit-sip}}
+  template:
+    metadata: {labels: {app: livekit-sip}}
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 3600
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution: [{topologyKey: kubernetes.io/hostname, labelSelector: {matchLabels: {app: livekit-sip}}}]
+      containers:
+        - name: sip
+          image: livekit/sip:v1.0.0
+          env:
+            - name: SIP_CONFIG_BODY
+              valueFrom: {configMapKeyRef: {name: livekit-sip-config, key: config.yaml}}
+          resources: {requests: {cpu: "1", memory: 512Mi}, limits: {memory: 2Gi}}
+          volumeMounts: [{name: certs, mountPath: /certs, readOnly: true}]
+      volumes: [{name: certs, secret: {secretName: sip-tls}}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: livekit-sip-config, namespace: amer-teams}
+data:
+  config.yaml: |
+    ws_url: ws://livekit.amer-teams:7880
+    redis: {sentinel_master_name: amer, sentinel_addresses: [redis-sentinel.amer-teams:26379]}
+    sip_port: 5060
+    tls: {port: 5061, certs: [{cert_file: /certs/tls.crt, key_file: /certs/tls.key}]}
+    rtp_port: 10000-20000
+    use_external_ip: true
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: livekit-sip, namespace: amer-teams}
+spec: {minAvailable: 1, selector: {matchLabels: {app: livekit-sip}}}

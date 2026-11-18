@@ -36,6 +36,10 @@ class ApiService {
 
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});
 
+  // ---------- Phone network ----------
+  Future<Map<String, dynamic>> phonePolicy() async => jsonDecode((await http.get(_u('/v1/phone/policy'), headers: _h)).body);
+  Future<Map<String, dynamic>> dial(String number) => _post('/v1/phone/dial', {'number': number});
+
   // ---------- Administration (server admins only) ----------
   Future<List<dynamic>> _get(String p) async {
     final r = await http.get(_u(p), headers: _h);

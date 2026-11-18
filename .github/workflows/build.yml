@@ -127,9 +127,7 @@ jobs:
         if: env.APPLE_TEAM_ID == ''
         working-directory: app
         run: |
-          flutter build ios --release --no-codesign --config-only
-          (cd ios && pod install --repo-update)
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign   # Flutter resolves iOS packages itself (Swift Package Manager / CocoaPods)
           mkdir -p build/unsigned/Payload && cp -R build/ios/iphoneos/Runner.app build/unsigned/Payload/
           cd build/unsigned && zip -qr ../AmerTeams-unsigned.ipa Payload
       - name: Upload unsigned IPA (install free with Sideloadly + Apple ID)
