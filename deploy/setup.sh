@@ -30,14 +30,12 @@ registration_requires_token: true
 password_config:
   enabled: true
   policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}
-registration_shared_secret_path: /data/registration.secret
 public_baseurl: https://%s/
 max_upload_size: 200M
 enable_metrics: true
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY
-  openssl rand -hex 32 > synapse/registration.secret
 fi
 echo "Setup complete. Next:"
 echo "  docker compose up -d"

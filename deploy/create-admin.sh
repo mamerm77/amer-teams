@@ -2,6 +2,7 @@
 # Creates the first administrator and gives the AI engine its admin token (for invite codes and user management).
 set -euo pipefail
 cd "$(dirname "$0")"; set -a; . ./.env; set +a
+echo "Waiting for the chat server..."; for i in $(seq 60); do curl -fsS "https://${DOMAIN}/_matrix/client/versions" >/dev/null 2>&1 && break; sleep 3; done
 read -rp "Admin username [admin]: " U; U=${U:-admin}
 read -rsp "Admin password (10+ chars, upper, lower, number, symbol): " P; echo
 docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u "$U" -p "$P" --admin http://localhost:8008
