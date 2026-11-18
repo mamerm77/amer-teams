@@ -19,6 +19,12 @@ if "ios" in sys.argv:
 	<key>UIBackgroundModes</key><array><string>audio</string><string>voip</string><string>remote-notification</string></array>
 """
     p.write_text(s.replace("<dict>", "<dict>\n" + add, 1))
+    pod = pathlib.Path("ios/Podfile"); t = pod.read_text()
+    t = re.sub(r"^#?\s*platform :ios, '[\d.]+'", "platform :ios, '14.0'", t, flags=re.M); pod.write_text(t)
+    pbx = pathlib.Path("ios/Runner.xcodeproj/project.pbxproj"); t = pbx.read_text()
+    t = re.sub(r"IPHONEOS_DEPLOYMENT_TARGET = [\d.]+;", "IPHONEOS_DEPLOYMENT_TARGET = 14.0;", t)
+    t = t.replace("PRODUCT_BUNDLE_IDENTIFIER = com.amerteams.amerTeams;", "PRODUCT_BUNDLE_IDENTIFIER = com.amerteams.app;")
+    pbx.write_text(t)
 if "windows" in sys.argv:
     import shutil
     shutil.copy("../installer/amer-teams.ico", "windows/runner/resources/app_icon.ico")
