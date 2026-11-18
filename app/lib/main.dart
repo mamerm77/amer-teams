@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/matrix_service.dart';
 import 'services/api_service.dart';
 import 'services/call_manager.dart';
+import 'services/app_lock.dart';
+import 'screens/security_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
@@ -31,7 +34,17 @@ class AmerTeamsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: amerTheme(Brightness.light),
       darkTheme: amerTheme(Brightness.dark),
-      home: m.isLoggedIn ? const HomeScreen() : const LoginScreen(),
+      builder: (ctx, child) => LockGate(child: child!),
+      home: m.isLoggedIn ? const _VerificationListener(child: HomeScreen()) : const LoginScreen(),
     );
   }
+}
+
+/// Pops up the emoji check when another device asks to verify.
+class _VerificationListener extends StatefulWidget { const _VerificationListener({required this.child}); final Widget child; @override State<_VerificationListener> createState() => _VL(); }
+class _VL extends State<_VerificationListener> {
+  StreamSubscription? sub;
+  @override void initState() { super.initState(); sub = context.read<MatrixService>().client.onKeyVerificationRequest.stream.listen((v) { if (mounted) showVerification(navigatorKey.currentContext ?? context, v); }); }
+  @override void dispose() { sub?.cancel(); super.dispose(); }
+  @override Widget build(BuildContext c) => widget.child;
 }
