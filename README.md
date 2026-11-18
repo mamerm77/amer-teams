@@ -14,6 +14,20 @@ Encryption design: see **docs/SECURITY.md**.
 ## Verified
 See **docs/TEST_REPORT.md** — 29/29 protocol, 26/26 registration and 14/14 functional checks against live servers on PostgreSQL, Redis and TLS.
 
+## Features
+| Area | What you can do |
+|---|---|
+| Calls | Voice or video call from any chat or from **Calls → New call**; incoming-call ringing with Accept / Decline; call history with missed calls and redial |
+| Meetings | **Meet now** with a 9-digit meeting ID; **Join with ID** through a waiting room the host controls (Admit / Decline); **Schedule** with date, time, duration and invitees; meetings appear in Calendar with a Join button |
+| In a call | Grid or speaker view, active-speaker highlight, participant list, meeting chat, raise hand, emoji reactions, screen share, front/back camera, mute, on-device captions, Amer minutes, safety code |
+| Chat | People search (organisation directory), 1:1 and group chats, replies, reactions, edit, delete for everyone, typing indicator, read receipts (✓✓), photo previews, files, voice messages, polls, message search, pinned chats, status message and online presence |
+| Teams | Teams with channels |
+| Phone | Calls to ordinary phone numbers through a company SIP trunk (admin enabled) |
+| AI | Amer co-pilot, thread summaries, translation, meeting minutes, scheduling |
+| Admin | Invite codes, create / reset / deactivate users, agent control, health and alerts |
+
+Everything except phone-network calls is end-to-end encrypted; call keys are post-quantum hybrid (ML-KEM-768).
+
 ## What works in this release
 - Encrypted 1:1 and group chat, file-ready, unencrypted rooms refused
 - Encrypted video/voice calls and meetings: per-call AES-GCM-256 key, shared only through the encrypted room, rotated on leave and every 10 min, **safety code** to verify
