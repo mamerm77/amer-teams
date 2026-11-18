@@ -192,7 +192,6 @@ class _S extends State<ChatScreen> {
     }
     return out;
   }
-  }
 
   Future<void> attach() async {
     final files = await FilePicker.pickFiles(); if (files.isEmpty) return;

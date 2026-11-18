@@ -29,7 +29,7 @@ class _S extends State<ActivityScreen> {
           leading: CircleAvatar(child: Icon(icons[a.kind])),
           title: Text(a.text, maxLines: 2, overflow: TextOverflow.ellipsis),
           subtitle: Text('${a.room.getLocalizedDisplayname()} · ${DateFormat('d MMM, HH:mm').format(a.event.originServerTs)}'),
-          onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: a.room.id)))).toList()]));
+          onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: a.room.id))))]));
       })),
     ]));
 }
