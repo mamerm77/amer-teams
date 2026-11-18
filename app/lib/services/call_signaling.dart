@@ -47,9 +47,9 @@ class CallSignaling {
   Map<String, Object?> _base() => {'call_id': callId, 'party_id': myDevice, 'version': 2};
 
   // ---------------- caller ----------------
-  void startCall() {
+  void startCall({Map<String, Object?> extra = const {}}) {
     assert(role == CallRole.caller);
-    send(kInvite, {..._base(), 'media': video ? 'video' : 'audio', 'lifetime_ms': lifetime.inMilliseconds,
+    send(kInvite, {..._base(), ...extra, 'media': video ? 'video' : 'audio', 'lifetime_ms': lifetime.inMilliseconds,
         'body': video ? '📹 Video call' : '📞 Voice call'});
     _startedAt = _now(); _go(CallState.calling);
   }
@@ -64,9 +64,9 @@ class CallSignaling {
     _go(CallState.ringing);
     return true;
   }
-  void accept() {
+  void accept({Map<String, Object?> extra = const {}}) {
     if (role != CallRole.callee || state != CallState.ringing) return;
-    send(kAnswer, {..._base(), 'body': 'answered'});
+    send(kAnswer, {..._base(), ...extra, 'body': 'answered'});
     _go(CallState.connecting);
   }
   void decline() {

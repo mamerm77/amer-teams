@@ -95,9 +95,10 @@ class _S extends State<CallsScreen> {
     } catch (e) { _err(e); }
   }
 
-  Widget _action(IconData i, String label, VoidCallback f) => SizedBox(width: 96, child: Column(children: [
-    IconButton.filledTonal(iconSize: 28, style: IconButton.styleFrom(minimumSize: const Size(60, 60)), onPressed: f, icon: Icon(i)),
-    const SizedBox(height: 4), Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium)]));
+  Widget _action(IconData i, String label, VoidCallback f) => SizedBox(width: 96, child: InkWell(borderRadius: BorderRadius.circular(12), onTap: f,
+    child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Column(children: [
+      IconButton.filledTonal(tooltip: label, iconSize: 28, style: IconButton.styleFrom(minimumSize: const Size(60, 60)), onPressed: f, icon: Icon(i)),
+      const SizedBox(height: 4), Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium)]))));
 
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: const Text('Calls & meetings'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
@@ -119,8 +120,9 @@ class _S extends State<CallsScreen> {
           title: Text(r.peer, style: TextStyle(color: r.missed ? Theme.of(c).colorScheme.error : null)),
           subtitle: Row(children: [
             Icon(r.missed ? Icons.call_missed : r.outgoing ? Icons.call_made : Icons.call_received, size: 14), const SizedBox(width: 4),
-            Text('${r.missed ? 'Missed' : r.outgoing ? 'Outgoing' : 'Incoming'} · ${DateFormat('d MMM, HH:mm').format(r.at)}'
-                 '${r.durationS != null ? ' · ${r.durationS! ~/ 60}:${(r.durationS! % 60).toString().padLeft(2, '0')}' : ''}')]),
+            Text('${r.outcome != null ? CallSummary(r.outcome!, r.durationS, r.answered).label(r.outgoing, r.video) : r.missed ? 'Missed' : r.outgoing ? 'Outgoing' : 'Incoming'}'
+                 ' · ${DateFormat('d MMM, HH:mm').format(r.at)}'
+                 '${r.outcome == null && r.durationS != null ? ' · ${r.durationS! ~/ 60}:${(r.durationS! % 60).toString().padLeft(2, '0')}' : ''}')]),
           trailing: IconButton(tooltip: 'Call again', icon: Icon(r.video ? Icons.videocam_outlined : Icons.call_outlined),
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: r.room.id, video: r.video))).then((_) => _load())))]);
       }),

@@ -43,7 +43,11 @@ void main() {
     }
     void expectFound(bool ok, String what) { if (!ok) throw StateError('Not shown on screen: $what'); }
     Future<void> tap(Finder f, String what) async { expectFound(await waitFor(f), what); await t.tap(f.first); await wait(.6); }
-    Future<void> type(Finder f, String text, String what) async { expectFound(await waitFor(f), what); await t.enterText(f.first, text); await wait(.3); }
+    Future<void> type(Finder f, String text, String what) async {
+      expectFound(await waitFor(f), what);
+      await t.tap(f.first); await wait(.3);            // focus the box first, as a person would (re-attaches text input after a menu closes)
+      await t.enterText(f.first, text); await wait(.3);
+    }
     Finder field(String label) => find.byWidgetPredicate((w) => w is TextField && (w.decoration?.labelText == label || w.decoration?.hintText == label));
     Future<void> sendText(String s) async {
       await type(field('Message'), s, 'message box');

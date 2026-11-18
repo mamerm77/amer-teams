@@ -66,6 +66,7 @@ class Peer:
         open(os.getenv("PEER_READY", "peer.ready"), "w").write(self.room)
 
     def base(self, cid): return {"call_id": cid, "party_id": self.c.device_id, "version": 2}
+    def advert(self): return {"pq_alg": "ML-KEM-768", "pq_pk": b64(self.pk)}
 
     async def on_text(self, room, ev):
         if ev.sender == BOB: return
@@ -86,6 +87,8 @@ class Peer:
         cid = c.get("call_id")
         if t == "com.amerteams.pq.device" and c.get("user_id") == ev.sender:
             self.pq_devs[f"{c['user_id']}|{c['device_id']}"] = (c["user_id"], c["device_id"], unb64(c["pk"])); return
+        if c.get("pq_alg") == "ML-KEM-768" and c.get("pq_pk") and c.get("party_id"):      # key carried in invite / answer
+            self.pq_devs[f"{ev.sender}|{c['party_id']}"] = (ev.sender, c["party_id"], unb64(c["pq_pk"]))
         if t == "com.amerteams.call.invite" and c.get("version") == 2:
             mode, self.mode = self.mode, "answer"
             if mode == "ignore": return
@@ -93,7 +96,7 @@ class Peer:
             await self.send("com.amerteams.call.ringing", self.base(cid)); await asyncio.sleep(3)
             if mode == "decline": await self.send("com.amerteams.call.reject", {**self.base(cid), "reason": "declined"}); return
             self.calls[cid] = {"role": "callee"}
-            await self.send("com.amerteams.call.answer", self.base(cid))
+            await self.send("com.amerteams.call.answer", {**self.base(cid), **self.advert()})
         elif t == "com.amerteams.call.answer" and cid in self.calls and self.calls[cid]["role"] == "caller":
             await self.share_key(cid)
             await self.join(cid)
@@ -107,7 +110,7 @@ class Peer:
 
     async def call_moh(self, video=False):
         cid = f"bob{int(time.time())}"; self.calls[cid] = {"role": "caller"}
-        await self.send("com.amerteams.call.invite", {**self.base(cid), "media": "video" if video else "audio", "lifetime_ms": 45000,
+        await self.send("com.amerteams.call.invite", {**self.base(cid), **self.advert(), "media": "video" if video else "audio", "lifetime_ms": 45000,
                                                       "body": "📹 Video call" if video else "📞 Voice call"})
         log("calling moh", cid)
 

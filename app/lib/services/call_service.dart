@@ -77,6 +77,10 @@ class SecureCall {
     await _join();
   }
   void Function()? onRemoteMedia;
+  /// This device's ML-KEM-768 public key, sent inside the invite / answer.
+  Map<String, Object?> get pqAdvert => {'pq_alg': 'ML-KEM-768', 'pq_pk': base64.encode(_pq.pk)};
+  final _peerKeys = <String, (String, String, Uint8List)>{};
+  void addPeerKey(String user, String device, Uint8List pk) => _peerKeys['$user|$device'] = (user, device, pk);
   bool get hasRemoteMedia => _joined && lk.remoteParticipants.values.any((p) => p.trackPublications.values.any((t) => t.subscribed));
 
   // ---------- media quality (WebRTC getStats via LiveKit) ----------
@@ -183,6 +187,7 @@ class SecureCall {
         found.putIfAbsent('$u|$d', () => (u, d, base64.decode(e.content['pk'] as String)));
       }
     } finally { tl.cancelSubscriptions(); }
+    found.addAll(_peerKeys);                   // keys received in this call's invite / answer win
     found.putIfAbsent('$_me|$_dev', () => (_me, _dev, _pq.pk));
     return found.values.toList();
   }

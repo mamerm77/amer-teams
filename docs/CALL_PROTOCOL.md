@@ -17,6 +17,13 @@ the end-to-end encrypted room, so the server sees only ciphertext and timing.
 
 `party_id` = the sending device ID, so multi-device behaviour is unambiguous.
 
+**Post-quantum key exchange inside the call (v2.1):** `invite` and `answer` also carry `pq_alg: ML-KEM-768` and
+`pq_pk` (the sending device's ML-KEM-768 public key). The side that creates the media key wraps it for the
+device that answered using this key, so a call never depends on older room history. Older history may be
+unreadable on a newly signed-in device, because Megolm sessions created before the device existed are not
+shared with it. Found by the in-use test: Bob's key, published before the app's device signed in, could not be
+decrypted, and the call failed.
+
 ## 2. Caller state machine
 ```
 idle ──invite──▶ calling ──first `ringing`──▶ ringing ──`answer`──▶ connecting ──remote media joined──▶ connected

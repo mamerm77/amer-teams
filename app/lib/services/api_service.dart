@@ -70,8 +70,12 @@ class ApiService {
     if (samples.isEmpty) return;
     try { await http.post(_u('/v1/calls/quality'), headers: _h, body: jsonEncode({'call_id': callId, 'device_id': device, 'samples': samples})).timeout(const Duration(seconds: 5)); } catch (_) {}
   }
-  Future<List<dynamic>> adminCalls({String? outcome, String? user}) =>
-      _get('/v1/admin/calls?limit=200${outcome != null ? '&outcome=$outcome' : ''}${user != null ? '&user=${Uri.encodeComponent(user)}' : ''}');
+  Future<List<dynamic>> adminCalls({String? outcome, String? user}) async {
+    final r = await http.get(_u('/v1/admin/calls').replace(queryParameters: {'limit': '200', if (outcome != null) 'outcome': outcome, if (user != null) 'user': user}), headers: _h);
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j as List;
+  }
   Future<Map<String, dynamic>> callTrace(String callId) async {
     final r = await http.get(_u('/v1/admin/calls/${Uri.encodeComponent(callId)}/trace'), headers: _h);
     final j = jsonDecode(utf8.decode(r.bodyBytes));

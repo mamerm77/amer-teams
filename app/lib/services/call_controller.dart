@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'api_service.dart';
@@ -51,7 +53,7 @@ class CallController extends ChangeNotifier {
     final c = _make(api, room, CallRole.caller, _newId, video);
     c.peerName = room.getLocalizedDisplayname();
     c.media = await SecureCall.prepare(api, room, callId: c.callId, video: video, caller: true);
-    c.sig.startCall();
+    c.sig.startCall(extra: c.media!.pqAdvert);
     Tones.ringback();
     return c;
   }
@@ -61,6 +63,7 @@ class CallController extends ChangeNotifier {
     final c = _make(api, room, CallRole.callee, invite.content['call_id'] as String, invite.content['media'] != 'audio', inviteTs: invite.originServerTs);
     c.peerName = invite.senderFromMemoryOrFallback.calcDisplayname();
     c._trace('invite', 'in', {'peer': invite.senderId});
+    c._takeKey(invite);
     if (!c.sig.receiveInvite(busy: busy)) { c._trace('state', 'local', {'state': 'ended', 'outcome': c.sig.outcome.name}); c._dispose(); return null; }
     Tones.ringtone();
     return c;
@@ -70,13 +73,24 @@ class CallController extends ChangeNotifier {
     if (e.roomId != room.id || !e.type.startsWith(kCallPrefix) || e.content['call_id'] != callId) return;
     if (e.senderId == room.client.userID && e.content['party_id'] == room.client.deviceID) return;   // our own echo
     _trace(e.type.split('.').last, 'in', {'reason': e.content['reason'], 'outcome': e.content['outcome']});
+    _takeKey(e);
     sig.onSignal(e.type, e.content, senderUser: e.senderId);
+  }
+
+  (String, String, Uint8List)? _callerKey;
+  /// The other side's ML-KEM-768 public key, carried inside invite/answer (works even for devices that joined later).
+  void _takeKey(mx.Event e) {
+    final pk = e.content['pq_pk'], dev = e.content['party_id'];
+    if (pk is! String || dev is! String || e.content['pq_alg'] != 'ML-KEM-768') return;
+    final k = (e.senderId, dev, base64.decode(pk));
+    if (media != null) { media!.addPeerKey(k.$1, k.$2, k.$3); } else { _callerKey = k; }
   }
 
   Future<void> accept() async {
     Tones.stop();
-    media = await SecureCall.prepare(api, room, callId: callId, video: video, caller: false);   // publish our key before answering
-    sig.accept();
+    media = await SecureCall.prepare(api, room, callId: callId, video: video, caller: false);
+    if (_callerKey != null) media!.addPeerKey(_callerKey!.$1, _callerKey!.$2, _callerKey!.$3);
+    sig.accept(extra: media!.pqAdvert);       // our ML-KEM key travels in the answer itself
   }
   void decline() { Tones.stop(); sig.decline(); }
   Future<void> hangup() async { sig.hangup(); }
