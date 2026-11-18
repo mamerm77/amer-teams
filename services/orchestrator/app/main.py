@@ -4,13 +4,15 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest
 import asyncio
-from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings
+from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace
+from .admin import require_admin
 
 app = FastAPI(title="Amer Teams Orchestrator", version="0.5.0")
 
 app.include_router(admin.router)
 app.include_router(sip.router)
 app.include_router(meetings.router)
+app.include_router(calltrace.router)
 
 @app.on_event("startup")
 async def _start():
@@ -78,7 +80,7 @@ async def list_agents(user=Depends(auth.matrix_user)):
 class Toggle(BaseModel): enabled: bool
 
 @app.post("/v1/agents/{aid}")
-async def toggle(aid: str, t: Toggle, user=Depends(auth.matrix_user)):
+async def toggle(aid: str, t: Toggle, user=Depends(require_admin)):
     if aid not in agents.AGENTS: raise HTTPException(404)
     agents.AGENTS[aid].enabled = t.enabled
     await db.save_agent(aid, t.enabled, user["user_id"])
@@ -86,10 +88,10 @@ async def toggle(aid: str, t: Toggle, user=Depends(auth.matrix_user)):
     return {"ok": True}
 
 @app.get("/v1/audit")
-async def get_audit(user=Depends(auth.matrix_user)): return await db.audit_recent()
+async def get_audit(user=Depends(require_admin)): return await db.audit_recent()
 
 @app.get("/v1/audit/verify")
-async def verify_audit(user=Depends(auth.matrix_user)):
+async def verify_audit(user=Depends(require_admin)):
     ok, n = await db.audit_verify(); return {"intact": ok, "entries": n}
 
 # ---------- Operations (real telemetry) ----------

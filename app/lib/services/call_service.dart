@@ -56,6 +56,65 @@ class SecureCall {
     return c;
   }
 
+  /// Protocol v2 (1:1 calls): prepare keys first; media connects only after the callee answers.
+  static Future<SecureCall> prepare(ApiService api, mx.Room room, {required String callId, required bool video, required bool caller}) async {
+    if (!room.encrypted) throw StateError('Calls require an end-to-end encrypted room');
+    final c = SecureCall(api, room, callId: callId, video: video).._caller = caller;
+    await c._setup();               // publishes this device's ML-KEM key so the other side can include it
+    return c;
+  }
+  /// Caller, after `answer`: wrap a fresh key for every member device (now including the callee's), then connect.
+  Future<void> connectAsCaller() async { await _shareNewKey(); await _join(); }
+  /// Callee, after sending `answer`: wait (up to 20 s) for the caller's key that includes this device, then connect.
+  Future<void> connectAsCallee() async {
+    Map<String, dynamic>? latest;
+    for (var i = 0; i < 20 && latest == null; i++) {
+      latest = await _latestKeyEventForMe();
+      if (latest == null) await Future.delayed(const Duration(seconds: 1));
+    }
+    if (latest == null) throw StateError('The caller did not send a key for this device');
+    await _applyKey(latest);
+    await _join();
+  }
+  void Function()? onRemoteMedia;
+  bool get hasRemoteMedia => _joined && lk.remoteParticipants.values.any((p) => p.trackPublications.values.any((t) => t.subscribed));
+
+  // ---------- media quality (WebRTC getStats via LiveKit) ----------
+  final _lastBytes = <String, (int, DateTime)>{};
+  Future<List<Map<String, Object?>>> qualitySamples() async {
+    if (!_joined) return [];
+    final out = <Map<String, Object?>>[];
+    Future<void> add(dynamic track, String kind, String dir, String key) async {
+      try {
+        final dynamic st = dir == 'send' ? await track.getSenderStats() : await track.getReceiverStats();
+        if (st == null) return;
+        int? i(dynamic f) { try { final v = f(); return v == null ? null : (v as num).toInt(); } catch (_) { return null; } }
+        double? d(dynamic f) { try { final v = f(); return v == null ? null : (v as num).toDouble(); } catch (_) { return null; } }
+        final bytes = dir == 'send' ? i(() => st.bytesSent) : i(() => st.bytesReceived);
+        final packets = dir == 'send' ? i(() => st.packetsSent) : i(() => st.packetsReceived);
+        double? kbps;
+        final prev = _lastBytes[key];
+        if (bytes != null) {
+          if (prev != null) { final dt = DateTime.now().difference(prev.$2).inMilliseconds / 1000; if (dt > 0) kbps = (bytes - prev.$1) * 8 / 1000 / dt; }
+          _lastBytes[key] = (bytes, DateTime.now());
+        }
+        final jit = d(() => st.jitter), rtt = d(() => st.roundTripTime);
+        String? codec; try { codec = (st.mimeType as String?)?.split('/').last; } catch (_) {}
+        out.add({'kind': kind, 'direction': dir, 'codec': codec, 'bitrate_kbps': kbps, 'packets': packets, 'packets_lost': i(() => st.packetsLost),
+                 'jitter_ms': jit == null ? null : jit * 1000, 'rtt_ms': rtt == null ? null : rtt * 1000});
+      } catch (_) {}
+    }
+    for (final t in lk.localParticipant?.trackPublications.values ?? const <LocalTrackPublication>[]) {
+      if (t.track != null) await add(t.track, t.kind == TrackType.VIDEO ? 'video' : 'audio', 'send', 'L${t.sid}');
+    }
+    for (final p in lk.remoteParticipants.values) {
+      for (final t in p.trackPublications.values) {
+        if (t.track != null) await add(t.track, t.kind == TrackType.VIDEO ? 'video' : 'audio', 'recv', 'R${t.sid}');
+      }
+    }
+    return out;
+  }
+
   static Future<SecureCall> join(ApiService api, mx.Room room, String callId, {bool video = true}) async {
     final c = SecureCall(api, room, callId: callId, video: video);
     await c._setup();              // publishes this device's key; members in the call re-key to include it
@@ -171,7 +230,9 @@ class SecureCall {
       await lk.localParticipant?.setMicrophoneEnabled(true);
     }
     _joinedAt = DateTime.now();
-    lk.createListener().on<ParticipantDisconnectedEvent>((_) => _shareNewKey());
+    lk.createListener()
+      ..on<ParticipantDisconnectedEvent>((_) => _shareNewKey())
+      ..on<TrackSubscribedEvent>((_) => onRemoteMedia?.call());
     _joined = true;
     _rotate = Timer.periodic(kCallKeyRotation, (_) => _shareNewKey());
   }
@@ -180,12 +241,12 @@ class SecureCall {
 
   Duration get elapsed => _joinedAt == null ? Duration.zero : DateTime.now().difference(_joinedAt!);
 
-  Future<void> leave() async {
+  Future<void> leave({bool sendEnd = true}) async {
     _rotate?.cancel(); await _sub?.cancel();
     if (_joined) {
       final alone = lk.remoteParticipants.isEmpty;
       await lk.disconnect();
-      if (_caller || alone) {        // record the call for everyone's history
+      if (sendEnd && (_caller || alone)) {        // record the call for everyone's history
         await room.sendEvent({'call_id': callId, 'duration_s': elapsed.inSeconds, 'reason': 'hangup',
             'body': '${video ? '📹' : '📞'} Call ended · ${elapsed.inMinutes}:${(elapsed.inSeconds % 60).toString().padLeft(2, '0')}'}, type: kCallEndEvent);
       }

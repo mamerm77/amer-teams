@@ -7,7 +7,10 @@ import 'package:matrix/matrix.dart' as mx;
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../services/api_service.dart';
+import '../services/call_controller.dart';
+import '../services/call_manager.dart';
 import '../services/call_service.dart';
+import '../services/call_signaling.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'whiteboard_screen.dart';
@@ -15,8 +18,10 @@ import 'whiteboard_screen.dart';
 /// Encrypted call or meeting: video grid, participants, in-meeting chat, raise hand, reactions,
 /// screen share, camera switch, on-device captions, waiting room for the host, Amer minutes.
 class CallScreen extends StatefulWidget {
-  const CallScreen({super.key, required this.roomId, this.callId, this.video = true, this.meeting = false});
+  const CallScreen({super.key, required this.roomId, this.callId, this.video = true, this.meeting = false, this.controller});
   final String roomId; final String? callId; final bool video, meeting;
+  /// 1:1 calls (protocol v2): the signalling controller. Null for meetings.
+  final CallController? controller;
   @override State<CallScreen> createState() => _S();
 }
 
@@ -24,6 +29,7 @@ enum _Panel { none, people, chat }
 
 class _S extends State<CallScreen> {
   SecureCall? call; String? err;
+  CallController? ctl; bool _closing = false; CallManager? cm;
   bool mic = true, cam = true, sharing = false, captions = false, amerNotes = false, myHand = false, grid = true, front = true;
   _Panel panel = _Panel.none;
   final hands = <String>{}; final floating = <(String, String, DateTime)>[];
@@ -113,7 +119,15 @@ class _S extends State<CallScreen> {
   @override void initState() { super.initState(); cam = widget.video; _start(); tick = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); }); }
 
   Future<void> _start() async {
-    final api = context.read<ApiService>();
+    final api = context.read<ApiService>(); cm = context.read<CallManager>();
+    if (!widget.meeting && widget.callId == null) {          // 1:1 call: ring first, media only after answer
+      try {
+        ctl = widget.controller ?? await cm!.startCall(room, video: widget.video);
+        ctl!.addListener(_onCtl); _onCtl();
+      } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
+      return;
+    }
+    if (widget.meeting) cm!.inCall = true;
     try {
       final id = widget.meeting ? 'meet-${widget.roomId}' : widget.callId;   // same on every device
       call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: widget.video)
@@ -126,6 +140,42 @@ class _S extends State<CallScreen> {
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
   }
   void _refresh() { if (mounted) setState(() {}); }
+
+  void _onCtl() {
+    final c = ctl!;
+    if (call == null && c.state == CallState.connected && c.media != null) {
+      call = c.media; call!.lk.addListener(_refresh);
+      ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
+      _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
+    }
+    if (c.ended && !_closing) {
+      _closing = true; call = null;
+      Future.delayed(Duration(milliseconds: c.sig.outcome == CallOutcome.completed || c.sig.outcome == CallOutcome.remoteHangup ? 1200 : 2500),
+          () { if (mounted) Navigator.of(context).maybePop(); });
+    }
+    _refresh();
+  }
+
+  /// Before media connects (Calling… / Ringing… / Connecting…) and after the call ends (outcome).
+  Widget _status(BuildContext c) {
+    final k = ctl!; final cs = Theme.of(c).colorScheme;
+    final endedBad = k.ended && !{CallOutcome.completed, CallOutcome.remoteHangup}.contains(k.sig.outcome);
+    return Scaffold(backgroundColor: cs.surfaceContainerHighest, body: SafeArea(child: Column(children: [
+      const Spacer(),
+      CircleAvatar(radius: 56, child: Text(_initials(k.peerName ?? room.getLocalizedDisplayname()), style: const TextStyle(fontSize: 36))),
+      const SizedBox(height: 20),
+      Text(k.peerName ?? room.getLocalizedDisplayname(), style: Theme.of(c).textTheme.headlineSmall),
+      const SizedBox(height: 8),
+      Text(k.label, style: Theme.of(c).textTheme.titleMedium?.copyWith(color: endedBad ? cs.error : null)),
+      const SizedBox(height: 6),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.lock, size: 14, color: Colors.green), const SizedBox(width: 4),
+        Text('${k.video ? 'Video' : 'Voice'} call · end-to-end encrypted', style: Theme.of(c).textTheme.labelSmall)]),
+      const Spacer(),
+      if (!k.ended) Padding(padding: const EdgeInsets.only(bottom: 40), child: FloatingActionButton.large(heroTag: 'end', backgroundColor: Colors.red,
+        onPressed: () => k.hangup(), child: const Icon(Icons.call_end, color: Colors.white))),
+      if (k.ended) const SizedBox(height: 136),
+    ])));
+  }
 
   // ---------- raise hand and reactions (small data messages between participants) ----------
   void _onData(DataReceivedEvent e) {
@@ -155,6 +205,10 @@ class _S extends State<CallScreen> {
   }
 
   Future<void> _leave() async {
+    if (ctl != null) {                         // 1:1: signalling sends hangup + end and tears media down
+      await stt.stop(); await ev?.dispose(); ev = null; await ctl!.hangup(); return;
+    }
+    cm?.inCall = false;
     tick?.cancel(); await stt.stop(); await ev?.dispose(); await call?.leave();
     if (amerNotes && transcript.isNotEmpty && mounted) {
       final r = await context.read<ApiService>().ask('Write minutes', context: transcript.toString(), agent: 'minutes');
@@ -162,20 +216,21 @@ class _S extends State<CallScreen> {
     }
     if (mounted) Navigator.pop(context);
   }
-  @override void dispose() { tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+  @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
 
   // ---------- UI ----------
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
     if (err != null) return Scaffold(appBar: AppBar(), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('Could not join: $err', textAlign: TextAlign.center))));
+    if (ctl != null && (call == null || ctl!.ended)) return _status(c);
     if (call == null) return Scaffold(body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const CircularProgressIndicator(), const SizedBox(height: 16), Text(widget.meeting ? 'Joining meeting…' : 'Connecting securely…')])));
     final lk = call!.lk;
     final people = <Participant>[if (lk.localParticipant != null) lk.localParticipant!, ...lk.remoteParticipants.values];
     final waiting = widget.meeting ? meetings.waiting(room) : <mx.User>[];
     final mid = meetings.meetingIdOf(room);
     floating.removeWhere((f) => DateTime.now().difference(f.$3).inSeconds > 4);
-    final t = call!.elapsed; final timer = '${t.inMinutes.toString().padLeft(2, '0')}:${(t.inSeconds % 60).toString().padLeft(2, '0')}';
+    final t = ctl?.sig.duration ?? call!.elapsed; final timer = '${t.inMinutes.toString().padLeft(2, '0')}:${(t.inSeconds % 60).toString().padLeft(2, '0')}';
     final wide = MediaQuery.sizeOf(c).width > 900;
 
     final stage = Stack(children: [

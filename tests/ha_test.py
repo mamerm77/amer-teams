@@ -44,7 +44,8 @@ def pg_setup():
 procs = {}
 def start_replica(port):
     env = {**os.environ, "SYNAPSE_URL": "http://127.0.0.1:8008", "LIVEKIT_HTTP_URL": "http://127.0.0.1:7880", "LIVEKIT_API_KEY": "APIamer",
-           "LIVEKIT_API_SECRET": "amer-test-secret-amer-test-secret-0123", "LIVEKIT_PUBLIC_URL": "ws://127.0.0.1:7880", "DATABASE_URL": DSN}
+           "LIVEKIT_API_SECRET": "amer-test-secret-amer-test-secret-0123", "LIVEKIT_PUBLIC_URL": "ws://127.0.0.1:7880", "DATABASE_URL": DSN,
+           "SYNAPSE_ADMIN_TOKEN": open("/opt/amer/admin.token").read().strip()}
     procs[port] = subprocess.Popen(["/opt/amer/venv/bin/uvicorn", "app.main:app", "--port", str(port)], cwd=ORCH_DIR, env=env,
                                    stdout=open(f"{BASE}/orch{port}.log", "a"), stderr=subprocess.STDOUT, start_new_session=True)
 def wait_up(url, secs=30):
@@ -83,7 +84,7 @@ async def main():
     for p in PORTS: start_replica(p)
     check("A0. 3 AI-engine replicas started", all(wait_up(f"http://127.0.0.1:{p}/healthz") for p in PORTS))
     lb = lb_start(); check("A1. Load balancer up", wait_up(LB + "/healthz"))
-    tok = httpx.post("http://127.0.0.1:8008/_matrix/client/v3/login", json={"type": "m.login.password", "identifier": {"type": "m.id.user", "user": "moh"}, "password": "Pass-moh-123"}).json()["access_token"]
+    tok = open("/opt/amer/admin.token").read().strip()      # audit log and agent switches are administrator-only
     H = {"Authorization": f"Bearer {tok}"}
 
     # A: kill one replica under load, then rolling restart

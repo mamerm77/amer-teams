@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 set -a; . ./.env; set +a
 python3 - <<PY2
 import re;p="livekit.yaml";s=open(p).read()
-s=re.sub(r"keys:\n(  #.*\n)?  .*\n","keys:\n  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}\n",s);open(p,"w").write(s)
+s=re.sub(r"keys:\n(  #.*\n)?  .*\n","keys:\n  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}\n",s);s=s.replace("api_key: LK_API_KEY","api_key: ${LIVEKIT_API_KEY}");open(p,"w").write(s)
 PY2
 if [ ! -f synapse/homeserver.yaml ]; then
   docker run --rm -v "$PWD/synapse:/data" -e SYNAPSE_SERVER_NAME="$SERVER_NAME" -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:v1.120.0 generate

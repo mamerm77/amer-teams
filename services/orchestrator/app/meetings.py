@@ -77,3 +77,14 @@ async def control(req: Control, user=Depends(auth.matrix_user)):
                         await lk.room.mute_published_track(lkapi.MuteRoomTrackRequest(room=room, identity=p.identity, track_sid=t.sid, muted=True)); done += 1
     await db.audit(user["user_id"], f"meeting.{req.action}", f"{req.call_id} {req.identity or ''}".strip())
     return {"ok": True, "affected": done}
+
+@router.get("/presence")
+async def presence(room_id: str, call_id: str, user=Depends(auth.matrix_user)):
+    """Who is in a meeting right now, from the media server itself (not from chat events)."""
+    await auth.assert_room_member(user, room_id)
+    async with lkapi.LiveKitAPI(config.LIVEKIT_HTTP_URL, config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET) as lk:
+        try:
+            ps = (await lk.room.list_participants(lkapi.ListParticipantsRequest(room=livekit_token.room_name(room_id, call_id)))).participants
+        except Exception:
+            ps = []            # room does not exist on the media server: nobody is in the meeting
+    return {"count": len(ps), "participants": [p.identity for p in ps]}

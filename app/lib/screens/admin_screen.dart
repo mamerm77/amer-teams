@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import 'call_trace_screen.dart';
 
 /// User administration for server admins: invite codes and accounts.
 class AdminScreen extends StatefulWidget { const AdminScreen({super.key}); @override State<AdminScreen> createState() => _S(); }
@@ -47,7 +48,8 @@ class _S extends State<AdminScreen> {
       : ListView(padding: const EdgeInsets.all(12), children: [
         Wrap(spacing: 8, children: [
           FilledButton.icon(onPressed: _invite, icon: const Icon(Icons.vpn_key), label: const Text('New invite code')),
-          OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: const Text('Create user'))]),
+          OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: const Text('Create user')),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CallTraceScreen())), icon: const Icon(Icons.timeline), label: const Text('Call trace'))]),
         const SizedBox(height: 16), Text('Accounts (${users.length})', style: Theme.of(c).textTheme.titleMedium),
         for (final u in users) ListTile(
           leading: Icon(u['deactivated'] ? Icons.person_off : u['admin'] ? Icons.admin_panel_settings : Icons.person),

@@ -20,7 +20,7 @@ GUARDIAN_BLOCK_LABELS=Confidential,Restricted
 "@ | Set-Content -Encoding ascii .env
 }
 $envs = @{}; Get-Content .env | ForEach-Object { if ($_ -match "^(\w+)=(.*)$") { $envs[$matches[1]] = $matches[2] } }
-(Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" | Set-Content -Encoding ascii livekit.yaml
+(Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" -replace "api_key: LK_API_KEY", "api_key: $($envs.LIVEKIT_API_KEY)" | Set-Content -Encoding ascii livekit.yaml
 if (-not (Test-Path synapse/homeserver.yaml)) {
   docker run --rm -v "${PWD}/synapse:/data" -e SYNAPSE_SERVER_NAME=$ip -e SYNAPSE_REPORT_STATS=no matrixdotorg/synapse:v1.120.0 generate
   $hs = Get-Content synapse/homeserver.yaml -Raw

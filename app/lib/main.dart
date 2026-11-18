@@ -19,7 +19,7 @@ Future<void> main() async {
   runApp(MultiProvider(providers: [
     ChangeNotifierProvider.value(value: matrix),
     ProxyProvider<MatrixService, ApiService>(update: (_, m, __) => ApiService(m)),
-    Provider<CallManager>(create: (_) => CallManager(matrix, navigatorKey)..start(), dispose: (_, cm) => cm.dispose()),
+    Provider<CallManager>(create: (_) => CallManager(matrix, navigatorKey, ApiService(matrix))..start(), dispose: (_, cm) => cm.dispose()),
   ], child: const AmerTeamsApp()));
 }
 

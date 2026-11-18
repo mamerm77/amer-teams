@@ -60,4 +60,33 @@ class ApiService {
   Future<void> resetPassword(String uid, String pw) => _post('/v1/admin/users/${Uri.encodeComponent(uid)}/password', {'password': pw});
 
   Future<List<dynamic>> audit() async => jsonDecode((await http.get(_u('/v1/audit'), headers: _h)).body);
+
+  // ---------- Call trace (metadata only) ----------
+  /// Fire-and-forget: a trace failure must never affect the call itself.
+  Future<void> trace(Map<String, Object?> ev) async {
+    try { await http.post(_u('/v1/calls/trace'), headers: _h, body: jsonEncode(ev)).timeout(const Duration(seconds: 5)); } catch (_) {}
+  }
+  Future<void> quality(String callId, String device, List<Map<String, Object?>> samples) async {
+    if (samples.isEmpty) return;
+    try { await http.post(_u('/v1/calls/quality'), headers: _h, body: jsonEncode({'call_id': callId, 'device_id': device, 'samples': samples})).timeout(const Duration(seconds: 5)); } catch (_) {}
+  }
+  Future<List<dynamic>> adminCalls({String? outcome, String? user}) =>
+      _get('/v1/admin/calls?limit=200${outcome != null ? '&outcome=$outcome' : ''}${user != null ? '&user=${Uri.encodeComponent(user)}' : ''}');
+  Future<Map<String, dynamic>> callTrace(String callId) async {
+    final r = await http.get(_u('/v1/admin/calls/${Uri.encodeComponent(callId)}/trace'), headers: _h);
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j;
+  }
+  Future<List<dynamic>> tenants() => _get('/v1/admin/tenants');
+  Future<void> saveTenant(Map<String, Object?> t) => _post('/v1/admin/tenants', t);
+  Future<void> setTenantMember(String uid, String tenant) => _post('/v1/admin/tenants/members', {'user_id': uid, 'tenant': tenant});
+  Future<Map<String, dynamic>> myCompliance() async => jsonDecode((await http.get(_u('/v1/compliance/me'), headers: _h)).body);
+  /// Live participant count of a meeting, from the media server.
+  Future<int> presence(String roomId, String callId) async {
+    try {
+      final r = await http.get(_u('/v1/meetings/presence').replace(queryParameters: {'room_id': roomId, 'call_id': callId}), headers: _h).timeout(const Duration(seconds: 5));
+      return r.statusCode == 200 ? (jsonDecode(r.body)['count'] as num).toInt() : 0;
+    } catch (_) { return 0; }
+  }
 }

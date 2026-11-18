@@ -28,6 +28,12 @@ class ChatScreen extends StatefulWidget {
   @override State<ChatScreen> createState() => _S();
 }
 class _S extends State<ChatScreen> {
+  final _presence = <String, (Future<int>, DateTime)>{};
+  Future<int> _live(String callId) {
+    final c = _presence[callId];
+    if (c != null && DateTime.now().difference(c.$2).inSeconds < 15) return c.$1;
+    final f = context.read<ApiService>().presence(room.id, callId); _presence[callId] = (f, DateTime.now()); return f;
+  }
   Timeline? tl; final input = TextEditingController(); final searchCtl = TextEditingController();
   Event? replyTo, editing; bool searching = false; Timer? typingOff; bool typing = false;
   final _thumbs = <String, Future<Uint8List?>>{};
@@ -114,7 +120,7 @@ class _S extends State<ChatScreen> {
   Future<void> send() async {
     final t = input.text.trim(); if (t.isEmpty) return; input.clear();
     typing = false; room.setTyping(false);
-    if (!room.encrypted) throw StateError('Refusing to send in an unencrypted room');
+    if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
     var text = t;
     _mentions.forEach((name, id) => text = text.replaceAll('@$name', mentionMarkdown(name, id)));   // @Name -> pill
     _mentions.clear();
@@ -312,10 +318,12 @@ class _S extends State<ChatScreen> {
       body: Column(children: [
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
+          // a read receipt on a message means everything before it has been read too (newest-first list)
+          final readIdx = evs.indexWhere((x) => x.receipts.any((r) => r.user.id != me));
           final newDay = i == evs.length - 1 || !DateUtils.isSameDay(e.originServerTs, evs[i + 1].originServerTs);
           return Column(children: [
             if (newDay) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Chip(label: Text(DateFormat('EEEE d MMMM').format(e.originServerTs)))),
-            _item(c, e, isLastMine: e.senderId == me && evs.indexWhere((x) => x.senderId == me) == i),
+            _item(c, e, isLastMine: e.senderId == me && evs.indexWhere((x) => x.senderId == me) == i, read: readIdx >= 0 && i >= readIdx),
           ]);
         })),
         if (replyTo != null || editing != null) Container(color: cs.surfaceContainerHighest, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Row(children: [
@@ -352,14 +360,55 @@ class _S extends State<ChatScreen> {
     );
   }
 
-  Widget _item(BuildContext c, Event e, {required bool isLastMine}) {
+  /// Delivery status of my own message: 🕓 sending · ✓ on the server · ✓✓ read · ⚠ failed (tap: retry or delete).
+  Widget _status(BuildContext c, Event e, bool read) {
+    final cs = Theme.of(c).colorScheme;
+    if (e.status.isError) {
+      return InkWell(onTap: () async {
+        final a = await showModalBottomSheet<String>(context: c, builder: (s) => SafeArea(child: Wrap(children: [
+          const ListTile(title: Text('Message not sent'), subtitle: Text('It is kept on this device until you retry or delete it.')),
+          ListTile(leading: const Icon(Icons.refresh), title: const Text('Retry'), onTap: () => Navigator.pop(s, 'retry')),
+          ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Delete'), onTap: () => Navigator.pop(s, 'del'))])));
+        if (a == 'retry') await e.sendAgain();
+        if (a == 'del') await e.cancelSend();
+        if (mounted) setState(() {});
+      }, child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.error, size: 14, color: cs.error), Text(' Not sent · tap', style: TextStyle(fontSize: 11, color: cs.error))]));
+    }
+    if (e.status.isSending) return const Icon(Icons.schedule, size: 14);
+    return Icon(read ? Icons.done_all : Icons.done, size: 14, color: read ? cs.primary : null);
+  }
+
+  Widget _item(BuildContext c, Event e, {required bool isLastMine, bool read = false}) {
     final cs = Theme.of(c).colorScheme; final mine = e.senderId == me;
+    if (e.type == kCallInviteEvent && e.content['version'] == 2) {
+      final v = e.content['media'] != 'audio';
+      final sm = CallSummary.of(tl?.events ?? const [], e.content['call_id'] as String, e.originServerTs);
+      final bad = {'missed', 'declined', 'busy', 'failed'}.contains(sm.outcome);
+      return ListTile(leading: CircleAvatar(backgroundColor: bad ? cs.errorContainer : null,
+          child: Icon(sm.outcome == 'missed' ? Icons.phone_missed : v ? Icons.videocam : Icons.call, color: bad ? cs.error : null)),
+        title: Text(sm.label(mine, v), style: TextStyle(color: bad && !mine ? cs.error : null)),
+        subtitle: Text('${DateFormat('HH:mm').format(e.originServerTs)} · end-to-end encrypted'),
+        trailing: sm.outcome == 'live' ? null : IconButton.filledTonal(tooltip: 'Call back', icon: Icon(v ? Icons.videocam : Icons.call),
+          onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: v)))));
+    }
     if (e.type == kCallInviteEvent) {
       final v = e.content['media'] != 'audio';
+      final meet = (e.content['call_id'] as String? ?? '').startsWith('meet-');
+      if (meet) {
+        return FutureBuilder<int>(future: _live(e.content['call_id'] as String), builder: (_, s) {
+          final n = s.data ?? 0;
+          return ListTile(leading: CircleAvatar(child: Icon(n > 0 ? Icons.groups : Icons.groups_outlined)),
+            title: Text(!s.hasData ? 'Meeting' : n > 0 ? 'Meeting in progress · $n ${n == 1 ? 'person' : 'people'}' : 'Meeting ended'),
+            subtitle: Text('Started by ${e.senderFromMemoryOrFallback.calcDisplayname()} · ${DateFormat('HH:mm').format(e.originServerTs)} · encrypted'),
+            trailing: FilledButton(child: Text(n > 0 ? 'Join' : 'Start'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: true, video: v)))));
+        });
+      }
       return ListTile(leading: CircleAvatar(child: Icon(v ? Icons.videocam : Icons.call)), title: Text(v ? 'Video call' : 'Voice call'),
         subtitle: Text('${e.senderFromMemoryOrFallback.calcDisplayname()} · ${DateFormat('HH:mm').format(e.originServerTs)} · encrypted'),
-        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, callId: e.content['call_id'] as String, video: v)))));
+        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => meet
+            ? CallScreen(roomId: room.id, meeting: true, video: v) : CallScreen(roomId: room.id, video: v)))));
     }
+    if (e.type == kCallEndEvent && e.content['version'] == 2) return const SizedBox.shrink();   // shown on the call card
     if (e.type == kCallEndEvent) {
       return Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e.body, style: Theme.of(c).textTheme.labelSmall)));
     }
@@ -416,7 +465,6 @@ class _S extends State<ChatScreen> {
     final edited = shown.eventId != e.eventId;
     final reactions = <String, int>{};
     if (tl != null) { for (final r in e.aggregatedEvents(tl!, RelationshipTypes.reaction)) { final k = r.content.tryGetMap<String, Object?>('m.relates_to')?['key'] as String?; if (k != null) reactions[k] = (reactions[k] ?? 0) + 1; } }
-    final seen = isLastMine && e.receipts.any((r) => r.user.id != me);
 
     Widget body;
     if (e.type == EventTypes.Encrypted) {
@@ -457,7 +505,7 @@ class _S extends State<ChatScreen> {
           Row(mainAxisSize: MainAxisSize.min, children: [
             if (edited) Text('edited · ', style: Theme.of(c).textTheme.labelSmall),
             Text(DateFormat('HH:mm').format(e.originServerTs), style: Theme.of(c).textTheme.labelSmall),
-            if (mine) Padding(padding: const EdgeInsets.only(left: 4), child: Icon(seen ? Icons.done_all : Icons.done, size: 14, color: seen ? cs.primary : null)),
+            if (mine) Padding(padding: const EdgeInsets.only(left: 4), child: _status(c, e, read)),
           ]),
           if (widget.threadRootId == null && _replyCount(e) > 0) TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId))),

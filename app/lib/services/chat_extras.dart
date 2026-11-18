@@ -66,7 +66,10 @@ class ActivityService {
           final rel = e.content.tryGetMap<String, Object?>('m.relates_to');
           if (e.type == EventTypes.Reaction && mine.contains(rel?['event_id'])) {
             out.add(Activity('reaction', r, e, '$who reacted ${rel?['key']}'));
-          } else if (e.type == kCallInviteEvent && !joined.contains(e.content['call_id'])) {
+          } else if (e.type == kCallInviteEvent && e.content['version'] == 2) {
+            final sm = CallSummary.of(tl.events, e.content['call_id'] as String, e.originServerTs);
+            if (sm.outcome == 'missed' || sm.outcome == 'busy') out.add(Activity('missed_call', r, e, 'Missed ${e.content['media'] == 'audio' ? 'voice' : 'video'} call from $who'));
+          } else if (e.type == kCallInviteEvent && !(e.content['call_id'] as String? ?? '').startsWith('meet-') && !joined.contains(e.content['call_id'])) {
             out.add(Activity('missed_call', r, e, 'Missed ${e.content['media'] == 'audio' ? 'voice' : 'video'} call from $who'));
           } else if (e.type == EventTypes.Message) {
             final replyTo = rel?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'];

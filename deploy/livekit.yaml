@@ -15,3 +15,7 @@ room:
   max_participants: 300
 logging:
   level: info
+webhook:
+  # replaced by setup.sh from .env
+  api_key: LK_API_KEY
+  urls: [http://orchestrator:8080/v1/livekit/webhook]
