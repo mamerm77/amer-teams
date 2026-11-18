@@ -94,7 +94,14 @@ jobs:
       - name: Build (unsigned, proves the iOS app compiles)
         if: env.APPLE_TEAM_ID == ''
         working-directory: app
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign
+          mkdir -p build/unsigned/Payload && cp -R build/ios/iphoneos/Runner.app build/unsigned/Payload/
+          cd build/unsigned && zip -qr ../AmerTeams-unsigned.ipa Payload
+      - name: Upload unsigned IPA (install free with Sideloadly + Apple ID)
+        if: env.APPLE_TEAM_ID == ''
+        uses: actions/upload-artifact@v4
+        with: {name: amer-teams-ios-unsigned, path: app/build/AmerTeams-unsigned.ipa}
       # ---- Signed build + TestFlight upload: runs once the Apple secrets are added ----
       - name: Install signing certificate and profile
         if: env.APPLE_TEAM_ID != ''

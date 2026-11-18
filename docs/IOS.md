@@ -1,5 +1,17 @@
 # Amer Teams on iPhone
 
+## Free testing (no Apple Developer account)
+1. Download **AmerTeams-unsigned.ipa** from the latest GitHub Actions run (Artifacts → *amer-teams-ios-unsigned*).
+2. On your Windows PC install **iTunes** (from apple.com, not the Microsoft Store version) and **Sideloadly** (sideloadly.io).
+3. Connect the iPhone by USB, tap *Trust this computer*.
+4. Open Sideloadly, drag in the .ipa, enter your normal Apple ID, click **Start**.
+5. On the iPhone: Settings → General → VPN & Device Management → your Apple ID → **Trust**. On iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode** and restart.
+
+Limits of the free route (Apple rules): the app must be re-installed every **7 days** (Sideloadly can refresh it), at most 3 sideloaded apps, and **push notifications do not work**, so keep the app open to receive calls. Chat, calls, meetings, files and the AI co-pilot work normally.
+iOS blocks plain HTTP, so point the app at a server with HTTPS (a public domain via Caddy), not the `http://<PC-IP>` Wi-Fi test mode.
+
+## Paid route: TestFlight (for many testers)
+
 Apple only lets signed apps run on a real iPhone. Until the Apple secrets below are added, GitHub builds the iOS app **unsigned** (proves it compiles). Once they are added, every push builds a signed app and uploads it to **TestFlight**; testers install it from the TestFlight app.
 
 ## One-time setup (about 30 minutes)
