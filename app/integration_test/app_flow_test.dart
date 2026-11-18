@@ -205,7 +205,7 @@ void main() {
       if (await waitFor(find.text('Start meeting'), secs: 15)) await tap(find.text('Start meeting'), 'Start meeting');
       expectFound(await waitFor(find.text('Leave'), secs: 40), 'meeting screen');
     });
-    await step('Meeting: raise hand', () async { await tap(find.byTooltip('Raise hand'), 'Raise hand'); expectFound(await waitFor(find.byTooltip('Lower hand')), 'hand raised'); });
+    await step('Meeting: raise hand', () async { await wait(6); /* let the "No camera" notice clear the control bar */ await tap(find.byTooltip('Raise hand'), 'Raise hand'); expectFound(await waitFor(find.byTooltip('Lower hand')), 'hand raised'); });
     await step('Meeting: participants panel', () async { await tap(find.byTooltip('Participants'), 'Participants'); expectFound(await waitFor(find.textContaining('Participants (')), 'participants list'); });
     await step('Meeting: chat panel', () async { await tap(find.byTooltip('Chat'), 'Chat'); expectFound(await waitFor(field('Message everyone (encrypted)')), 'meeting chat'); });
     await step('Meeting: whiteboard', () async {
