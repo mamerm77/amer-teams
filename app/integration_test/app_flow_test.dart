@@ -42,7 +42,7 @@ void main() {
       if (err != null) { for (var i = 0; i < 3 && find.byType(BottomSheet).evaluate().isNotEmpty || find.byType(Dialog).evaluate().isNotEmpty; i++) { await t.tapAt(const Offset(5, 5)); await wait(.5); } }
     }
     void expectFound(bool ok, String what) { if (!ok) throw StateError('Not shown on screen: $what'); }
-    Future<void> tap(Finder f, String what) async { expectFound(await waitFor(f), what); await t.tap(f.first); await wait(.6); }
+    Future<void> tap(Finder f, String what) async { expectFound(await waitFor(f), what); try { await t.ensureVisible(f.first); } catch (_) {} await t.tap(f.first); await wait(.6); }
     Future<void> type(Finder f, String text, String what) async {
       expectFound(await waitFor(f), what);
       await t.tap(f.first); await wait(.3);            // focus the box first, as a person would (re-attaches text input after a menu closes)
@@ -145,7 +145,7 @@ void main() {
       await tap(find.byTooltip('Close search'), 'close search');
     });
     await step('Chat info', () async {
-      await tap(find.byType(PopupMenuButton<String>).last, 'chat menu');
+      await tap(find.byTooltip('Chat menu'), 'chat menu');
       await tap(find.text('Chat info'), 'Chat info');
       await wait(2); await t.pageBack(); await wait(1);
     });
@@ -246,7 +246,7 @@ void main() {
 
     // ---------------- remaining messaging and security features ----------------
     Future<void> home() async { for (var i = 0; i < 5 && find.text('Activity').evaluate().isEmpty; i++) { await t.pageBack(); await wait(1); } }
-    Future<void> chatInfo() async { await openChat(); await tap(find.byType(PopupMenuButton<String>).last, 'chat menu'); await tap(find.text('Chat info'), 'Chat info'); }
+    Future<void> chatInfo() async { await openChat(); await tap(find.byTooltip('Chat menu'), 'chat menu'); await tap(find.text('Chat info'), 'Chat info'); }
     Future<String> docker(List<String> a) async => ((await Process.run('docker', a)).stdout as String).trim();
 
     await step('Typing indicator', () async {
@@ -321,7 +321,7 @@ void main() {
     });
     await step('Find a time with Bob: 3 slots, Bob\'s calendar checked, book one', () async {
       await home(); await openChat();
-      await tap(find.byTooltip('Show menu'), 'chat menu'); await tap(find.text('Find a time'), 'Find a time');
+      await tap(find.byTooltip('Chat menu'), 'chat menu'); await tap(find.text('Find a time'), 'Find a time');
       await tap(find.text('Find the best times'), 'Find the best times');
       expectFound(await waitFor(find.text('Everyone is free at:'), secs: 30), 'slots found');
       expectFound(find.textContaining('Not checked').evaluate().isEmpty, 'Bob\'s free/busy was used');

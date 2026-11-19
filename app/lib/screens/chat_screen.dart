@@ -447,7 +447,7 @@ class _S extends State<ChatScreen> {
           IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
           IconButton(tooltip: 'Video call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
-          PopupMenuButton<String>(onSelected: (v) {
+          PopupMenuButton<String>(tooltip: 'Chat menu', onSelected: (v) {
             if (v == 'sum') summarise();
             if (v == 'info') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatInfoScreen(roomId: room.id)));
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));

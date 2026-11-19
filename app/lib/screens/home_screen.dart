@@ -75,11 +75,13 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     final wide = MediaQuery.sizeOf(c).width > 720;
     final body = pages[i];
     if (wide) {
+      // the rail scrolls when the window is too short for every destination (12 of them on a small laptop screen)
       return Scaffold(body: Row(children: [
+        LayoutBuilder(builder: (lc, box) => SingleChildScrollView(child: ConstrainedBox(constraints: BoxConstraints(minHeight: box.maxHeight), child: IntrinsicHeight(child:
         NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all,
           leading: const Tooltip(message: 'Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', child: Text('b${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')}', style: TextStyle(fontSize: 10))),
           trailing: IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => confirmSignOut(c)),
-          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(d.$2))]),
+          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(d.$2))]))))),
         const VerticalDivider(width: 1), Expanded(child: body)]));
     }
     // Phones: first four tabs plus "More" for Control, Health and Users.
