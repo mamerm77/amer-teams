@@ -537,7 +537,7 @@ void main() {
       expectFound(await waitFor(find.textContaining('already unlocked'), secs: 30), 'already unlocked');
     });
     await step('Sign out warns and confirms', () async {
-      await wait(4); await tap(find.byTooltip('Sign out'), 'Sign out');
+      await wait(4); await home(); await tap(find.byTooltip('Your profile and settings'), 'profile menu'); await tap(find.text('Sign out'), 'Sign out');
       expectFound(await waitFor(find.textContaining('backed up')), 'backup-aware warning');
       await tap(find.widgetWithText(FilledButton, 'Sign out'), 'confirm');
       expectFound(await waitFor(field('Server'), secs: 60), 'sign-in screen');

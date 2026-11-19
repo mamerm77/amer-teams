@@ -865,19 +865,33 @@ class _S extends State<CallScreen> {
           Text('Translated to $capLang', style: Theme.of(context).textTheme.labelSmall),
           if (tCaps.isEmpty) const Text('Waiting for speech…'),
           for (final (w, t) in tCaps) Text('$w: $t', textDirection: RegExp(r'[\u0600-\u06FF]').hasMatch(t) ? TextDirection.rtl : TextDirection.ltr)])),
-        SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
+        // Teams-style meeting bar: the controls you use all the time in the middle; the rest under "More effects";
+        // Leave on the far right, away from the others, so it is not pressed by mistake.
+        SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), child: Row(children: [
+          const Spacer(),
+          Flexible(flex: 8, child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
           if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
           if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
-          if (!attendee && cam && AmerBackground.supported) _btn(bgBlur ? Icons.blur_on : Icons.blur_off, bgBlur ? 'Stop blur' : 'Blur background', () => _effects(blur: !bgBlur)),
-          if (!attendee && cam && AmerBackground.supported) _btn(Icons.wb_sunny_outlined, lowLight ? 'Normal light' : 'Low light', () => _effects(low: !lowLight), off: !lowLight),
-          if (cam && !attendee) _btn(Icons.cameraswitch, 'Switch camera', _switchCamera),
           if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
           _btn(Icons.back_hand, myHand ? 'Lower hand' : 'Raise hand', _toggleHand, off: myHand),
           PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
             itemBuilder: (_) => [for (final e in ['👍', '👏', '❤️', '😂', '😮', '🎉']) PopupMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 22)))]),
-          _btn(captions ? Icons.closed_caption : Icons.closed_caption_off, 'Captions', _toggleCaptions, off: captions),
           if (aiOn) _btn(Icons.question_answer_outlined, 'Ask Amer', () => _askDialog()),
-          _btn(Icons.auto_awesome, 'Amer minutes', () => setState(() => amerNotes = !amerNotes), off: amerNotes),
+          SizedBox(width: 76, child: Column(mainAxisSize: MainAxisSize.min, children: [
+            PopupMenuButton<String>(tooltip: 'More effects', icon: const Icon(Icons.more_horiz),
+              style: IconButton.styleFrom(backgroundColor: cs.secondaryContainer),
+              onSelected: (v) { switch (v) { case 'cap': _toggleCaptions(); case 'min': setState(() => amerNotes = !amerNotes); case 'blur': _effects(blur: !bgBlur); case 'low': _effects(low: !lowLight); case 'sw': _switchCamera(); } },
+              itemBuilder: (_) => [
+                CheckedPopupMenuItem(value: 'cap', checked: captions, child: const Text('Captions')),
+                CheckedPopupMenuItem(value: 'min', checked: amerNotes, child: const Text('Amer minutes')),
+                if (!attendee && cam && AmerBackground.supported) CheckedPopupMenuItem(value: 'blur', checked: bgBlur, child: const Text('Blur background')),
+                if (!attendee && cam && AmerBackground.supported) CheckedPopupMenuItem(value: 'low', checked: lowLight, child: const Text('Low light')),
+                if (cam && !attendee) const PopupMenuItem(value: 'sw', child: Text('Switch camera')),
+              ]),
+            ExcludeSemantics(child: Text('More', maxLines: 1, style: Theme.of(context).textTheme.labelSmall)),
+          ])),
+          ])),
+          const Spacer(),
           FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(110, 48)), onPressed: _leave, icon: const Icon(Icons.call_end), label: Text(L.t(context, 'Leave'))),
         ]))),
       ]),
