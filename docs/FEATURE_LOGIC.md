@@ -17,7 +17,7 @@ proves it, and the status. Enforcement levels:
 |---|---|---|---|---|---|
 | Encrypted 1:1 and group chat | WhatsApp, Signal: end-to-end by default | Every room has `m.room.encryption`. The server policy forces it, and the app refuses to send if it is missing. The database stores ciphertext only. | Server + app | e2e_real 2–4; in-use "Open chat", "Send and get reply" | **Verified in use** |
 | Delivery ticks | WhatsApp: 1 grey = sent, 2 grey = delivered, 2 blue = read | 🕓 sending · ✓ stored on server for all recipients · ✓✓ (blue) read. A receipt on a later message implies earlier ones were read. Matrix has no per-device delivery receipt, so "delivered" and "sent" are the same tick. | Server (receipts) + app (display) | in-use "Read receipt ticks" | **Verified in use** |
-| Failed send | WhatsApp: red ⚠, tap to retry | ⚠ Not sent · tap → Retry / Delete. The message is kept on the device until resolved. | App | in-use "Failed send … Retry" (server paused for real) | Testing |
+| Failed send | WhatsApp: pending while offline, sent automatically when back; ⚠ with retry | Never lost: kept in a per-chat outbox on the device (survives restart), shown as "⚠ Not sent · tap" (Retry / Delete), retried automatically every 10 s, delivered exactly once. Edits and thread replies that fail return their text to the box. | App | in-use "Failed send … Retry" (server paused for real) | Testing |
 | Reply / quote | All four | Reply shows the quoted original and keeps the link to it (`m.in_reply_to`) | App + protocol | in-use "Reply" | **Verified in use** |
 | Reactions | All four | One emoji per user per message. Counts are aggregated from the timeline. | Protocol | in-use "React" | **Verified in use** |
 | Edit | WhatsApp: 15 min · Telegram: 48 h · Teams: any time, marked "Edited" | Own text messages only, **within 24 h**, marked "edited". Edits are re-encrypted. | App (Synapse has no edit window) | in-use "Edit" | **Verified in use** (24 h rule implemented) |
@@ -69,3 +69,8 @@ proves it, and the status. Enforcement levels:
 - WhatsApp ticks: [Tech Advisor](https://www.techadvisor.com/article/727095/what-are-the-two-blue-ticks-in-whatsapp.html)
 - Telegram deletion rules: [The Star](https://www.thestar.com.my/tech/tech-news/2019/03/25/delete-any-message-on-telegram/)
 - Teams lobby bypass and admit roles: [Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/who-can-bypass-meeting-lobby), [Microsoft Support](https://support.microsoft.com/teams/meetings/using-the-lobby-in-microsoft-teams-meetings)
+
+## Call-trace retention
+| Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
+|---|---|---|---|---|---|
+| Trace retention | Teams CQD: 30 days default, policy-based | Per tenant (1–3650 days; public 90). An hourly purge on one replica (advisory lock) deletes expired events, quality samples and records. Admins can run it on demand, and that run is audited. | **Server** | call_trace_test 19–23 | Server-tested (23/23) |

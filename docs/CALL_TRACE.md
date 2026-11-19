@@ -31,4 +31,4 @@ Status: the tenant model, API, enforcement and user notice are implemented and t
 - the archiver service that stores decrypted content for e-discovery
 
 ## Retention
-`call_events` and `call_quality` follow the tenant's `retention_days`. A purge job is part of the archiver work above.
+`call_events`, `call_quality` and `call_records` follow the tenant's `retention_days`. An hourly purge runs on one replica at a time (PostgreSQL advisory lock). `POST /v1/admin/calls/purge` runs it on demand, and that run is audited.

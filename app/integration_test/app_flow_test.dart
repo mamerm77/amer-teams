@@ -261,14 +261,19 @@ void main() {
         expectFound(await waitFor(find.textContaining('Not sent'), secs: 90), '⚠ Not sent');
         await shot('failed-send');
       } finally { await docker(['unpause', id]); }
-      await wait(5);
-      await tap(find.textContaining('Not sent'), 'Not sent · tap');
-      await tap(find.text('Retry'), 'Retry');
+      await wait(3);
+      // either the automatic retry (every 10 s) or the Retry button must deliver it, exactly once
+      if (find.textContaining('Not sent').evaluate().isNotEmpty) {
+        await tap(find.textContaining('Not sent'), 'Not sent · tap');
+        if (find.text('Retry').evaluate().isNotEmpty) await tap(find.text('Retry'), 'Retry');
+      }
       for (var i = 0; i < 60 && find.textContaining('Not sent').evaluate().isNotEmpty; i++) { await wait(1); }
-      if (find.textContaining('Not sent').evaluate().isNotEmpty) throw StateError('still not sent after retry');
+      if (find.textContaining('Not sent').evaluate().isNotEmpty) throw StateError('still not sent after the server came back');
+      expectFound(await waitFor(find.text('sent while the server was down'), secs: 30), 'message delivered');
+      if (find.text('sent while the server was down').evaluate().length != 1) throw StateError('message delivered more than once');
     });
     await step('Block: no messages or calls from Bob', () async {
-      await home(); await sendText('bob: in 20s say hi'); await sendText('bob: in 20s call me');
+      await home(); await openChat(); await sendText('bob: in 20s say hi'); await sendText('bob: in 20s call me');
       await chatInfo(); await tap(find.text('Block contact'), 'Block contact');
       expectFound(await waitFor(find.text('Blocked')), 'Blocked confirmation');
       await home(); await openChat();

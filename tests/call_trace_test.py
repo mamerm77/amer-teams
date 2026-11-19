@@ -100,6 +100,27 @@ async def main():
         r = await h.post(f"{ORCH}/v1/agents/amer", headers=B, json={"enabled": False})
         check("18. Agent switches are admin-only", r.status_code == 403, r.status_code)
 
+        # retention: per-tenant purge of expired trace data (real PostgreSQL rows, backdated)
+        import psycopg
+        dsn = os.getenv("DATABASE_URL", "postgresql://amer:amer-pass@127.0.0.1/amer")
+        old_pub, old_biz, fresh = "ret-pub-" + secrets.token_hex(3), "ret-biz-" + secrets.token_hex(3), "ret-new-" + secrets.token_hex(3)
+        await h.post(f"{ORCH}/v1/admin/tenants", headers=ADM, json={"tenant": "acme", "name": "Acme Business", "compliance_enabled": False, "retention_days": 30})
+        with psycopg.connect(dsn, autocommit=True) as c:
+            for rid_, ten, age in ((old_pub, "public", 100), (old_biz, "acme", 40), (fresh, "acme", 5)):
+                c.execute("INSERT INTO call_records (call_id, caller, started_at, tenant) VALUES (%s,'@x:amer.test', now() - make_interval(days => %s), %s)", (rid_, age, ten))
+                c.execute("INSERT INTO call_events (call_id, source, event, ts) VALUES (%s,'client','invite', now() - make_interval(days => %s))", (rid_, age))
+                c.execute("INSERT INTO call_quality (call_id, user_id, kind, direction, ts) VALUES (%s,'@x:amer.test','audio','send', now() - make_interval(days => %s))", (rid_, age))
+        r = await h.post(f"{ORCH}/v1/admin/calls/purge", headers=B)
+        check("19. Purge is admin-only", r.status_code == 403, r.status_code)
+        r = await h.post(f"{ORCH}/v1/admin/calls/purge", headers=ADM)
+        with psycopg.connect(dsn) as c:
+            left = {k: c.execute("SELECT (SELECT count(*) FROM call_records WHERE call_id=%s)+(SELECT count(*) FROM call_events WHERE call_id=%s)+(SELECT count(*) FROM call_quality WHERE call_id=%s)", (k, k, k)).fetchone()[0]
+                    for k in (old_pub, old_biz, fresh)}
+        check("20. Retention: 100-day-old public call purged (90-day policy)", left[old_pub] == 0, left)
+        check("21. Retention: 40-day-old business call purged (tenant policy 30 days)", left[old_biz] == 0, left)
+        check("22. Retention: 5-day-old call kept", left[fresh] == 3, left)
+        check("23. Today's real call kept", any(c["call_id"] == cid for c in (await h.get(f"{ORCH}/v1/admin/calls", headers=ADM)).json()), r.text)
+
     json.dump(R, open(os.getenv("OUT", "/opt/amer/call_trace.json"), "w"), indent=1)
     print(f"{sum(r['pass'] for r in R)}/{len(R)} passed")
 

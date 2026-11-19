@@ -20,6 +20,7 @@ async def _start():
     for aid, en in (await db.load_agent_config()).items():
         if aid in agents.AGENTS: agents.AGENTS[aid].enabled = en
     asyncio.create_task(ops.loop())
+    asyncio.create_task(calltrace.retention_loop())
 REQ = Counter("amer_agent_requests_total", "Agent requests", ["agent"])
 LAT = Histogram("amer_agent_latency_seconds", "Agent latency", ["agent"])
 ERR = Counter("amer_agent_errors_total", "Agent requests that failed", ["agent"])

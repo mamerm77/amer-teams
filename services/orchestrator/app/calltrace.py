@@ -201,3 +201,48 @@ async def my_compliance(user=Depends(auth.matrix_user)):
     r = await _q("SELECT name, compliance_enabled, compliance_user, retention_days FROM tenants WHERE tenant=%s", (t,), True)
     name, en, cu, rd = r[0]
     return {"tenant": t, "name": name, "compliance_enabled": en, "compliance_user": cu if en else None, "retention_days": rd}
+
+# ---------------- retention ----------------
+PURGE_SQL = [
+    # rows of calls that have a record: that record's tenant decides
+    """DELETE FROM call_events e USING call_records r, tenants t
+       WHERE e.call_id = r.call_id AND r.tenant = t.tenant AND e.ts < now() - make_interval(days => t.retention_days)""",
+    """DELETE FROM call_quality q USING call_records r, tenants t
+       WHERE q.call_id = r.call_id AND r.tenant = t.tenant AND q.ts < now() - make_interval(days => t.retention_days)""",
+    # rows without a record (e.g. media-server events of unknown rooms): public retention
+    """DELETE FROM call_events e WHERE NOT EXISTS (SELECT 1 FROM call_records r WHERE r.call_id = e.call_id)
+       AND e.ts < now() - make_interval(days => (SELECT retention_days FROM tenants WHERE tenant = 'public'))""",
+    """DELETE FROM call_quality q WHERE NOT EXISTS (SELECT 1 FROM call_records r WHERE r.call_id = q.call_id)
+       AND q.ts < now() - make_interval(days => (SELECT retention_days FROM tenants WHERE tenant = 'public'))""",
+    """DELETE FROM call_records r USING tenants t
+       WHERE r.tenant = t.tenant AND r.started_at < now() - make_interval(days => t.retention_days)""",
+]
+
+async def purge_once() -> dict:
+    """Deletes call-trace data older than each tenant's retention. One replica at a time (advisory lock)."""
+    out = {}
+    async with db.pool.connection() as c:
+        got = (await (await c.execute("SELECT pg_try_advisory_lock(73315)")).fetchone())[0]
+        if not got: return {"skipped": "another replica is purging"}
+        try:
+            for i, sql in enumerate(PURGE_SQL):
+                cur = await c.execute(sql); out[["events", "quality", "orphan_events", "orphan_quality", "records"][i]] = cur.rowcount
+        finally:
+            await c.execute("SELECT pg_advisory_unlock(73315)")
+    return out
+
+async def retention_loop():
+    import asyncio, logging
+    while True:
+        try:
+            r = await purge_once()
+            if any(isinstance(v, int) and v for v in r.values()): logging.info("call-trace retention purge: %s", r)
+        except Exception as e:
+            logging.warning("call-trace retention purge failed: %s", e)
+        await asyncio.sleep(3600)
+
+@router.post("/v1/admin/calls/purge")
+async def purge_now(admin=Depends(require_admin)):
+    r = await purge_once()
+    await db.audit(admin["user_id"], "admin.calls_purge", json.dumps(r))
+    return r

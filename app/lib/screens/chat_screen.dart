@@ -18,6 +18,7 @@ import '../services/meeting_service.dart';
 import 'call_screen.dart';
 import 'chat_info_screen.dart';
 import '../services/chat_extras.dart';
+import '../services/outbox.dart';
 
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
@@ -43,15 +44,19 @@ class _S extends State<ChatScreen> {
   Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
   String get me => room.client.userID!;
 
+  late final Outbox outbox;
+  void _safeTyping(bool on, {int? timeout}) { room.setTyping(on, timeout: timeout).catchError((_) {}); }   // best effort; never throws
+
   @override void initState() {
     super.initState();
+    outbox = Outbox(room)..addListener(() { if (mounted) setState(() {}); })..load();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       tl = await room.getTimeline(onUpdate: () { if (mounted) setState(() {}); _markRead(); });
       final dm = room.directChatMatrixID; if (dm != null) _presence = room.client.fetchCurrentPresence(dm);
       _markRead(); setState(() {});
     });
   }
-  @override void dispose() { tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) room.setTyping(false); _rec.dispose(); _player.dispose(); super.dispose(); }
+  @override void dispose() { tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) _safeTyping(false); outbox.dispose(); _rec.dispose(); _player.dispose(); super.dispose(); }
 
   // ---------- voice messages ----------
   Future<void> _toggleRecord() async {
@@ -112,23 +117,31 @@ class _S extends State<ChatScreen> {
   void _markRead() { final last = tl?.events.firstOrNull; if (last != null && last.senderId != me) tl!.setReadMarker(eventId: last.eventId); }
 
   void _onTyping(String t) {
-    if (!typing && t.isNotEmpty) { typing = true; room.setTyping(true, timeout: 10000); }
+    if (!typing && t.isNotEmpty) { typing = true; _safeTyping(true, timeout: 10000); }
     typingOff?.cancel();
-    typingOff = Timer(const Duration(seconds: 4), () { typing = false; room.setTyping(false); });
+    typingOff = Timer(const Duration(seconds: 4), () { typing = false; _safeTyping(false); });
   }
 
   Future<void> send() async {
     final t = input.text.trim(); if (t.isEmpty) return; input.clear();
-    typing = false; room.setTyping(false);
+    typing = false; _safeTyping(false);
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
     var text = t;
     _mentions.forEach((name, id) => text = text.replaceAll('@$name', mentionMarkdown(name, id)));   // @Name -> pill
     _mentions.clear();
-    if (editing != null) { await room.sendTextEvent(text, editEventId: editing!.eventId); }
-    else if (widget.threadRootId != null) {
-      final last = (tl?.events ?? []).where((e) => _inThread(e)).firstOrNull?.eventId ?? widget.threadRootId;
-      await room.sendTextEvent(text, threadRootEventId: widget.threadRootId, threadLastEventId: last, inReplyTo: replyTo);
-    } else { await room.sendTextEvent(text, inReplyTo: replyTo); }
+    try {
+      if (editing != null) { await room.sendTextEvent(text, editEventId: editing!.eventId).timeout(const Duration(seconds: 20)); }
+      else if (widget.threadRootId != null) {
+        final last = (tl?.events ?? []).where((e) => _inThread(e)).firstOrNull?.eventId ?? widget.threadRootId;
+        await room.sendTextEvent(text, threadRootEventId: widget.threadRootId, threadLastEventId: last, inReplyTo: replyTo).timeout(const Duration(seconds: 20));
+      } else {
+        await outbox.send(text, replyTo: replyTo);          // never lost: kept as "Not sent" and retried if the server is unreachable
+      }
+    } catch (e) {
+      // edits and thread replies: give the text back so nothing is lost
+      input.text = t; _snack('Not sent: no connection to the server. Your text is kept, so tap send to try again.');
+      return;
+    }
     setState(() { replyTo = null; editing = null; });
   }
 
@@ -332,6 +345,22 @@ class _S extends State<ChatScreen> {
             _item(c, e, isLastMine: e.senderId == me && evs.indexWhere((x) => x.senderId == me) == i, read: readIdx >= 0 && i >= readIdx),
           ]);
         })),
+        if (outbox.items.isNotEmpty) Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          for (final o in outbox.items) Align(alignment: Alignment.centerRight, child: Container(
+            margin: const EdgeInsets.fromLTRB(60, 2, 8, 2), padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: cs.errorContainer.withValues(alpha: .5), borderRadius: BorderRadius.circular(14)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(o.text),
+              InkWell(onTap: () async {
+                final a = await showModalBottomSheet<String>(context: c, builder: (s) => SafeArea(child: Wrap(children: [
+                  const ListTile(title: Text('Message not sent'), subtitle: Text('It is kept on this device and retried automatically every 10 seconds.')),
+                  ListTile(leading: const Icon(Icons.refresh), title: const Text('Retry'), onTap: () => Navigator.pop(s, 'retry')),
+                  ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Delete'), onTap: () => Navigator.pop(s, 'del'))])));
+                if (a == 'retry') await outbox.retry(o);
+                if (a == 'del') await outbox.delete(o);
+              }, child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.error, size: 14, color: cs.error),
+                Text(' Not sent · tap', style: TextStyle(fontSize: 11, color: cs.error))])),
+            ])))]),
         if (replyTo != null || editing != null) Container(color: cs.surfaceContainerHighest, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Row(children: [
           Icon(editing != null ? Icons.edit : Icons.reply, size: 18), const SizedBox(width: 8),
           Expanded(child: Text(editing != null ? 'Editing message' : 'Replying to ${replyTo!.senderFromMemoryOrFallback.calcDisplayname()}: ${_text(replyTo!)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
