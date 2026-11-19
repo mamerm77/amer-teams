@@ -253,16 +253,6 @@ void main() {
     }
     await step('Users (admin)', () async { await tap(find.text('Users'), 'Users tab'); expectFound(await waitFor(find.text('New invite code')), 'admin tools'); });
     await step('Admin: create invite code', () async { await tap(find.text('New invite code'), 'New invite code'); expectFound(await waitFor(find.text('Invite code created')), 'invite code'); await tap(find.text('Done'), 'Done'); });
-    await step('Admin: feature flag off hides the feature, on brings it back', () async {
-      await tap(find.text('Feature flags'), 'Feature flags');
-      await tap(find.text('Workflows'), 'Workflows flag'); await wait(2);
-      await t.pageBack(); await wait(1);
-      await relaunchFlags();
-      await home(); await tap(find.text('Amer'), 'Amer tab'); await wait(2);
-      expectFound(find.byIcon(Icons.account_tree_outlined).evaluate().isEmpty, 'Workflows hidden');
-      await home(); await tap(find.text('Users'), 'Users tab'); await tap(find.text('Feature flags'), 'Feature flags');
-      await tap(find.text('Workflows'), 'Workflows flag'); await wait(2); await t.pageBack(); await wait(1); await relaunchFlags();
-    });
     await step('Admin: call trace list', () async { await tap(find.text('Call trace'), 'Call trace'); expectFound(await waitFor(find.textContaining('@moh:amer.test →')), 'recorded calls'); });
     await step('Admin: one call\'s full trace', () async {
       await tap(find.textContaining('@moh:amer.test →'), 'a call');
@@ -278,6 +268,17 @@ void main() {
       await Flags.instance.load(ApiService(Provider.of<MatrixService>(ctx, listen: false))); await wait(1);
     }
     Future<String> docker(List<String> a) async => ((await Process.run('docker', a)).stdout as String).trim();
+
+    await step('Admin: feature flag off hides the feature, on brings it back', () async {
+      await home(); await tap(find.text('Users'), 'Users tab'); await tap(find.text('Feature flags'), 'Feature flags');
+      await tap(find.text('Workflows'), 'Workflows flag'); await wait(2);
+      await t.pageBack(); await wait(1);
+      await relaunchFlags();
+      await home(); await tap(find.text('Amer'), 'Amer tab'); await wait(2);
+      expectFound(find.byIcon(Icons.account_tree_outlined).evaluate().isEmpty, 'Workflows hidden');
+      await home(); await tap(find.text('Users'), 'Users tab'); await tap(find.text('Feature flags'), 'Feature flags');
+      await tap(find.text('Workflows'), 'Workflows flag'); await wait(2); await t.pageBack(); await wait(1); await relaunchFlags();
+    });
 
     await step('Typing indicator', () async {
       await home(); await openChat(); await sendText('bob: type');

@@ -26,7 +26,7 @@ class _S extends State<PartnersScreen> {
       if (!mounted) return;
       await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Approved on our side'), content: SelectableText(
           'Give this one-time code to ${r['server']}\'s administrator. Their Amer Teams server confirms with it, and the connection becomes active.\n\n${r['code']}\n\n'
-          'If they run another Matrix server, confirm here once they have allowed your server.')),
+          'If they run another Matrix server, confirm here once they have allowed your server.'),
         actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Done'))]));
     } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
     _load();
