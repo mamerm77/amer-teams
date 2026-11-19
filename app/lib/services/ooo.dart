@@ -31,8 +31,8 @@ class OutOfOffice {
   }
   void stop() { _t?.cancel(); _sub?.cancel(); c = null; }
 
-  Future<void> save({required bool enabled, required DateTime start, required DateTime end, String message = '', String? delegate}) async {
-    await c!.setAccountData(c!.userID!, type, {'enabled': enabled, 'start': start.toIso8601String(), 'end': end.toIso8601String(), 'message': message, if (delegate != null) 'delegate': delegate});
+  Future<void> save({required bool enabled, required DateTime start, required DateTime end, String message = '', String? delegate, String source = 'manual'}) async {
+    await c!.setAccountData(c!.userID!, type, {'enabled': enabled, 'start': start.toIso8601String(), 'end': end.toIso8601String(), 'message': message, if (delegate != null) 'delegate': delegate, 'source': source});
     await _apply();
   }
 

@@ -81,14 +81,14 @@ Each built feature has a doc listing its open gaps.
 | Whiteboard templates | Built: retro, SWOT, optical/IP network sketch, text labels |
 | Automatic follow-up | Built: minutes follow the agenda; decisions become proposals, actions become tasks. Email to external invitees not built |
 | Find-a-time | Built (FIND_A_TIME.md), with prayer times and Ramadan hours |
-| Out-of-office from calendar | Partial: set by hand (status, automatic reply, delegate); calendar-event trigger waits for connectors |
+| Out-of-office from calendar | Built: leave or OOF events in a connected calendar switch it on and off; manual setting wins (CONNECTORS.md) |
 | Message-to-task and task boards | Built (DECISIONS.md) |
 | File previews with comments | Built: PDF (pdfium), Word, Excel, PowerPoint and text previewed on the device; threaded encrypted comments. Layout not reproduced (FILE_PREVIEWS.md) |
 | Unified search | Built: on-device FTS index, filters, people (SEARCH.md); transcripts not indexed |
 | Notification settings and quiet hours | Built: server push filter, per-chat levels, priority senders (NOTIFICATIONS.md) |
 | Accessibility | Not started (beyond tooltips and labels) |
 | Multi-device handoff | Not started |
-| Calendar and tool connectors | Not started |
+| Calendar and tool connectors | Partial: any calendar by ICS (Outlook, Google, iCloud), fetched on the device, busy times only to find-a-time; read only, no tool connectors yet (CONNECTORS.md) |
 | Usage analytics | Not started |
 | Guest accounts and UAE data residency | Not started |
 

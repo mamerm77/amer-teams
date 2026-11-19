@@ -1,3 +1,4 @@
+import '../services/calendar_connector.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/matrix_service.dart';
@@ -38,7 +39,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     GlassBox.instance.start(m, ApiService(m));                     // personal agents' approvals; approved actions run here
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
-    OutOfOffice.instance.start(m.client);
+    OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);

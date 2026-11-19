@@ -1,3 +1,5 @@
+import 'calendars_screen.dart';
+import '../services/calendar_connector.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -29,7 +31,8 @@ class CalendarPrefs {
     final ms = await m.meetings();
     final now = DateTime.now();
     final busy = [for (final x in ms.where((x) => x.start.add(Duration(minutes: x.minutes)).isAfter(now) && x.start.isBefore(now.add(const Duration(days: 45)))))
-      {'start': x.start.toUtc().toIso8601String(), 'end': x.start.add(Duration(minutes: x.minutes)).toUtc().toIso8601String()}];
+      {'start': x.start.toUtc().toIso8601String(), 'end': x.start.add(Duration(minutes: x.minutes)).toUtc().toIso8601String()},
+      ...CalendarConnector.instance.busy()];          // connected calendars (times only)
     final city = p.v['city'] as String?; final ll = city == null ? null : cities[city];
     await api.putFreeBusy({'busy': busy, 'tz': await _tz(), 'work': {'days': p.v['days'], 'start': p.v['start'], 'end': p.v['end']},
         'prayer': ll == null ? null : {'lat': ll.$1, 'lon': ll.$2, 'method': p.v['method']}, 'ramadan_hours': p.v['ramadan'] == true});
@@ -75,7 +78,7 @@ class _S extends State<FindTimeScreen> {
 
   @override Widget build(BuildContext c) {
     final rooms = context.read<MatrixService>().client.rooms.where((r) => r.membership == Membership.join && !r.isSpace).toList();
-    return Scaffold(appBar: AppBar(title: const Text('Find a time')), body: ListView(padding: const EdgeInsets.all(16), children: [
+    return Scaffold(appBar: AppBar(title: const Text('Find a time'), actions: [IconButton(tooltip: 'Connected calendars', icon: const Icon(Icons.event_note), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CalendarsScreen())))]), body: ListView(padding: const EdgeInsets.all(16), children: [
       DropdownButtonFormField<String>(value: room?.id, decoration: const InputDecoration(labelText: 'With the members of'),
         items: [for (final r in rooms) DropdownMenuItem(value: r.id, child: Text(r.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis))],
         onChanged: (v) => setState(() { room = rooms.firstWhere((r) => r.id == v); slots = null; })),
