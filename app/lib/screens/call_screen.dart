@@ -523,7 +523,7 @@ class _S extends State<CallScreen> {
     final f = await recorder.stop(); rec.reset(); setState(() {});
     if (f == null) { _snack('The recording was empty'); return; }
     try {
-      await room.sendFileEvent(MatrixVideoFile(bytes: await f.readAsBytes(), name: 'Meeting recording ${DateTime.now().toIso8601String().substring(0, 16)}.mp4', mimeType: 'video/mp4'));
+      await room.sendFileEvent(mx.MatrixVideoFile(bytes: await f.readAsBytes(), name: 'Meeting recording ${DateTime.now().toIso8601String().substring(0, 16)}.mp4', mimeType: 'video/mp4'));
       await f.delete(); _snack('Recording shared in the chat, end-to-end encrypted ($why)');
     } catch (e) { _snack('Could not share the recording: $e'); }
   }
