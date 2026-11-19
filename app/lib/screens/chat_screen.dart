@@ -1,3 +1,4 @@
+import 'operator_screen.dart';
 import '../services/premortem.dart';
 import '../services/office_text.dart';
 import 'file_preview_screen.dart';
@@ -224,6 +225,26 @@ class _S extends State<ChatScreen> {
         ]),
       ]))));
     } catch (e) { _snack('Pre-mortem failed: $e'); }
+  }
+
+  /// Post-incident review (docs/OPERATOR_MODE.md): drafted by Amer from this war room's timeline, shown to you first.
+  Future<void> _incidentReview() async {
+    final g = aiFor(room); if (!g.allowed) { _snack(g.where); return; }
+    final s = room.getState(kIncident)!.content;
+    final evs = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).toList().reversed;
+    final timeline = evs.map((e) => '${e.originServerTs.toUtc().toIso8601String().substring(11, 16)}Z ${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
+    _snack('Amer is drafting the review…');
+    try {
+      final r = await context.read<ApiService>().ask('Write a blameless post-incident review for ${s['number']} (${s['severity']}, ${s['service']}). Sections: Summary; Impact (${s['impact'] ?? 'unknown'}); Timeline (UTC, from the messages); Root cause (say "not yet known" if the chat does not establish it); What went well; What went badly; Actions (owner, due). British English. Never invent facts that are not in the timeline.',
+          context: timeline, agent: 'minutes', encrypted: room.encrypted);
+      if (!mounted) return;
+      final text = '${r['answer']}';
+      await showModalBottomSheet(context: context, isScrollControlled: true, builder: (b) => DraggableScrollableSheet(expand: false, initialChildSize: 0.85, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
+        Text('Draft post-incident review · only you see it until you share', style: Theme.of(b).textTheme.titleMedium), Text(g.where, style: const TextStyle(fontSize: 12)), const SizedBox(height: 8),
+        SelectableText(text), const SizedBox(height: 12),
+        FilledButton.icon(onPressed: () async { Navigator.pop(b); await room.sendTextEvent('📝 Post-incident review (draft)\n$text'); }, icon: const Icon(Icons.share), label: const Text('Share in the war room')),
+      ])));
+    } catch (e) { _snack('Could not draft the review: $e'); }
   }
 
   Future<void> send() async {
@@ -522,6 +543,7 @@ class _S extends State<ChatScreen> {
             const PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
+        if (room.getState(kIncident) != null) IncidentBanner(room: room, onReview: _incidentReview),
         if (lifetime != null) Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), color: Theme.of(c).colorScheme.surfaceContainerHigh,
           child: Row(children: [const Icon(Icons.timer_outlined, size: 14), const SizedBox(width: 6), Expanded(child: Text(
             'Disappearing messages: deleted after ${lifetime >= 31536000000 ? '${lifetime ~/ 31536000000} year${lifetime >= 63072000000 ? 's' : ''}' : lifetime >= 86400000 ? '${lifetime ~/ 86400000} day${lifetime >= 172800000 ? 's' : ''}' : '${lifetime ~/ 3600000} hours'}, on every device and on the server',

@@ -1,3 +1,4 @@
+import 'operator_screen.dart';
 import 'dart:async';
 import 'call_screen.dart';
 import '../services/handoff.dart';
@@ -90,10 +91,10 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
   int i = 0;
   static const _dest = [
     (Icons.notifications_none, 'Activity'), (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),
-    (Icons.auto_awesome, 'Amer'), (Icons.hub_outlined, 'Agent Ops'), (Icons.tune, 'Control'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users'), (Icons.security, 'Security')];
+    (Icons.auto_awesome, 'Amer'), (Icons.hub_outlined, 'Agent Ops'), (Icons.tune, 'Control'), (Icons.crisis_alert, 'Operator'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users'), (Icons.security, 'Security')];
   @override
   Widget build(BuildContext c) {
-    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const AgentOpsScreen(), const ControlScreen(), const OpsScreen(), const AdminScreen(), const SecurityScreen()];
+    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const AgentOpsScreen(), const ControlScreen(), const OperatorScreen(), const OpsScreen(), const AdminScreen(), const SecurityScreen()];
     final wide = MediaQuery.sizeOf(c).width > 720;
     final body = pages[i];
     if (wide) {

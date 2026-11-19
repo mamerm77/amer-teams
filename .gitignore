@@ -7,3 +7,4 @@ app/build/
 app/.dart_tool/
 installer/stage/
 installer/*.exe
+deploy/monitoring/amer_alert_secret

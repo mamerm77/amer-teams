@@ -18,7 +18,7 @@ class AppLocale extends ChangeNotifier {
 
 const _ar = {
   'Activity': 'النشاط', 'Chat': 'الدردشة', 'Calls': 'المكالمات', 'Teams': 'الفرق', 'Calendar': 'التقويم', 'Amer': 'عامر',
-  'Agent Ops': 'عمليات الوكلاء', 'Control': 'التحكم', 'Health': 'حالة الخدمة', 'Users': 'المستخدمون', 'Security': 'الأمان', 'More': 'المزيد',
+  'Agent Ops': 'عمليات الوكلاء', 'Control': 'التحكم', 'Operator': 'غرفة العمليات', 'Health': 'حالة الخدمة', 'Users': 'المستخدمون', 'Security': 'الأمان', 'More': 'المزيد',
   'Chats': 'الدردشات', 'New encrypted chat': 'دردشة مشفرة جديدة', 'Search everywhere': 'البحث في كل مكان', 'Catch me up': 'أطلعني على ما فاتني',
   'Workflows': 'سير العمل', 'My agents': 'وكلائي', 'Notifications': 'الإشعارات', 'Find a time': 'إيجاد موعد', 'Sign out': 'تسجيل الخروج',
   'Language': 'اللغة', 'System': 'لغة الجهاز', 'Out of office': 'خارج المكتب', 'My tasks': 'مهامي', 'My decisions': 'قراراتي',

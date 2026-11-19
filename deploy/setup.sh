@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
   sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
   sed -i "s/^LIVEKIT_API_SECRET=.*/LIVEKIT_API_SECRET=$(openssl rand -hex 32)/" .env
   echo "Created .env — edit DOMAIN, SERVER_NAME and ANTHROPIC_API_KEY, then re-run."; exit 0; }
+grep -q '^AMER_ALERT_SECRET=' .env || echo "AMER_ALERT_SECRET=$(openssl rand -hex 24)" >> .env             # Alertmanager -> incidents (docs/OPERATOR_MODE.md)
+(umask 077; grep '^AMER_ALERT_SECRET=' .env | cut -d= -f2- | tr -d '\n' > monitoring/amer_alert_secret)
 grep -q '^AMER_FEDERATION_SECRET=' .env || echo "AMER_FEDERATION_SECRET=$(openssl rand -hex 24)" >> .env   # Synapse module <-> orchestrator
 set -a; . ./.env; set +a
 python3 - <<PY2

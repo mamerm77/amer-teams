@@ -61,7 +61,7 @@ Each built feature has a doc listing its open gaps.
 | 12 | Live expertise map | Not started |
 | 13 | Ambient presence rooms | Not started |
 | 14 | Agent marketplace | Not started |
-| 15 | Operator mode for telecoms | Not started |
+| 15 | Operator mode for telecoms | Built: on-call rotas, incident numbers, encrypted war rooms, paging through quiet hours, forward-only states, MTTA/MTTR, Alertmanager opens and resolves incidents; AI post-incident review; tested 12/12 (OPERATOR_MODE.md) |
 
 ## Practical (25)
 | Feature | Status |

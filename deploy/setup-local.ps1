@@ -24,6 +24,8 @@ if (-not (Select-String -Path .env -Pattern "^AMER_BOT_SECRET=" -Quiet)) {
   Add-Content -Encoding ascii .env "AMER_BOT_USER=amer`nAMER_BOT_PASSWORD=Am$(Rand 20)!Q`nAMER_BOT_SECRET=$(Rand 48)"
 }
 # partner policy secret, shared by the Synapse module and the orchestrator (docs/PARTNERS.md)
+if (-not (Select-String -Path .env -Pattern "^AMER_ALERT_SECRET=" -Quiet)) { Add-Content -Encoding ascii .env "AMER_ALERT_SECRET=$(Rand 48)" }
+((Select-String -Path .env -Pattern "^AMER_ALERT_SECRET=(.*)$").Matches[0].Groups[1].Value) | Set-Content -NoNewline -Encoding ascii monitoring\amer_alert_secret
 if (-not (Select-String -Path .env -Pattern "^AMER_FEDERATION_SECRET=" -Quiet)) { Add-Content -Encoding ascii .env "AMER_FEDERATION_SECRET=$(Rand 48)" }
 $envs = @{}; Get-Content .env | ForEach-Object { if ($_ -match "^(\w+)=(.*)$") { $envs[$matches[1]] = $matches[2] } }
 (Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" -replace "api_key: LK_API_KEY", "api_key: $($envs.LIVEKIT_API_KEY)" | Set-Content -Encoding ascii livekit.yaml

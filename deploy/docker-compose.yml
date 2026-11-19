@@ -125,7 +125,7 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--cluster.listen-address="]   # single node
-    volumes: [./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro]
+    volumes: [./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro, ./monitoring/amer_alert_secret:/etc/alertmanager/amer_alert_secret:ro]
     restart: unless-stopped
   grafana:
     image: grafana/grafana:11.3.0
