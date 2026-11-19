@@ -259,7 +259,7 @@ class _S extends State<ChatScreen> {
       if (mine && !canEdit && e.messageType == MessageTypes.Text) const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Messages can be edited for 24 hours')),
     ]))));
     if (a == null) return;
-    if (a.startsWith('react:')) await room.sendReaction(e.eventId, a.substring(6));
+    if (a.startsWith('react:')) await sendEncryptedReaction(room, e.eventId, a.substring(6));
     if (a == 'reply') setState(() { replyTo = e; editing = null; });
     if (a == 'copy') await Clipboard.setData(ClipboardData(text: _text(e)));
     if (a == 'edit') setState(() { editing = e; replyTo = null; input.text = _text(e); });
@@ -511,8 +511,7 @@ class _S extends State<ChatScreen> {
     }
     final shown = tl == null ? e : e.getDisplayEvent(tl!);
     final edited = shown.eventId != e.eventId;
-    final reactions = <String, int>{};
-    if (tl != null) { for (final r in e.aggregatedEvents(tl!, RelationshipTypes.reaction)) { final k = r.content.tryGetMap<String, Object?>('m.relates_to')?['key'] as String?; if (k != null) reactions[k] = (reactions[k] ?? 0) + 1; } }
+    final reactions = tl == null ? <String, int>{} : reactionsFor(tl!.events, e.eventId);
 
     Widget body;
     if (e.type == EventTypes.Encrypted) {

@@ -8,6 +8,37 @@ const kStarredType = 'com.amerteams.starred';
 const kChecklistEvent = 'com.amerteams.checklist';
 const kChecklistTick = 'com.amerteams.checklist.tick';
 
+/// Reactions are fully end-to-end encrypted (docs/FEATURE_LOGIC.md). The SDK sends m.reaction in cleartext
+/// (emoji, sender and target visible to the server), so Amer Teams sends `com.amerteams.reaction` with the
+/// target and emoji inside the encrypted content. Cleartext m.reaction from other clients is still counted.
+const kReactionEvent = 'com.amerteams.reaction';
+Future<void> sendEncryptedReaction(Room room, String eventId, String key) =>
+    room.sendEvent({'com.amerteams.reaction': {'event_id': eventId, 'key': key}, 'body': key}, type: kReactionEvent);
+/// (target, key) of a reaction event, in either form; null if it is not a reaction.
+(String, String)? reactionOf(Event e) {
+  if (e.type == kReactionEvent) {
+    final r = e.content.tryGetMap<String, Object?>('com.amerteams.reaction');
+    final t = r?['event_id'], k = r?['key'];
+    return t is String && k is String ? (t, k) : null;
+  }
+  if (e.type == EventTypes.Reaction) {
+    final r = e.content.tryGetMap<String, Object?>('m.relates_to');
+    final t = r?['event_id'], k = r?['key'];
+    return t is String && k is String ? (t, k) : null;
+  }
+  return null;
+}
+/// Reaction counts per emoji for one message: one per person per emoji, redacted reactions ignored.
+Map<String, int> reactionsFor(Iterable<Event> timeline, String eventId) {
+  final seen = <String, Set<String>>{};
+  for (final e in timeline) {
+    if (e.redacted) continue;
+    final r = reactionOf(e); if (r == null || r.$1 != eventId) continue;
+    (seen[r.$2] ??= <String>{}).add(e.senderId);
+  }
+  return {for (final k in seen.keys) k: seen[k]!.length};
+}
+
 /// @mentions are sent as Matrix pills: [Name](https://matrix.to/#/@user:server) plus m.mentions.
 final mentionLink = RegExp(r'\[([^\]]+)\]\(https://matrix\.to/#/(@[^)]+)\)');
 String mentionMarkdown(String name, String userId) => '[$name](https://matrix.to/#/$userId)';
@@ -64,8 +95,9 @@ class ActivityService {
           if (e.senderId == me) continue;
           final who = e.senderFromMemoryOrFallback.calcDisplayname();
           final rel = e.content.tryGetMap<String, Object?>('m.relates_to');
-          if (e.type == EventTypes.Reaction && mine.contains(rel?['event_id'])) {
-            out.add(Activity('reaction', r, e, '$who reacted ${rel?['key']}'));
+          final rx = reactionOf(e);
+          if (rx != null && mine.contains(rx.$1)) {
+            out.add(Activity('reaction', r, e, '$who reacted ${rx.$2}'));
           } else if (e.type == kCallInviteEvent && e.content['version'] == 2) {
             final sm = CallSummary.of(tl.events, e.content['call_id'] as String, e.originServerTs);
             if (sm.outcome == 'missed' || sm.outcome == 'busy') out.add(Activity('missed_call', r, e, 'Missed ${e.content['media'] == 'audio' ? 'voice' : 'video'} call from $who'));
