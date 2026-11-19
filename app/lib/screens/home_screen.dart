@@ -24,6 +24,7 @@ import 'find_time_screen.dart';
 import '../services/ooo.dart';
 import '../services/feature_flags.dart';
 import '../services/enclave_client.dart';
+import '../services/search_index.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -37,11 +38,12 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client);
+    SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
   }
-  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); super.dispose(); }
+  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

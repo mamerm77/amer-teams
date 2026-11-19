@@ -401,6 +401,12 @@ void main() {
       await home(); await tap(find.text('Calendar'), 'Calendar tab'); await tap(find.byTooltip('Out of office'), 'Out of office');
       await tap(find.text('On'), 'Off'); await tap(find.text('Save'), 'Save'); await home();
     });
+    await step('Search everywhere finds a message by a word prefix, on this device', () async {
+      await home(); await tap(find.text('Chat'), 'Chat tab'); await tap(find.byTooltip('Search everywhere'), 'Search everywhere');
+      await t.enterText(find.byType(TextField).first, 'vendo'); await t.testTextInput.receiveAction(TextInputAction.search); await wait(2);
+      expectFound(await waitFor(find.textContaining('vendor comparison'), secs: 20), 'message found by prefix');
+      await t.pageBack(); await wait(1);
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
