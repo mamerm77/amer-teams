@@ -374,8 +374,10 @@ void main() {
       }
       expectFound(await waitFor(find.text('Chat'), secs: 60), 'home');
       await tap(find.text('Chat'), 'Chat'); await tap(find.text('Bob Tester'), 'chat');
-      await wait(5);
-      if (find.text('pong from Bob').evaluate().isNotEmpty) throw StateError('old message readable before restore: keys leaked to the new device');
+      await wait(8);
+      // a recent message from the previous device, so it is on screen: must not be readable yet
+      if (find.text('sent while the server was down').evaluate().isNotEmpty) throw StateError('old message readable before restore: keys reached the new device another way');
+      expectFound(find.textContaining('key').evaluate().isNotEmpty || find.textContaining('decrypt').evaluate().isNotEmpty, 'locked-message placeholder');
     });
     await step('New device: restore with the recovery key, old messages readable', () async {
       await home(); await tap(find.text('Security'), 'Security tab');
@@ -383,7 +385,7 @@ void main() {
       await type(find.byType(TextField).last, recoveryKey ?? '', 'recovery key'); await tap(find.text('Unlock'), 'Unlock');
       expectFound(await waitFor(find.textContaining('Backup unlocked'), secs: 90), 'Backup unlocked');
       await home(); await tap(find.text('Chat'), 'Chat'); await tap(find.text('Bob Tester'), 'chat');
-      expectFound(await waitFor(find.text('pong from Bob'), secs: 60), 'old message decrypted from backup');
+      expectFound(await waitFor(find.text('sent while the server was down'), secs: 60), 'old message decrypted from backup');
     });
 
     FlutterError.onError = prevOnError;

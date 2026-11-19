@@ -26,6 +26,9 @@ class MatrixService extends ChangeNotifier {
     client = Client('AmerTeams',
       database: await MatrixSdkDatabase.init('amer_teams', database: db),
       supportedLoginTypes: {AuthenticationTypes.password, AuthenticationTypes.sso},
+      // Without this the SDK supports no verification method and silently ignores every verification request
+      // (found by the in-use test). Emoji (SAS) and numbers, as in Element.
+      verificationMethods: {KeyVerificationMethod.emoji, KeyVerificationMethod.numbers},
     );
     await client.init();
     client.onSync.stream.listen((_) => notifyListeners());
