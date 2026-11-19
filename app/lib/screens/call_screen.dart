@@ -61,7 +61,8 @@ class _S extends State<CallScreen> {
     'Incident review': [('Timeline', 10), ('Root cause', 15), ('Actions and owners', 10)],
     'Retrospective': [('What went well', 10), ('What to improve', 10), ('Actions', 10)]};
   Map<String, Object?>? get agenda { final a = room.getState(_agState)?.content; return a != null && a['call_id'] == callId && a['items'] is List ? Map<String, Object?>.from(a) : null; }
-  List<String> get parking => [for (final e in (_parkTl?.events ?? const <mx.Event>[]).where((e) => e.type == _parkType && e.content['call_id'] == callId).toList().reversed) '${e.content['text']}'];
+  final _parkedLocal = <String>[];
+  List<String> get parking { final fromTl = [for (final e in (_parkTl?.events ?? const <mx.Event>[]).where((e) => e.type == _parkType && e.content['call_id'] == callId).toList().reversed) '${e.content['text']}']; return [...fromTl, for (final t in _parkedLocal) if (!fromTl.contains(t)) t]; }
   mx.Timeline? _parkTl;
   Future<void> _setAgenda(List<(String, int)> items) => room.client.setRoomStateWithKey(room.id, _agState, '', {'call_id': callId,
       'items': [for (final (t, m) in items) {'t': t, 'min': m}], 'idx': 0, 'item_started_ms': DateTime.now().millisecondsSinceEpoch});
@@ -986,7 +987,7 @@ class _S extends State<CallScreen> {
   Future<void> _sendChat() async {
     final t = chatInput.text.trim(); if (t.isEmpty) return; chatInput.clear();
     if (t.toLowerCase().startsWith('/ask')) { final q = t.substring(4).trim(); return _askDialog(q.isEmpty ? null : q); }   // private: never posted
-    if (t.toLowerCase().startsWith('/park ')) { await room.sendEvent({'call_id': callId, 'text': t.substring(6).trim(), 'body': '🅿️ Parking lot: ${t.substring(6).trim()}'}, type: _parkType); _snack('Added to the parking lot'); return; }
+    if (t.toLowerCase().startsWith('/park ')) { setState(() => _parkedLocal.add(t.substring(6).trim())); await room.sendEvent({'call_id': callId, 'text': t.substring(6).trim(), 'body': '🅿️ Parking lot: ${t.substring(6).trim()}'}, type: _parkType); _snack('Added to the parking lot'); return; }
     await room.sendTextEvent(t);
   }
 }
