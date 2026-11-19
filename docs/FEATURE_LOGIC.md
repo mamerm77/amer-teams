@@ -17,7 +17,7 @@ proves it, and the status. Enforcement levels:
 |---|---|---|---|---|---|
 | Encrypted 1:1 and group chat | WhatsApp, Signal: end-to-end by default | Every room has `m.room.encryption`. The server policy forces it, and the app refuses to send if it is missing. The database stores ciphertext only. | Server + app | e2e_real 2–4; in-use "Open chat", "Send and get reply" | **Verified in use** |
 | Delivery ticks | WhatsApp: 1 grey = sent, 2 grey = delivered, 2 blue = read | 🕓 sending · ✓ stored on server for all recipients · ✓✓ (blue) read. A receipt on a later message implies earlier ones were read. Matrix has no per-device delivery receipt, so "delivered" and "sent" are the same tick. | Server (receipts) + app (display) | in-use "Read receipt ticks" | **Verified in use** |
-| Failed send | WhatsApp: pending while offline, sent automatically when back; ⚠ with retry | Never lost: kept in a per-chat outbox on the device (survives restart), shown as "⚠ Not sent · tap" (Retry / Delete), retried automatically every 10 s, delivered exactly once. Edits and thread replies that fail return their text to the box. | App | in-use "Failed send … Retry" (server paused for real) | Testing |
+| Failed send | WhatsApp: pending while offline, sent automatically when back; ⚠ with retry | Never lost: kept in a per-chat outbox on the device (survives restart), shown as "⚠ Not sent · tap" (Retry / Delete), retried automatically every 10 s, delivered exactly once (each message keeps one Matrix transaction ID, which the server de-duplicates). Edits and thread replies that fail return their text to the box. | App | in-use "Failed send … Retry" (server paused for real) | Testing |
 | Reply / quote | All four | Reply shows the quoted original and keeps the link to it (`m.in_reply_to`) | App + protocol | in-use "Reply" | **Verified in use** |
 | Reactions | All four | One emoji per user per message. Counts are aggregated from the timeline. | Protocol | in-use "React" | **Verified in use** |
 | Edit | WhatsApp: 15 min · Telegram: 48 h · Teams: any time, marked "Edited" | Own text messages only, **within 24 h**, marked "edited". Edits are re-encrypted. | App (Synapse has no edit window) | in-use "Edit" | **Verified in use** (24 h rule implemented) |
@@ -30,7 +30,7 @@ proves it, and the status. Enforcement levels:
 | Search in chat | All four | Searches decrypted messages on the device. The server cannot search ciphertext, by design. | App | in-use "Search" | **Verified in use** |
 | Scheduled send | Telegram, Teams | Stored on the device and sent at the chosen time **only while the app is running**. Labelled as such. | App | none yet | Partial (by design) |
 | Disappearing messages | WhatsApp: 24 h / 7 d / 90 d | Room retention policy. The server purges expired events. | Server (retention) | chat_features_test | Server-tested |
-| Block | All four | Blocked user's messages and calls are not delivered: the server filters them via `m.ignored_user_list`. Unblock is available in Chat info. | **Server** + app | in-use "Block", "Unblock" | Testing |
+| Block | All four | Blocked user's messages and calls are not delivered: the server filters them via `m.ignored_user_list`. The chat stays, as in WhatsApp; the SDK helper that also left the chat is not used. Unblock is available in Chat info. | **Server** + app | in-use "Block", "Unblock" | Testing |
 | Mentions, Activity feed | Teams | @mention pill with `m.mentions`. Activity lists mentions, replies to me, reactions to me and missed calls. | App | in-use "Mention reaches Activity" | Testing |
 
 ## Calls (protocol v2, docs/CALL_PROTOCOL.md)
@@ -74,3 +74,8 @@ proves it, and the status. Enforcement levels:
 | Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
 |---|---|---|---|---|---|
 | Trace retention | Teams CQD: 30 days default, policy-based | Per tenant (1–3650 days; public 90). An hourly purge on one replica (advisory lock) deletes expired events, quality samples and records. Admins can run it on demand, and that run is audited. | **Server** | call_trace_test 19–23 | Server-tested (23/23) |
+
+## Rate limits
+| Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
+|---|---|---|---|---|---|
+| Message rate | Business chat tools do not visibly throttle normal use | 10 messages/s, burst 100. Synapse's default of 0.2/s with burst 10 throttled meeting creation in the in-use test. | **Server** | in-use (Meet now) | Testing |

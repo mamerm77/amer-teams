@@ -41,6 +41,9 @@ if ($hsText -notmatch "(?m)^user_directory") {
   Add-Content -Encoding ascii $hsPath "`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}"
   Write-Host "Enabled the people directory (everyone can find each other)."
 }
+if ((Get-Content $hsPath -Raw) -notmatch "(?m)^rc_message") {
+  Add-Content -Encoding ascii $hsPath "`n# business messaging rates (Synapse default 0.2/s, burst 10, throttles active chats and meetings)`nrc_message: {per_second: 10, burst_count: 100}"
+}
 if ((Get-Content $hsPath -Raw) -notmatch "(?m)^retention") {
   Add-Content -Encoding ascii $hsPath "`nretention: {enabled: true, purge_jobs: [{interval: 1h}]}"
   Write-Host "Enabled disappearing messages."

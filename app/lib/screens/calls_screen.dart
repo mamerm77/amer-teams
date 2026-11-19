@@ -32,9 +32,16 @@ class _S extends State<CallsScreen> {
     } catch (e) { _err(e); }
   }
 
+  bool _creating = false;
   Future<void> _meetNow() async {
+    if (_creating) return; _creating = true;
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const AlertDialog(content: Row(children: [
+      CircularProgressIndicator(), SizedBox(width: 16), Expanded(child: Text('Creating an encrypted meeting…'))])));
     try {
-      final (roomId, id) = await meet.create('');
+      final (String, String) r;
+      try { r = await meet.create('').timeout(const Duration(seconds: 45)); }
+      finally { if (mounted) Navigator.of(context, rootNavigator: true).pop(); _creating = false; }
+      final (roomId, id) = r;
       if (!mounted) return;
       await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Meeting ready'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [

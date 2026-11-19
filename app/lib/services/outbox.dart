@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 /// 10 s, and the user can retry or delete it. Kept on the device, so it survives an app restart.
 class OutboxItem {
   OutboxItem(this.id, this.text, this.at, {this.replyTo, this.error});
+  // `id` is also the Matrix transaction ID: the server de-duplicates repeats of the same ID, so a retry can
+  // never create a second copy even if an earlier attempt reached the server after all.
   final String id, text; final DateTime at; final String? replyTo; String? error;
   Map<String, Object?> toJson() => {'id': id, 'text': text, 'at': at.millisecondsSinceEpoch, 'replyTo': replyTo};
   static OutboxItem fromJson(Map<String, dynamic> j) =>
@@ -33,12 +35,13 @@ class Outbox extends ChangeNotifier {
   Future<void> _save() async { try { await (await _file()).writeAsString(jsonEncode(items.map((i) => i.toJson()).toList())); } catch (_) {} }
 
   /// Sends now; on failure keeps the message and schedules retries. Returns true if the server accepted it.
-  Future<bool> send(String text, {Event? replyTo, Future<void> Function()? sender}) async {
+  Future<bool> send(String text, {Event? replyTo}) async {
+    final txid = 'amer${DateTime.now().microsecondsSinceEpoch}';
     try {
-      await (sender?.call() ?? room.sendTextEvent(text, inReplyTo: replyTo)).timeout(const Duration(seconds: 20));
+      await room.sendTextEvent(text, inReplyTo: replyTo, txid: txid).timeout(const Duration(seconds: 20));
       return true;
     } catch (e) {
-      items.add(OutboxItem('${DateTime.now().microsecondsSinceEpoch}', text, DateTime.now(), replyTo: replyTo?.eventId, error: '$e'));
+      items.add(OutboxItem(txid, text, DateTime.now(), replyTo: replyTo?.eventId, error: '$e'));
       await _save(); notifyListeners(); _schedule();
       return false;
     }
@@ -48,7 +51,7 @@ class Outbox extends ChangeNotifier {
     if (_busy) return; _busy = true;
     try {
       Event? reply; if (i.replyTo != null) { try { reply = await room.getEventById(i.replyTo!); } catch (_) {} }
-      await room.sendTextEvent(i.text, inReplyTo: reply).timeout(const Duration(seconds: 20));
+      await room.sendTextEvent(i.text, inReplyTo: reply, txid: i.id).timeout(const Duration(seconds: 20));
       items.remove(i); await _save();
     } catch (e) { i.error = '$e'; }
     finally { _busy = false; notifyListeners(); if (items.isEmpty) { _retry?.cancel(); _retry = null; } }

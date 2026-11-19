@@ -106,18 +106,23 @@ class _S extends State<ChatInfoScreen> {
         onTap: () async { room.tags.containsKey(TagType.lowPriority) ? await room.removeTag(TagType.lowPriority) : await room.addTag(TagType.lowPriority); if (c.mounted) Navigator.pop(c); }),
       if (dm != null && room.client.ignoredUsers.contains(dm)) ListTile(leading: const Icon(Icons.lock_open), title: const Text('Unblock contact'),
         subtitle: const Text('Their new messages and calls will reach you again'),
-        onTap: () async { await room.client.unignoreUser(dm); _msg('Unblocked'); if (mounted) setState(() {}); }),
+        onTap: () async { await setBlocked(room.client, dm, false); _msg('Unblocked'); if (mounted) setState(() {}); }),
       if (dm != null && !room.client.ignoredUsers.contains(dm)) ListTile(leading: Icon(Icons.block, color: Theme.of(c).colorScheme.error), title: const Text('Block contact'),
         subtitle: const Text('You will no longer see their messages or calls. The server stops delivering them to you.'),
-        onTap: () async {
-          final nav = Navigator.of(c); final msg = ScaffoldMessenger.of(c);
-          await room.client.ignoreUser(dm);           // the SDK clears its cache and re-syncs so the server filters them out
-          nav.popUntil((r) => r.isFirst);
-          msg.showSnackBar(const SnackBar(content: Text('Blocked')));
-        }),
+        onTap: () async { await setBlocked(room.client, dm, true); _msg('Blocked'); if (mounted) setState(() {}); }),
       ListTile(leading: Icon(Icons.logout, color: Theme.of(c).colorScheme.error), title: Text(dm != null ? 'Delete chat' : 'Leave group'),
         onTap: () async { await room.leave(); if (c.mounted) Navigator.popUntil(c, (r) => r.isFirst); }),
       const SizedBox(height: 24),
     ]));
   }
+}
+
+
+/// Block / unblock like WhatsApp and Teams: the chat stays, the server stops delivering the person's events.
+/// Writes `m.ignored_user_list` directly (the SDK's ignoreUser also leaves direct chats and clears the cache).
+Future<void> setBlocked(Client client, String userId, bool blocked) async {
+  final current = Map<String, Object?>.from(client.accountData['m.ignored_user_list']?.content.tryGetMap<String, Object?>('ignored_users') ?? {});
+  if (blocked) { current[userId] = <String, Object?>{}; } else { current.remove(userId); }
+  await client.setAccountData(client.userID!, 'm.ignored_user_list', {'ignored_users': current});
+  for (var i = 0; i < 50 && client.ignoredUsers.contains(userId) != blocked; i++) { await Future.delayed(const Duration(milliseconds: 200)); }
 }

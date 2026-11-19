@@ -203,7 +203,7 @@ void main() {
     // ---------------- meetings ----------------
     await step('Meet now', () async {
       await tap(find.text('Meet now'), 'Meet now');
-      if (await waitFor(find.text('Start meeting'), secs: 15)) await tap(find.text('Start meeting'), 'Start meeting');
+      if (await waitFor(find.text('Start meeting'), secs: 50)) await tap(find.text('Start meeting'), 'Start meeting');
       expectFound(await waitFor(find.text('Leave'), secs: 40), 'meeting screen');
     });
     await step('Meeting: raise hand', () async { await wait(6); /* let the "No camera" notice clear the control bar */ await tap(find.byTooltip('Raise hand'), 'Raise hand'); expectFound(await waitFor(find.byTooltip('Lower hand')), 'hand raised'); });

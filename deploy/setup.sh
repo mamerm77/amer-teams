@@ -37,6 +37,8 @@ max_upload_size: 200M
 enable_metrics: true
 user_directory: {enabled: true, search_all_users: true, prefer_local_users: true}
 retention: {enabled: true, purge_jobs: [{interval: 1h}]}
+# business messaging rates (Synapse default 0.2/s with burst 10 throttles active chats and meetings)
+rc_message: {per_second: 10, burst_count: 100}
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY
