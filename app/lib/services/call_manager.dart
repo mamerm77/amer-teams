@@ -154,12 +154,12 @@ class CallManager {
           if (e.content['version'] == 2) {
             final sm = CallSummary.of(evs, id, e.originServerTs);
             out.add(CallRecord(room: r, callId: id, video: e.content['media'] != 'audio', outgoing: mine, at: e.originServerTs,
-                peer: mine ? r.getLocalizedDisplayname() : e.senderFromMemoryOrFallback.calcDisplayname(),
+                peer: mine ? peerName(r) : e.senderFromMemoryOrFallback.calcDisplayname(),
                 durationS: sm.durationS, answered: sm.answered, outcome: sm.outcome));
             continue;
           }
           out.add(CallRecord(room: r, callId: id, video: e.content['media'] != 'audio', outgoing: mine, at: e.originServerTs,
-              peer: mine ? r.getLocalizedDisplayname() : e.senderFromMemoryOrFallback.calcDisplayname(),
+              peer: mine ? peerName(r) : e.senderFromMemoryOrFallback.calcDisplayname(),
               durationS: ends[id], answered: mine || joinedByMe.contains(id)));
         }
       } finally { tl.cancelSubscriptions(); }
@@ -167,4 +167,11 @@ class CallManager {
     out.sort((a, b) => b.at.compareTo(a.at));
     return out;
   }
+}
+
+/// The other person in a 1:1 chat (even if they have not joined yet); the chat name for groups.
+String peerName(Room r) {
+  final dm = r.directChatMatrixID;
+  if (dm != null) return r.unsafeGetUserFromMemoryOrFallback(dm).calcDisplayname();
+  return r.getLocalizedDisplayname();
 }

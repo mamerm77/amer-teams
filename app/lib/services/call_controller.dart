@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'api_service.dart';
+import 'call_manager.dart' show peerName;
 import 'call_service.dart';
 import 'call_signaling.dart';
 import 'tones.dart';
@@ -51,7 +52,7 @@ class CallController extends ChangeNotifier {
   static Future<CallController> outgoing(ApiService api, mx.Room room, {required bool video}) async {
     if (!room.encrypted) throw StateError('Calls require an end-to-end encrypted room');
     final c = _make(api, room, CallRole.caller, _newId, video);
-    c.peerName = room.getLocalizedDisplayname();
+    c.peerName = peerName(room);
     c.media = await SecureCall.prepare(api, room, callId: c.callId, video: video, caller: true);
     c.sig.startCall(extra: c.media!.pqAdvert);
     Tones.ringback();

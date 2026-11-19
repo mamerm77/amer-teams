@@ -5,6 +5,7 @@ import '../services/call_manager.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'call_screen.dart';
+import 'chat_screen.dart';
 import 'people_picker.dart';
 import 'phone_screen.dart';
 
@@ -122,16 +123,34 @@ class _S extends State<CallsScreen> {
       FutureBuilder<List<CallRecord>>(future: hist, builder: (_, s) {
         if (!s.hasData) return const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()));
         if (s.data!.isEmpty) return const Padding(padding: EdgeInsets.all(24), child: Text('No calls yet. Start one above.'));
-        return Column(children: [for (final r in s.data!) ListTile(
-          leading: CircleAvatar(backgroundColor: r.missed ? Theme.of(c).colorScheme.errorContainer : null, child: Icon(r.video ? Icons.videocam : Icons.call)),
-          title: Text(r.peer, style: TextStyle(color: r.missed ? Theme.of(c).colorScheme.error : null)),
-          subtitle: Row(children: [
-            Icon(r.missed ? Icons.call_missed : r.outgoing ? Icons.call_made : Icons.call_received, size: 14), const SizedBox(width: 4),
-            Text('${r.outcome != null ? CallSummary(r.outcome!, r.durationS, r.answered).label(r.outgoing, r.video) : r.missed ? 'Missed' : r.outgoing ? 'Outgoing' : 'Incoming'}'
-                 ' · ${DateFormat('d MMM, HH:mm').format(r.at)}'
-                 '${r.outcome == null && r.durationS != null ? ' · ${r.durationS! ~/ 60}:${(r.durationS! % 60).toString().padLeft(2, '0')}' : ''}')]),
-          trailing: IconButton(tooltip: 'Call again', icon: Icon(r.video ? Icons.videocam_outlined : Icons.call_outlined),
-            onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: r.room.id, video: r.video))).then((_) => _load())))]);
+        final cs = Theme.of(c).colorScheme; final now = DateTime.now();
+        String day(DateTime t) {
+          final d = DateTime(t.year, t.month, t.day), today = DateTime(now.year, now.month, now.day);
+          if (d == today) return 'Today';
+          if (d == today.subtract(const Duration(days: 1))) return 'Yesterday';
+          return DateFormat(now.difference(t).inDays < 7 ? 'EEEE' : 'd MMMM yyyy').format(t);
+        }
+        String initials(String n) { final p = n.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList(); return p.isEmpty ? '?' : (p.first[0] + (p.length > 1 ? p.last[0] : '')).toUpperCase(); }
+        final rows = <Widget>[]; String? last;
+        for (final r in s.data!) {
+          final d = day(r.at);
+          if (d != last) { rows.add(Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 2), child: Text(d, style: Theme.of(c).textTheme.labelMedium?.copyWith(color: cs.primary)))); last = d; }
+          final failedOut = r.outgoing && const {'missed', 'declined', 'busy', 'failed', 'cancelled'}.contains(r.outcome);
+          final tone = r.missed ? cs.error : failedOut ? Colors.orange.shade800 : null;
+          final label = r.outcome != null ? CallSummary(r.outcome!, r.durationS, r.answered).label(r.outgoing, r.video) : r.missed ? 'Missed' : r.outgoing ? 'Outgoing' : 'Incoming';
+          rows.add(ListTile(
+            onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: r.room.id))).then((_) => _load()),
+            leading: Stack(clipBehavior: Clip.none, children: [
+              CircleAvatar(backgroundColor: r.missed ? cs.errorContainer : cs.primaryContainer, child: Text(initials(r.peer), style: TextStyle(color: r.missed ? cs.onErrorContainer : cs.onPrimaryContainer))),
+              Positioned(right: -4, bottom: -4, child: CircleAvatar(radius: 10, backgroundColor: cs.surface, child: Icon(r.video ? Icons.videocam : Icons.call, size: 13, color: tone ?? cs.primary)))]),
+            title: Text(r.peer, style: TextStyle(color: r.missed ? cs.error : null, fontWeight: r.missed ? FontWeight.w600 : null)),
+            subtitle: Row(children: [
+              Icon(r.missed ? Icons.call_missed : r.outgoing ? Icons.call_made : Icons.call_received, size: 14, color: tone), const SizedBox(width: 4),
+              Flexible(child: Text('$label · ${DateFormat('HH:mm').format(r.at)}', style: TextStyle(color: tone), overflow: TextOverflow.ellipsis))]),
+            trailing: IconButton(tooltip: r.video ? 'Video call back' : 'Call back', icon: Icon(r.video ? Icons.videocam_outlined : Icons.call_outlined, color: cs.primary),
+              onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: r.room.id, video: r.video))).then((_) => _load()))));
+        }
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: rows);
       }),
     ]));
 }

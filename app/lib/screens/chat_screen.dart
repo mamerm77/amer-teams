@@ -48,6 +48,18 @@ class _S extends State<ChatScreen> {
   String get me => room.client.userID!;
 
   late final Outbox outbox;
+  static String _initials(String n) { final p = n.trim().split(RegExp(r'\s+')).where((x) => x.isNotEmpty).toList(); return p.isEmpty ? '?' : (p.first[0] + (p.length > 1 ? p.last[0] : '')).toUpperCase(); }
+  static String _lastSeen(DateTime t) {
+    final now = DateTime.now(); final d = DateTime(t.year, t.month, t.day), today = DateTime(now.year, now.month, now.day);
+    if (d == today) return 'today at ${DateFormat('HH:mm').format(t)}';
+    if (d == today.subtract(const Duration(days: 1))) return 'yesterday at ${DateFormat('HH:mm').format(t)}';
+    return DateFormat('d MMM, HH:mm').format(t);
+  }
+  /// 1:1 chat where the other person was invited but has never joined (e.g. has not signed in yet).
+  bool get _peerInvitedOnly {
+    final dm = room.directChatMatrixID; if (dm == null) return false;
+    return room.getState(EventTypes.RoomMember, dm)?.content['membership'] == 'invite';
+  }
   void _safeTyping(bool on, {int? timeout}) { room.setTyping(on, timeout: timeout).catchError((_) {}); }   // best effort; never throws
 
   @override void initState() {
@@ -314,17 +326,23 @@ class _S extends State<ChatScreen> {
       appBar: AppBar(
         title: searching
             ? TextField(controller: searchCtl, autofocus: true, decoration: const InputDecoration(hintText: 'Search messages', border: InputBorder.none), onChanged: (_) => setState(() {}))
-            : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(widget.threadRootId != null ? 'Thread' : widget.filesOnly ? 'Files and media' : room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
+            : Row(children: [
+              if (widget.threadRootId == null && !widget.filesOnly) Padding(padding: const EdgeInsets.only(right: 10),
+                child: CircleAvatar(radius: 18, backgroundColor: cs.primaryContainer, child: Text(_initials(peerName(room)), style: TextStyle(fontSize: 14, color: cs.onPrimaryContainer)))),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.threadRootId != null ? 'Thread' : widget.filesOnly ? 'Files and media' : peerName(room), overflow: TextOverflow.ellipsis),
                 FutureBuilder<CachedPresence>(future: _presence, builder: (_, p) {
                   final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
                   final status = p.data?.statusMsg;
+                  final seen = p.data?.lastActiveTimestamp;
+                  final away = seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}';
                   final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
-                      : room.isDirectChat ? '${online ? 'Online' : 'Offline'}${status != null && status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
+                      : room.isDirectChat && _peerInvitedOnly ? 'Invited · hasn\'t signed in yet · 🔒 encrypted'
+                      : room.isDirectChat ? '${online ? 'Online' : away}${status != null && status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
                       : '🔒 End-to-end encrypted · $members member${members == 1 ? '' : 's'}';
                   return Text(line, style: Theme.of(c).textTheme.labelSmall?.copyWith(color: typers.isNotEmpty || online ? cs.primary : null));
                 }),
-              ]),
+              ]))]),
         actions: [
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
@@ -347,6 +365,14 @@ class _S extends State<ChatScreen> {
               'This chat is archived by ${cp.orgName ?? 'your organisation'} for compliance (kept ${cp.retentionDays} days). Messages stay end-to-end encrypted in transit.',
               style: Theme.of(c).textTheme.labelSmall))]));
         }),
+        if (evs.length < 3 && widget.threadRootId == null && !widget.filesOnly) Padding(padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+            const Icon(Icons.lock_outline, size: 28),
+            const SizedBox(height: 8),
+            const Text('Messages and calls in this chat are end-to-end encrypted. Only the people in it can read or listen to them.', textAlign: TextAlign.center),
+            if (_peerInvitedOnly) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${peerName(room)} hasn\'t signed in yet. They will get your messages (✓✓) once they do.', textAlign: TextAlign.center, style: TextStyle(color: cs.primary))),
+            if (evs.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: ActionChip(avatar: const Text('👋'), label: const Text('Say hello'), onPressed: () { input.text = 'Hello 👋'; send(); })),
+          ])))),
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
           // a read receipt on a message means everything before it has been read too (newest-first list)
