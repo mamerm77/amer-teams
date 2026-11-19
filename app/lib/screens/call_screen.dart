@@ -303,7 +303,7 @@ class _S extends State<CallScreen> {
         if (j['t'] == 'qa') _onQa(j, who);
         if (j['t'] == 'rec') _onRec(j, e.participant?.identity ?? '', who);
         if (j['t'] == 'react') floating.add((who, j['e'] as String, DateTime.now()));
-        if (j['t'] == 'cap' && aiOn && j['x'] is String) lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch});
+        if (j['t'] == 'cap' && aiOn && j['x'] is String) { lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch}); _translateLine(who, j['x']); }
       });
     } catch (_) {}
   }
@@ -324,6 +324,7 @@ class _S extends State<CallScreen> {
         final ts = DateTime.now().millisecondsSinceEpoch;
         lines.add({'speaker': room.client.userID == null ? 'Me' : (room.unsafeGetUserFromMemoryOrFallback(me).calcDisplayname()), 'text': r.recognizedWords, 'ts': ts});
         if (aiOn && call != null) _send({'t': 'cap', 'x': r.recognizedWords, 'ts': ts}).catchError((_) {});   // shared only while Amer is on
+        _translateLine('Me', r.recognizedWords);
       },
                  listenOptions: SpeechListenOptions(partialResults: true, onDevice: true));
       setState(() => captions = true);
@@ -416,6 +417,40 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- live translated captions (docs/TRANSLATED_CAPTIONS.md) ----------
+  String? capLang; final tCaps = <(String, String)>[]; final _tq = <(String, String)>[]; bool _tBusy = false;
+  static const capLangs = ['English', 'العربية (Arabic)', 'Français (French)', 'हिन्दी (Hindi)', 'اردو (Urdu)', 'বাংলা (Bengali)', 'Tagalog', 'Español (Spanish)', '中文 (Chinese)', 'Русский (Russian)'];
+  void _translateLine(String who, String text) {
+    if (capLang == null || text.trim().isEmpty) return;
+    _tq.add((who, text)); if (_tq.length > 6) _tq.removeAt(0);          // keep up with speech: drop the oldest if behind
+    _pumpTranslations();
+  }
+  Future<void> _pumpTranslations() async {
+    if (_tBusy) return; _tBusy = true;
+    try {
+      while (_tq.isNotEmpty && capLang != null && mounted) {
+        final (who, text) = _tq.removeAt(0);
+        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final r = await context.read<ApiService>().ask('Translate this meeting caption to $capLang. Reply with the translation only.', context: text, agent: 'trans', labels: [if (label != null) label], encrypted: room.encrypted);
+        if (!mounted) return;
+        if (r['blocked'] == true) { setState(() { capLang = null; }); _snack('${r['answer']}'); return; }
+        setState(() { tCaps.add((who, '${r['answer']}'.trim())); if (tCaps.length > 3) tCaps.removeAt(0); });
+      }
+    } catch (e) { _snack('Translation stopped: $e'); } finally { _tBusy = false; }
+  }
+  Future<void> _pickCapLang() async {
+    final gate = aiFor(room, small: true);
+    if (!gate.allowed) { _snack(gate.where); return; }
+    final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: const Text('Translated captions'), children: [
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Text('Captions from everyone who shares them (Amer on in this meeting) are translated for you only. ${gate.where}.', style: const TextStyle(fontSize: 12))),
+      for (final l in capLangs) SimpleDialogOption(onPressed: () => Navigator.pop(d, l), child: Text(l)),
+      if (capLang != null) SimpleDialogOption(onPressed: () => Navigator.pop(d, ''), child: const Text('Turn off')),
+    ]));
+    if (v == null) return;
+    setState(() { capLang = v.isEmpty ? null : v; tCaps.clear(); _tq.clear(); });
+    if (capLang != null && !aiOn) _snack('Others\' captions are shared only while Amer is on in this meeting; your own speech is translated now');
+  }
 
   // ---------- browser guests: lobby and key hand-over (docs/GUESTS.md) ----------
   final lobby = <String, (String, String)>{};      // identity -> (X25519 public key, display name), waiting
@@ -633,6 +668,7 @@ class _S extends State<CallScreen> {
               case 'guest': _guestLinkDialog();
               case 'webinarreg': _guestLinkDialog(webinar: true);
               case 'qa': _qaSheet();
+              case 'tcap': _pickCapLang();
               case 'end': _host('end');
             }
           }, itemBuilder: (_) => [
@@ -649,6 +685,7 @@ class _S extends State<CallScreen> {
             if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'guest', child: ListTile(leading: Icon(Icons.public), title: Text('Guest link (browser)'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
+            PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
             if (widget.meeting) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
@@ -673,6 +710,10 @@ class _S extends State<CallScreen> {
             ? Row(children: [Expanded(child: stage), if (panel != _Panel.none) SizedBox(width: 340, child: _panel(people, waiting))])
             : _panel(people, waiting)),
         if (captions) Container(width: double.infinity, padding: const EdgeInsets.all(12), color: cs.surfaceContainerHighest, child: Text(liveCaption.isEmpty ? 'Listening on this device…' : liveCaption)),
+        if (capLang != null) Container(width: double.infinity, padding: const EdgeInsets.all(12), color: cs.secondaryContainer, child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Text('Translated to $capLang', style: Theme.of(context).textTheme.labelSmall),
+          if (tCaps.isEmpty) const Text('Waiting for speech…'),
+          for (final (w, t) in tCaps) Text('$w: $t', textDirection: RegExp(r'[\u0600-\u06FF]').hasMatch(t) ? TextDirection.rtl : TextDirection.ltr)])),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
           if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
           if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),

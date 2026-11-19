@@ -36,7 +36,7 @@ Each built feature has a doc listing its open gaps.
 | Shared channels across organisations | Built (see top five) |
 | Webinars and town halls | Built: registration page with capacity, attendee-only join links, Q&A with votes; tested 12/12 on the real stack with a browser. HLS not built (WEBINARS.md) |
 | Breakout rooms | Existing |
-| Live translated captions | Partial: on-device captions exist; translation not started |
+| Live translated captions | Built: per-listener language, label-aware AI translation of shared captions, right-to-left lines; AI engine, not on device (TRANSLATED_CAPTIONS.md) |
 | Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
 | Deepfake detection | Not started |
 | AI call handling for phone lines | Not started |
