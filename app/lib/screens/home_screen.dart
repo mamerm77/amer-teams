@@ -1,3 +1,7 @@
+import '../services/accessibility.dart';
+import 'notifications_screen.dart';
+import 'search_screen.dart';
+import 'apps_screen.dart';
 import '../services/focus.dart';
 import 'operator_screen.dart';
 import 'dart:async';
@@ -92,39 +96,71 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   int i = 0;
+  // Teams / Slack layout: a short app bar; everything else is one tap away in Apps, which also explains each feature.
   static const _dest = [
-    (Icons.notifications_none, 'Activity'), (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),
-    (Icons.auto_awesome, 'Amer'), (Icons.hub_outlined, 'Agent Ops'), (Icons.tune, 'Control'), (Icons.crisis_alert, 'Operator'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users'), (Icons.security, 'Security')];
+    (Icons.notifications_none, Icons.notifications, 'Activity'), (Icons.chat_bubble_outline, Icons.chat_bubble, 'Chat'), (Icons.groups_outlined, Icons.groups, 'Teams'),
+    (Icons.calendar_month_outlined, Icons.calendar_month, 'Calendar'), (Icons.call_outlined, Icons.call, 'Calls'), (Icons.auto_awesome_outlined, Icons.auto_awesome, 'Amer'),
+    (Icons.apps_outlined, Icons.apps, 'Apps')];
+
+  Widget _page(BuildContext c, int k) => switch (k) {
+    0 => const ActivityScreen(),
+    1 => twoPane(c) ? Row(children: [const SizedBox(width: 380, child: RoomsScreen()), const VerticalDivider(width: 1),
+          Expanded(child: ValueListenableBuilder<String?>(valueListenable: selectedChat, builder: (c, id, _) => id == null
+            ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.forum_outlined, size: 64, color: Theme.of(c).colorScheme.outline), const SizedBox(height: 12),
+                Text(L.t(c, 'Choose a chat'), style: Theme.of(c).textTheme.titleMedium)]))
+            : ChatScreen(key: ValueKey(id), roomId: id, onClose: () => selectedChat.value = null)))])
+        : const RoomsScreen(),
+    2 => const TeamsScreen(), 3 => const CalendarScreen(), 4 => const CallsScreen(), 5 => const CopilotScreen(), _ => const AppsScreen() };
+
+  /// Top bar, as in Teams: search everywhere in the middle, your profile and settings on the right.
+  PreferredSizeWidget _top(BuildContext c) {
+    final m = context.read<MatrixService>(); final me = m.client.userID ?? '';
+    return PreferredSize(preferredSize: const Size.fromHeight(52), child: Material(color: Theme.of(c).colorScheme.surfaceContainer, child: SafeArea(bottom: false, child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), child: Row(children: [
+        Text('Amer Teams', style: Theme.of(c).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)), const SizedBox(width: 16),
+        Expanded(child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: InkWell(borderRadius: BorderRadius.circular(8),
+          onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SearchScreen())),
+          child: Container(height: 34, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Theme.of(c).colorScheme.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: Theme.of(c).colorScheme.outlineVariant)),
+            child: Row(children: [const Icon(Icons.search, size: 18), const SizedBox(width: 8), Text(L.t(c, 'Search messages, files and people'), style: Theme.of(c).textTheme.bodySmall)])))))),
+        const SizedBox(width: 12),
+        PopupMenuButton<String>(tooltip: 'Your profile and settings', onSelected: (v) {
+            if (v == 'security') Navigator.push(c, MaterialPageRoute(builder: (_) => const SecurityScreen()));
+            if (v == 'a11y') Navigator.push(c, MaterialPageRoute(builder: (_) => const A11yScreen()));
+            if (v == 'notify') Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
+            if (v == 'out') confirmSignOut(c);
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(enabled: false, child: Text(me)),
+            PopupMenuItem(value: 'notify', child: ListTile(leading: const Icon(Icons.notifications_active_outlined), title: Text(L.t(c, 'Notifications')))),
+            PopupMenuItem(value: 'security', child: ListTile(leading: const Icon(Icons.security), title: Text(L.t(c, 'Security')))),
+            PopupMenuItem(value: 'a11y', child: ListTile(leading: const Icon(Icons.accessibility_new), title: Text(L.t(c, 'Accessibility')))),
+            PopupMenuItem(enabled: false, child: Text('Build ${const String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${const String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', style: const TextStyle(fontSize: 11))),
+            PopupMenuItem(value: 'out', child: ListTile(leading: const Icon(Icons.logout), title: Text(L.t(c, 'Sign out')))),
+          ],
+          child: CircleAvatar(radius: 16, child: Text(me.length > 1 ? me[1].toUpperCase() : '?'))),
+      ]))))); }
+
   @override
   Widget build(BuildContext c) {
-    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const AgentOpsScreen(), const ControlScreen(), const OperatorScreen(), const OpsScreen(), const AdminScreen(), const SecurityScreen()];
     final wide = MediaQuery.sizeOf(c).width > 720;
-    final body = pages[i];
     if (wide) {
-      // the rail scrolls when the window is too short for every destination (12 of them on a small laptop screen)
-      return Scaffold(body: Row(children: [
-        LayoutBuilder(builder: (lc, box) => SingleChildScrollView(child: ConstrainedBox(constraints: BoxConstraints(minHeight: box.maxHeight), child: IntrinsicHeight(child:
-        NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all,
-          leading: const Tooltip(message: 'Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', child: Text('b${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')}', style: TextStyle(fontSize: 10))),
-          trailing: IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => confirmSignOut(c)),
-          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(t(c, d.$2)))]))))),
-        const VerticalDivider(width: 1), Expanded(child: body)]));
+      return Scaffold(appBar: _top(c), body: Row(children: [
+        NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all, minWidth: 68,
+          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: Text(t(c, d.$3)))]),
+        const VerticalDivider(width: 1), Expanded(child: _page(c, i))]));
     }
-    // Phones: first four tabs plus "More" for Control, Health and Users.
-    const main = 4;   // Activity, Chat, Calls, Teams
-    return Scaffold(body: body, bottomNavigationBar: NavigationBar(
-      selectedIndex: i < main ? i : main,
+    // Phones, as in the Teams and Slack mobile apps: five tabs; Amer and Apps sit under More.
+    return Scaffold(body: _page(c, i), bottomNavigationBar: NavigationBar(selectedIndex: i < 4 ? i : 4,
       onDestinationSelected: (v) async {
-        if (v < main) { setState(() => i = v); return; }
+        if (v < 4) { setState(() => i = v); return; }
         final pick = await showModalBottomSheet<int>(context: c, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (var k = main; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(t(c, _dest[k].$2)), onTap: () => Navigator.pop(s, k)),
-          const ListTile(leading: Icon(Icons.info_outline), title: Text('About Amer Teams'),
-            subtitle: Text('Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}')),
+          for (var k = 4; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(t(c, _dest[k].$3)), onTap: () => Navigator.pop(s, k)),
+          ListTile(leading: const Icon(Icons.security), title: Text(t(c, 'Security')), onTap: () { Navigator.pop(s); Navigator.push(c, MaterialPageRoute(builder: (_) => const SecurityScreen())); }),
           ListTile(leading: const Icon(Icons.logout), title: Text(t(c, 'Sign out')), onTap: () { Navigator.pop(s); confirmSignOut(c); }),
         ])));
         if (pick != null) setState(() => i = pick);
       },
-      destinations: [for (var k = 0; k < main; k++) NavigationDestination(icon: Icon(_dest[k].$1), label: t(c, _dest[k].$2)),
+      destinations: [for (var k = 0; k < 4; k++) NavigationDestination(icon: Icon(_dest[k].$1), selectedIcon: Icon(_dest[k].$2), label: t(c, _dest[k].$3)),
         NavigationDestination(icon: const Icon(Icons.more_horiz), label: t(c, 'More'))]));
   }
 }

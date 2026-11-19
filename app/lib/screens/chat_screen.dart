@@ -52,8 +52,10 @@ const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
 /// photo previews (decrypted on device), files, search, call and meeting cards.
 /// [threadRootId]: show one thread. [filesOnly]: show only shared files, photos and voice.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.roomId, this.threadRootId, this.filesOnly = false});
+  const ChatScreen({super.key, required this.roomId, this.threadRootId, this.filesOnly = false, this.onClose});
   final String roomId; final String? threadRootId; final bool filesOnly;
+  /// Set when the chat is shown beside the chat list (two-pane layout): the back button closes it there.
+  final VoidCallback? onClose;
   @override State<ChatScreen> createState() => _S();
 }
 class _S extends State<ChatScreen> {
@@ -548,6 +550,7 @@ class _S extends State<ChatScreen> {
 
     final page = Scaffold(
       appBar: AppBar(
+        leading: widget.onClose != null ? BackButton(onPressed: widget.onClose) : null,
         title: searching
             ? TextField(controller: searchCtl, autofocus: true, decoration: const InputDecoration(hintText: 'Search messages', border: InputBorder.none), onChanged: (_) => setState(() {}))
             : Row(children: [

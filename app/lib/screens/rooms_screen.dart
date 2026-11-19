@@ -35,6 +35,14 @@ String previewOf(Event? e, Room r, String me) {
   return '🔒 End-to-end encrypted chat';
 }
 
+/// The open chat in the two-pane layout (chat list on the left, the chat on the right), as in Teams and Slack.
+final selectedChat = ValueNotifier<String?>(null);
+bool twoPane(BuildContext c) => MediaQuery.sizeOf(c).width >= 1000;
+void openChat(BuildContext c, String roomId) {
+  if (twoPane(c)) { selectedChat.value = roomId; return; }
+  Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: roomId)));
+}
+
 class RoomsScreen extends StatefulWidget { const RoomsScreen({super.key}); @override State<RoomsScreen> createState() => _RS(); }
 class _RS extends State<RoomsScreen> {
   String filter = 'all'; final q = TextEditingController(); bool searching = false;
@@ -91,14 +99,14 @@ class _RS extends State<RoomsScreen> {
             subtitle: Text('${r.isDirectChat ? 'wants to chat with you' : 'invited you to a group'} · encrypted'),
             trailing: Wrap(spacing: 6, children: [
               TextButton(onPressed: () async { await r.leave(); }, child: const Text('Decline')),
-              FilledButton(onPressed: () async { await r.join(); if (c.mounted) Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: r.id))); }, child: const Text('Accept'))])),
+              FilledButton(onPressed: () async { await r.join(); if (c.mounted) openChat(c, r.id); }, child: const Text('Accept'))])),
           if (invites.isNotEmpty) const Divider(),
           for (final r in chats) () {
             final name = peerName(r); final unread = r.notificationCount > 0 || r.isUnread;
             final typers = r.typingUsers.where((u) => u.id != me).toList();
             final ev = r.lastEvent; final mine = ev?.senderId == me;
             return ListTile(
-              onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: r.id))),
+              onTap: () => openChat(c, r.id),
               onLongPress: () => _menu(c, r),
               leading: CircleAvatar(backgroundColor: cs.primaryContainer, child: Text(_initials(name), style: TextStyle(color: cs.onPrimaryContainer))),
               title: Row(children: [
@@ -160,6 +168,6 @@ class _RS extends State<RoomsScreen> {
       name = ctl.text.trim().isEmpty ? people.map((p) => p.displayName ?? p.userId).join(', ') : ctl.text.trim();
     }
     final id = await m.createRoom(name: name, invite: people.map((p) => p.userId).toList(), direct: people.length == 1);
-    if (c.mounted) Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: id)));
+    if (c.mounted) openChat(c, id);
   }
 }

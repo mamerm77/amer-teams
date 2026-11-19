@@ -47,6 +47,8 @@ void main() {
     }
     void expectFound(bool ok, String what) { if (!ok) throw StateError('Not shown on screen: $what'); }
     Future<void> tap(Finder f, String what) async { expectFound(await waitFor(f), what); try { await t.ensureVisible(f.first); } catch (_) {} await t.tap(f.first); await wait(.6); }
+    // Users and Security now live under Apps (Teams-style layout)
+    Future<void> openApp(String name) async { await tap(find.text('Apps'), 'Apps tab'); await tap(find.text(name), name); }
     Future<void> type(Finder f, String text, String what) async {
       expectFound(await waitFor(f), what);
       await t.tap(f.first); await wait(.3);            // focus the box first, as a person would (re-attaches text input after a menu closes)
@@ -248,10 +250,17 @@ void main() {
     // ---------------- other areas ----------------
     // back to the main screen whatever the meeting steps left open
     for (var i = 0; i < 4 && find.text('Activity').evaluate().isEmpty; i++) { await t.pageBack(); await wait(1); }
-    for (final tab in ['Activity', 'Teams', 'Calendar', 'Amer', 'Control', 'Health', 'Security']) {
+    for (final tab in ['Activity', 'Teams', 'Calendar', 'Amer', 'Apps']) {
       await step('$tab screen', () async { await tap(find.text(tab), '$tab tab'); await wait(3); });
     }
-    await step('Users (admin)', () async { await tap(find.text('Users'), 'Users tab'); expectFound(await waitFor(find.text('New invite code')), 'admin tools'); });
+    await step('Apps lists every feature with what it does', () async {
+      for (final n in ['Catch me up', 'Operator', 'Meeting rooms', 'Skills and marketplace', 'Usage analytics']) { expectFound(await waitFor(find.text(n), secs: 5), n); }
+      expectFound(await waitFor(find.textContaining('NOC incidents'), secs: 5), 'one-line description');
+    });
+    for (final app in ['Control centre', 'Health', 'Security and devices']) {
+      await step('$app screen', () async { await openApp(app); await wait(3); await t.pageBack(); await wait(1); });
+    }
+    await step('Users (admin)', () async { await openApp('Users'); expectFound(await waitFor(find.text('New invite code')), 'admin tools'); });
     await step('Admin: create invite code', () async { await tap(find.text('New invite code'), 'New invite code'); expectFound(await waitFor(find.text('Invite code created')), 'invite code'); await tap(find.text('Done'), 'Done'); });
     await step('Admin: call trace list', () async { await tap(find.text('Call trace'), 'Call trace'); expectFound(await waitFor(find.textContaining('@moh:amer.test →')), 'recorded calls'); });
     await step('Admin: one call\'s full trace', () async {
@@ -270,13 +279,13 @@ void main() {
     Future<String> docker(List<String> a) async => ((await Process.run('docker', a)).stdout as String).trim();
 
     await step('Admin: feature flag off hides the feature, on brings it back', () async {
-      await home(); await tap(find.text('Users'), 'Users tab'); await tap(find.text('Feature flags'), 'Feature flags');
+      await home(); await openApp('Users'); await tap(find.text('Feature flags'), 'Feature flags');
       await tap(find.text('Workflows'), 'Workflows flag'); await wait(2);
       await t.pageBack(); await wait(1);
       await relaunchFlags();
       await home(); await tap(find.text('Amer'), 'Amer tab'); await wait(2);
       expectFound(find.byIcon(Icons.account_tree_outlined).evaluate().isEmpty, 'Workflows hidden');
-      await home(); await tap(find.text('Users'), 'Users tab'); await tap(find.text('Feature flags'), 'Feature flags');
+      await home(); await openApp('Users'); await tap(find.text('Feature flags'), 'Feature flags');
       await tap(find.text('Workflows'), 'Workflows flag'); await wait(2); await t.pageBack(); await wait(1); await relaunchFlags();
     });
 
@@ -451,7 +460,7 @@ void main() {
       await home();
     });
     await step('App lock: set PIN', () async {
-      await home(); await tap(find.text('Security'), 'Security tab');
+      await home(); await openApp('Security and devices');
       await tap(find.text('App lock'), 'App lock switch');
       await type(field('PIN (4–8 digits)'), '4826', 'PIN'); await type(field('Repeat PIN'), '4826', 'repeat PIN');
       await tap(find.text('Set'), 'Set');
@@ -468,7 +477,7 @@ void main() {
       expectFound(await waitFor(find.text('App lock off'), secs: 30), 'App lock off');
     });
     await step('Arabic: the layout mirrors right to left, then back to English', () async {
-      await home(); await tap(find.text('Security'), 'Security tab');
+      await home(); await openApp('Security and devices');
       await tap(find.text('Language'), 'Language'); await tap(find.textContaining('العربية'), 'Arabic'); await wait(2);
       expectFound(await waitFor(find.text('الأمان'), secs: 10), 'navigation in Arabic');
       final dir = Directionality.of(t.element(find.text('الأمان').first));
@@ -500,7 +509,7 @@ void main() {
     });
     String? recoveryKey;
     await step('Set up encrypted key backup', () async {
-      await home(); await tap(find.text('Security'), 'Security tab');
+      await home(); await openApp('Security and devices');
       await tap(find.text('Set up'), 'Set up backup');
       expectFound(await waitFor(find.text('Save your recovery key'), secs: 90), 'recovery key dialog');
       recoveryKey = find.byType(SelectableText).evaluate().map((e) => (e.widget as SelectableText).data ?? '').firstWhere((x) => x.startsWith('Es'), orElse: () => '');
@@ -551,7 +560,7 @@ void main() {
       expectFound(find.textContaining('key').evaluate().isNotEmpty || find.textContaining('decrypt').evaluate().isNotEmpty, 'locked-message placeholder');
     });
     await step('New device: restore with the recovery key, old messages readable', () async {
-      await home(); await tap(find.text('Security'), 'Security tab');
+      await home(); await openApp('Security and devices');
       await tap(find.text('Restore here'), 'Restore here');
       await type(find.byType(TextField).last, recoveryKey ?? '', 'recovery key'); await tap(find.text('Unlock'), 'Unlock');
       expectFound(await waitFor(find.textContaining('Backup unlocked'), secs: 90), 'Backup unlocked');

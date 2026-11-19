@@ -26,6 +26,8 @@ const _ar = {
   'All': 'الكل', 'Unread': 'غير المقروءة', 'People': 'الأشخاص', 'Groups': 'المجموعات', 'Pinned': 'المثبتة', 'Archived': 'المؤرشفة', 'Drafts': 'المسودات',
   '@Mentions': 'الإشارات', 'Followed threads': 'المحادثات المتابَعة', 'Search messages, files and people': 'ابحث في الرسائل والملفات والأشخاص',
   // Phase 3 screens and buttons
+  'Apps': 'التطبيقات', 'Choose a chat': 'اختر دردشة', 'Find a feature': 'ابحث عن ميزة', 'Your work': 'عملك', 'Meetings and calls': 'الاجتماعات والمكالمات',
+  'Amer and agents': 'عامر والوكلاء', 'Operations': 'العمليات', 'Administration': 'الإدارة', 'Settings': 'الإعدادات', 'In a meeting': 'أثناء الاجتماع', 'In a chat': 'داخل الدردشة',
   "Acknowledge": "تأكيد الاستلام",
   "Add": "إضافة",
   "Add channel": "إضافة قناة",
