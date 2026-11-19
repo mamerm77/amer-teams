@@ -1,3 +1,4 @@
+import 'in_person_screen.dart';
 import 'focus_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -39,6 +40,7 @@ class _S extends State<CalendarScreen> {
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: const Text('Calendar'), actions: [
       if (Flags.instance.on('find_time')) TextButton.icon(icon: const Icon(Icons.manage_search), label: const Text('Find a time'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
+      TextButton.icon(icon: const Icon(Icons.record_voice_over), label: const Text('In-person notes'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const InPersonScreen()))),
       TextButton.icon(icon: const Icon(Icons.headphones), label: const Text('Focus'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FocusScreen()))),
       IconButton(tooltip: 'Out of office', icon: const Icon(Icons.beach_access_outlined), onPressed: () => showOutOfOffice(c)),
       IconButton(tooltip: 'Working hours and prayer times', icon: const Icon(Icons.schedule), onPressed: () => showCalendarSettings(c)),

@@ -27,7 +27,7 @@ Each built feature has a doc listing its open gaps.
 | Agent inside a live meeting | Built (see top five) |
 | Video recap with chapters | Not started (needs recording) |
 | Reusable AI skills and custom agents | Not started |
-| In-person meeting notes | Not started |
+| In-person meeting notes | Built: on-device transcription, speaker marking, AI minutes, decisions and tasks; no diarisation (IN_PERSON_NOTES.md) |
 | No-code workflows | Built |
 | Agent messages visible to one user | Partial: meeting answers and `/ask` are private on the asker's screen; the encrypted-to-one-user event is not built |
 | Canvases / Loop | Built |
