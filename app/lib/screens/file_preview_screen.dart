@@ -32,14 +32,21 @@ class _S extends State<FilePreviewScreen> {
       Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(t, style: s.startsWith('Heading') || s == 'Title' ? Theme.of(context).textTheme.titleLarge : null))]),
     SheetPreview(:final sheets) => DefaultTabController(length: sheets.length, child: Column(children: [
       TabBar(isScrollable: true, tabs: [for (final s in sheets) Tab(text: s.$1)]),
-      Expanded(child: TabBarView(children: [for (final s in sheets) SingleChildScrollView(child: SingleChildScrollView(scrollDirection: Axis.horizontal,
-        child: DataTable(headingRowHeight: 0, columns: [for (var i = 0; i < s.$2.fold<int>(1, (m, r) => r.length > m ? r.length : m); i++) DataColumn(label: Text('${i + 1}'))],
-          rows: [for (final r in s.$2) DataRow(cells: [for (var i = 0; i < s.$2.fold<int>(1, (m, r) => r.length > m ? r.length : m); i++) DataCell(Text(i < r.length ? r[i] : ''))])]))))]))])),
+      Expanded(child: TabBarView(children: [for (final s in sheets) _sheet(s.$2)])),
+    ])),
     SlidesPreview(:final slides) => ListView(padding: const EdgeInsets.all(16), children: [for (var i = 0; i < slides.length; i++) Card(child: Padding(padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Slide ${i + 1}', style: Theme.of(context).textTheme.labelSmall),
         if (slides[i].isNotEmpty) Text(slides[i].first, style: Theme.of(context).textTheme.titleMedium), for (final t in slides[i].skip(1)) Text(t)])))]),
     TextPreview(:final text) => SingleChildScrollView(padding: const EdgeInsets.all(16), child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace'))),
   };
+
+  Widget _sheet(List<List<String>> rows) {
+    final n = rows.fold<int>(1, (m, r) => r.length > m ? r.length : m);
+    return SingleChildScrollView(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(
+      columns: [for (var i = 0; i < n; i++) DataColumn(label: Text(_colName(i)))],
+      rows: [for (final r in rows) DataRow(cells: [for (var i = 0; i < n; i++) DataCell(Text(i < r.length ? r[i] : ''))])])));
+  }
+  static String _colName(int i) { var s = ''; i++; while (i > 0) { final m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) ~/ 26; } return s; }
 
   @override
   Widget build(BuildContext c) {
