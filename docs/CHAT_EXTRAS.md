@@ -36,3 +36,6 @@
 - Role mentions expand on send into one pill per member holding the role (sender excluded), so each person gets a normal mention.
 - Messages with `m.mentions.room` or `@room` count as mentioning you (highlight, Activity, @Mentions chip).
 - Logic: `services/group_mentions.dart`, unit tests in `app/test/group_mentions_test.dart`. Custom named roles (beyond power levels) are not built.
+
+## Saved message folders
+Saved → **New folder**. Move any saved message into a folder; filter by folder; deleting a folder keeps its messages saved. Folder names and which message is in which folder live in your account data (synced to your devices, visible to the server like the saved list itself); message text isn't copied there.

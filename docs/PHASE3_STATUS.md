@@ -70,7 +70,7 @@ Each built feature has a doc listing its open gaps.
 | Follow, mute, pop-out threads | Built: follow and mute, Followed threads view; pop-out not started |
 | Rich text, code blocks, role mentions | Built: Markdown, code blocks with copy, @channel/@here and @moderators/@admins mentions (CHAT_EXTRAS.md); syntax highlighting and tables not started |
 | Translate on tap | Partial: label-aware and cached, via the AI engine |
-| Bookmarks and folders | Existing saved messages; folders not started |
+| Bookmarks and folders | Built: saved messages in your own folders (create, move, filter, delete), synced through account data |
 | Announcements with acknowledgement | Built |
 | Retention and auto-delete timers | Built (1 day to 7 years, server purge, banner); legal hold not started |
 | Slash commands | Built |
