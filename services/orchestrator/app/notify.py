@@ -32,6 +32,7 @@ class Settings(BaseModel):
     quiet: Quiet = Quiet()
     priority_senders: list[str] = Field(default=[], max_length=50)
     pushkeys: list[str] = Field(default=[], max_length=20)   # this user's devices' push keys (so the filter knows whose they are)
+    focus_until: float = 0                              # focus session (docs/FOCUS.md): epoch seconds; only priority senders come through
 
 def in_quiet(q: Quiet, now: datetime | None = None) -> bool:
     if not q.enabled: return False
@@ -44,6 +45,9 @@ def in_quiet(q: Quiet, now: datetime | None = None) -> bool:
     return (m >= s and t.weekday() in q.days) or (m < e and (t.weekday() - 1) % 7 in q.days)
 
 def hold(st: Settings, sender: str | None, prio: str | None, now: datetime | None = None) -> bool:
+    t = (now or datetime.now(ZoneInfo('UTC'))).timestamp()
+    if st.focus_until > t:                            # focus: even mentions wait; priority senders still come through
+        return not (sender and sender in st.priority_senders)
     if not in_quiet(st.quiet, now): return False
     if sender and sender in st.priority_senders: return False
     if st.quiet.allow_high and prio == "high": return False
@@ -68,6 +72,16 @@ async def _owner(pushkey: str) -> tuple[str, Settings] | None:
     async with db.pool.connection() as c:
         r = await (await c.execute("SELECT user_id, data FROM notify_settings WHERE data->'pushkeys' ? %s", (pushkey,))).fetchone()
     return (r[0], Settings(**(r[1] if isinstance(r[1], dict) else json.loads(r[1])))) if r else None
+
+class Focus(BaseModel):
+    minutes: int = Field(ge=0, le=480)                  # 0 ends the session
+
+@router.post("/v1/notify/focus")
+async def focus(req: Focus, user=Depends(flags.require("quiet_hours"))):
+    st = await _load(user["user_id"])
+    st.focus_until = time.time() + req.minutes * 60 if req.minutes else 0
+    await _save(user["user_id"], st)
+    return {"focus_until": st.focus_until}
 
 @router.get("/v1/notify/settings")
 async def get_settings(user=Depends(flags.require("quiet_hours"))): return (await _load(user["user_id"])).model_dump()

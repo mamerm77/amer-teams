@@ -56,8 +56,8 @@ Each built feature has a doc listing its open gaps.
 | 7 | Network-aware calls | Not started (call trace collects the inputs) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
 | 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
-| 10 | Focus guardian | Not started |
-| 11 | Wellbeing signals | Not started |
+| 10 | Focus guardian | Built: server holds pushes (priority senders only), status, DM auto-reply, busy in find-a-time, summary of what waited (FOCUS.md) |
+| 11 | Wellbeing signals | Built: private, on-device weekly signals and nudges; no team view by design (WELLBEING.md) |
 | 12 | Live expertise map | Not started |
 | 13 | Ambient presence rooms | Not started |
 | 14 | Agent marketplace | Not started |

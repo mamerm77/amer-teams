@@ -1,3 +1,4 @@
+import '../services/focus.dart';
 import 'operator_screen.dart';
 import 'dart:async';
 import 'call_screen.dart';
@@ -44,6 +45,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
+    FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
     SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
@@ -51,6 +53,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     _handoffSub = m.client.onSync.stream.listen((_) => _checkHandoff());
   }
   StreamSubscription? _handoffSub; int? _handoffShown;
+  void _focusEnded() { final s = FocusGuard.instance.ended.value; if (s != null && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(duration: const Duration(seconds: 10), content: Text(s.text))); }
   void _checkHandoff() {
     final m = context.read<MatrixService>(); final h = Handoff.elsewhere(m.client);
     if (h == null || h['since'] == _handoffShown || !mounted) return;

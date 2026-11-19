@@ -52,6 +52,13 @@ class SearchIndex {
     backfilling = false;
   }
 
+  /// When I sent messages (times only), for wellbeing signals on this device (docs/WELLBEING.md).
+  Future<List<DateTime>> sentTimes(String me, DateTime since) async {
+    final db = _db; if (db == null) return [];
+    final rows = await db.query('msgs', columns: ['ts'], where: 'sender = ? AND CAST(ts AS INTEGER) >= ?', whereArgs: [me, since.millisecondsSinceEpoch]);
+    return [for (final r in rows) DateTime.fromMillisecondsSinceEpoch(int.parse('${r['ts']}'))];
+  }
+
   /// Full-text search with optional filters. Words are matched as prefixes ("vend" finds "vendor").
   Future<List<Map<String, Object?>>> search(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
     final db = _db; if (db == null) return [];

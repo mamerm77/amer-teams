@@ -1,3 +1,4 @@
+import '../services/focus.dart';
 import 'calendars_screen.dart';
 import '../services/calendar_connector.dart';
 import 'dart:convert';
@@ -32,7 +33,8 @@ class CalendarPrefs {
     final now = DateTime.now();
     final busy = [for (final x in ms.where((x) => x.start.add(Duration(minutes: x.minutes)).isAfter(now) && x.start.isBefore(now.add(const Duration(days: 45)))))
       {'start': x.start.toUtc().toIso8601String(), 'end': x.start.add(Duration(minutes: x.minutes)).toUtc().toIso8601String()},
-      ...CalendarConnector.instance.busy()];          // connected calendars (times only)
+      ...CalendarConnector.instance.busy(),          // connected calendars (times only)
+      if (FocusGuard.instance.until != null) {'start': DateTime.now().toUtc().toIso8601String(), 'end': FocusGuard.instance.until!.toUtc().toIso8601String()}];
     final city = p.v['city'] as String?; final ll = city == null ? null : cities[city];
     await api.putFreeBusy({'busy': busy, 'tz': await _tz(), 'work': {'days': p.v['days'], 'start': p.v['start'], 'end': p.v['end']},
         'prayer': ll == null ? null : {'lat': ll.$1, 'lon': ll.$2, 'method': p.v['method']}, 'ramadan_hours': p.v['ramadan'] == true});
