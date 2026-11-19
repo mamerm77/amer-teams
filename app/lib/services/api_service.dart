@@ -158,6 +158,8 @@ class ApiService {
     if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
     return j as Map<String, dynamic>;
   }
+  Future<Map<String, dynamic>> postMap(String p, Map<String, Object?> body) => _post(p, body);
+  Future<List<dynamic>> guestAccounts() => _get('/v1/admin/guest-accounts');
   Future<Map<String, dynamic>> analytics(int days) => getMap('/v1/admin/analytics?days=$days');
   Future<List<dynamic>> _get(String p) async {
     final r = await http.get(_u(p), headers: _h);

@@ -90,7 +90,7 @@ Each built feature has a doc listing its open gaps.
 | Multi-device handoff | Built for meetings and group calls: other devices offer "Move it here", old device disconnects; 1:1 calls not yet (HANDOFF.md) |
 | Calendar and tool connectors | Partial: any calendar by ICS (Outlook, Google, iCloud), fetched on the device, busy times only to find-a-time; read only, no tool connectors yet (CONNECTORS.md) |
 | Usage analytics | Built: active people, calls, quality, AI, feature adoption; small groups folded (k = 5); checked on the real database (ANALYTICS.md) |
-| Guest accounts and UAE data residency | Not started |
+| Guest accounts and UAE data residency | Built: guest accounts limited by the server (no rooms, no invites, invited rooms only), expiry; tested 10/10 on the real stack. Residency report from declared locations (GUEST_ACCOUNTS.md, DATA_RESIDENCY.md) |
 
 ## Platform
 | Item | Status |

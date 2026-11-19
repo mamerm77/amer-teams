@@ -23,7 +23,9 @@ class AmerFederation:
         # check_event_allowed covers joins and invites; the spam checker also runs on every event arriving over
         # federation, so messages from a server that is no longer a partner are refused (their content removed).
         if hasattr(api, "register_spam_checker_callbacks"):
-            api.register_spam_checker_callbacks(check_event_for_spam=self.check_event_for_spam)
+            api.register_spam_checker_callbacks(check_event_for_spam=self.check_event_for_spam,
+                user_may_create_room=self.user_may_create_room, user_may_invite=self.user_may_invite, user_may_join_room=self.user_may_join_room)
+        self._guests: set[str] = set(); self._gat = 0.0
 
     @staticmethod
     def parse_config(config): return config
@@ -36,6 +38,36 @@ class AmerFederation:
         except Exception:
             self._at = time.time() - self.ttl + 2              # retry soon; keep the last known list meanwhile
         return self._partners
+
+    # ---- guest accounts (docs/GUEST_ACCOUNTS.md): no new rooms, no invites, only rooms they were invited to ----
+    async def guests(self) -> set[str]:
+        if time.time() - self._gat < self.ttl: return self._guests
+        try:
+            j = await self.api.http_client.get_json(f"{self.url}/v1/federation/guests", headers={"X-Amer-Federation": [self.secret]})
+            self._guests = set(j.get("guests", [])); self._gat = time.time()
+        except Exception:
+            self._gat = time.time() - self.ttl + 2
+        return self._guests
+
+    @staticmethod
+    def _ok():
+        try:
+            from synapse.module_api import NOT_SPAM
+            return NOT_SPAM
+        except ImportError: return "NOT_SPAM"
+    @staticmethod
+    def _no():
+        try:
+            from synapse.api.errors import Codes
+            return Codes.FORBIDDEN
+        except ImportError: return "M_FORBIDDEN"
+
+    async def user_may_create_room(self, user_id: str):
+        return self._no() if user_id in await self.guests() else self._ok()
+    async def user_may_invite(self, inviter: str, invitee: str, room_id: str):
+        return self._no() if inviter in await self.guests() else self._ok()
+    async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool):
+        return self._no() if (user_id in await self.guests() and not is_invited) else self._ok()
 
     async def check_event_allowed(self, event, state_events):
         sender = getattr(event, "sender", "") or ""
