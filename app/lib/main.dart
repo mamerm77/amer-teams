@@ -1,3 +1,4 @@
+import 'services/accessibility.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   final matrix = MatrixService();
   await matrix.init();
   await AppLocale.instance.load();
+  await A11y.instance.load();
   runApp(MultiProvider(providers: [
     ChangeNotifierProvider.value(value: matrix),
     ProxyProvider<MatrixService, ApiService>(update: (_, m, __) => ApiService(m)),
@@ -31,16 +33,16 @@ class AmerTeamsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = context.watch<MatrixService>();
-    return ListenableBuilder(listenable: AppLocale.instance, builder: (_, __) => MaterialApp(
+    return ListenableBuilder(listenable: Listenable.merge([AppLocale.instance, A11y.instance]), builder: (_, __) => MaterialApp(
       locale: AppLocale.instance.locale,
       supportedLocales: const [Locale('en'), Locale('ar')],
       localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
       navigatorKey: navigatorKey,
       title: 'Amer Teams',
       debugShowCheckedModeBanner: false,
-      theme: amerTheme(Brightness.light),
-      darkTheme: amerTheme(Brightness.dark),
-      builder: (ctx, child) => LockGate(child: child!),
+      theme: A11y.instance.theme(amerTheme(Brightness.light), Brightness.light),
+      darkTheme: A11y.instance.theme(amerTheme(Brightness.dark), Brightness.dark),
+      builder: (ctx, child) => A11y.instance.apply(ctx, LockGate(child: child!)),
       home: m.isLoggedIn ? const _VerificationListener(child: HomeScreen()) : const LoginScreen(),
     ));
   }

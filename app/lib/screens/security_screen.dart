@@ -1,3 +1,4 @@
+import '../services/accessibility.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -162,6 +163,8 @@ class _S extends State<SecurityScreen> {
               SimpleDialogOption(onPressed: () => Navigator.pop(d, k), child: Text(l))]));
           if (v != null) { await AppLocale.instance.set(v); if (mounted) setState(() {}); }
         }),
+      ListTile(leading: const Icon(Icons.accessibility_new), title: const Text('Accessibility'), subtitle: const Text('Text size, high contrast, motion, captions, shortcuts'),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const A11yScreen()))),
       SwitchListTile(secondary: const Icon(Icons.pin), title: const Text('App lock'), subtitle: const Text('Ask for a PIN when you return to the app'),
         value: lockOn ?? false, onChanged: (v) async { if (v) { await _setPin(); } else { await _disableLock(); } }),
     ])));

@@ -1,4 +1,6 @@
 import 'dart:math' show min;
+import '../services/accessibility.dart';
+import 'package:flutter/semantics.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -223,6 +225,7 @@ class _S extends State<CallScreen> {
       mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
       for (final w in call!.deviceWarnings) { _snack(w); }
       await _applyPreJoin();
+      if (A11y.instance.captionsByDefault && !captions) unawaited(_toggleCaptions());
       setState(() {});
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
   }
@@ -298,11 +301,11 @@ class _S extends State<CallScreen> {
     try {
       final j = jsonDecode(utf8.decode(e.data)); final who = e.participant?.name ?? 'Someone';
       setState(() {
-        if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); }
+        if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); if (j['up'] == true) _say('$who raised their hand'); }
         if (j['t'] == 'gk-hello' && (e.participant?.identity ?? '').startsWith('guest-') && j['pk'] is String) lobby[e.participant!.identity] = (j['pk'] as String, who);
         if (j['t'] == 'qa') _onQa(j, who);
         if (j['t'] == 'rec') _onRec(j, e.participant?.identity ?? '', who);
-        if (j['t'] == 'react') floating.add((who, j['e'] as String, DateTime.now()));
+        if (j['t'] == 'react' && !A11y.instance.reduceMotion) floating.add((who, j['e'] as String, DateTime.now()));
         if (j['t'] == 'cap' && aiOn && j['x'] is String) { lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch}); _translateLine(who, j['x']); }
       });
     } catch (_) {}
@@ -417,6 +420,17 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- accessibility (docs/ACCESSIBILITY.md) ----------
+  Widget _shortcuts(Widget child) => CallbackShortcuts(bindings: {
+    const SingleActivator(LogicalKeyboardKey.keyD, control: true): () { if (attendee) return; mic = !mic; call?.lk.localParticipant?.setMicrophoneEnabled(mic); _say(mic ? 'Microphone on' : 'Muted'); setState(() {}); },
+    const SingleActivator(LogicalKeyboardKey.keyE, control: true): () { if (attendee) return; cam = !cam; call?.lk.localParticipant?.setCameraEnabled(cam); _say(cam ? 'Camera on' : 'Camera off'); setState(() {}); },
+    const SingleActivator(LogicalKeyboardKey.keyH, control: true, shift: true): () { _toggleHand(); _say(myHand ? 'Hand lowered' : 'Hand raised'); },
+    const SingleActivator(LogicalKeyboardKey.keyC, control: true, shift: true): () { _toggleCaptions(); },
+    const SingleActivator(LogicalKeyboardKey.keyL, control: true, shift: true): () { _leave(); },
+  }, child: Focus(autofocus: true, child: child));
+  /// Spoken by screen readers (TalkBack, VoiceOver, Narrator, Orca).
+  void _say(String text) => SemanticsService.announce(text, Directionality.of(context));
 
   // ---------- live translated captions (docs/TRANSLATED_CAPTIONS.md) ----------
   String? capLang; final tCaps = <(String, String)>[]; final _tq = <(String, String)>[]; bool _tBusy = false;
@@ -565,7 +579,7 @@ class _S extends State<CallScreen> {
   void _onRec(Map j, String from, String who) {
     final id = j['id'] as String?; final op = j['op'];
     if (op == 'ask' || op == 'ask-late') { if (!_recPrompt) _consentDialog(id!, who, op == 'ask-late'); return; }
-    if (op == 'started') { rec.id = id; rec.recording = true; return; }
+    if (op == 'started') { rec.id = id; rec.recording = true; _say('Recording started'); return; }
     if (op == 'stopped') { rec.reset(); _snack('Recording stopped${j['why'] != null ? ' (${j['why']})' : ''}'); return; }
     if (!isHost || id != rec.id) return;
     if (op == 'yes') { rec.agreed.add(from); _recTick(); }
@@ -633,7 +647,7 @@ class _S extends State<CallScreen> {
       ]))),
     ]);
 
-    return Scaffold(
+    return _shortcuts(Scaffold(
       appBar: AppBar(
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
@@ -730,14 +744,14 @@ class _S extends State<CallScreen> {
           FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(110, 48)), onPressed: _leave, icon: const Icon(Icons.call_end), label: const Text('Leave')),
         ]))),
       ]),
-    );
+    ));
   }
 
   /// Control with a text label under the icon (Teams/Zoom style); tooltip kept for accessibility.
   Widget _btn(IconData i, String tip, VoidCallback f, {bool off = false}) => SizedBox(width: 76, child: Column(mainAxisSize: MainAxisSize.min, children: [
     IconButton.filledTonal(tooltip: tip, onPressed: f,
       style: off ? IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer) : null, icon: Icon(i)),
-    Text(tip, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall)]));
+    ExcludeSemantics(child: Text(tip, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall))]));   // the tooltip already gives the spoken label
 
   Widget _tile(Participant p) {
     final vt = p.videoTrackPublications.where((x) => !x.muted).map((x) => x.track).whereType<VideoTrack>().firstOrNull;
