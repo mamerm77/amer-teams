@@ -55,6 +55,7 @@ jobs:
     runs-on: windows-latest
     env:
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'   # Firebase C++ SDK still declares an old CMake minimum
+      PUB_CACHE: D:\pub-cache              # cargokit's symlink resolver fails on the runner's AppData path; keep the pub cache off it
     steps:
       - uses: actions/checkout@v4
       - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
