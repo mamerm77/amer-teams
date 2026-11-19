@@ -53,7 +53,7 @@ Each built feature has a doc listing its open gaps.
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |
 | 5 | Meeting digital twin | Not started |
 | 6 | Pre-mortem agent | Built: /premortem, ranked plan-specific risks, share or turn mitigations into tasks (PREMORTEM.md) |
-| 7 | Network-aware calls | Not started (call trace collects the inputs) |
+| 7 | Network-aware calls | Built: per-tile quality, automatic data saver then audio-only (screen share kept), recovery; manual modes (NETWORK_AWARE.md) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
 | 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
 | 10 | Focus guardian | Built: server holds pushes (priority senders only), status, DM auto-reply, busy in find-a-time, summary of what waited (FOCUS.md) |

@@ -219,7 +219,7 @@ class _S extends State<CallScreen> {
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
           : await SecureCall.join(api, room, widget.callId!, video: widget.video);
       call!.lk.addListener(_refresh);
-      ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData)..on<RoomDisconnectedEvent>(_onDisconnected);
+      ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData)..on<RoomDisconnectedEvent>(_onDisconnected)..on<ParticipantConnectionQualityUpdatedEvent>(_onQuality);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
       _parkTl = await room.getTimeline(onUpdate: _refresh);
       cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
@@ -423,6 +423,52 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- network-aware calls (docs/NETWORK_AWARE.md) ----------
+  String net = 'normal';                 // normal | saver | audio
+  bool netAuto = true, netAutoSwitched = false; DateTime? _poorSince, _goodSince; bool _camBeforeAudio = false;
+  void _onQuality(ParticipantConnectionQualityUpdatedEvent e) {
+    if (e.participant is! LocalParticipant) { if (mounted) setState(() {}); return; }   // others' quality is shown on their tile
+    final q = e.connectionQuality; final now = DateTime.now();
+    if (q == ConnectionQuality.poor || q == ConnectionQuality.lost) { _poorSince ??= now; _goodSince = null; }
+    else if (q == ConnectionQuality.excellent || q == ConnectionQuality.good) { _goodSince ??= now; _poorSince = null; }
+    if (!netAuto) return;
+    final bad = _poorSince == null ? Duration.zero : now.difference(_poorSince!), ok = _goodSince == null ? Duration.zero : now.difference(_goodSince!);
+    if (net == 'normal' && bad >= const Duration(seconds: 10)) { _setNet('saver', auto: true); }
+    else if (net == 'saver' && (bad >= const Duration(seconds: 30) || q == ConnectionQuality.lost)) { _setNet('audio', auto: true); }
+    else if (net != 'normal' && netAutoSwitched && ok >= const Duration(seconds: 30)) { _setNet('normal', auto: true); }
+  }
+  Future<void> _setNet(String mode, {bool auto = false}) async {
+    final lk = call?.lk; if (lk == null) return;
+    final prev = net; net = mode; netAutoSwitched = auto && mode != 'normal';
+    for (final p in lk.remoteParticipants.values) {
+      for (final pub in p.videoTrackPublications) {
+        if (mode == 'audio' && pub.source != TrackSource.screenShareVideo) { await pub.disable(); }     // screen share stays: it is usually why you are there
+        else { await pub.enable(); await pub.setVideoQuality(mode == 'saver' ? VideoQuality.LOW : VideoQuality.HIGH); }
+      }
+    }
+    if (mode == 'audio' && prev != 'audio') { _camBeforeAudio = cam; if (cam) { cam = false; await lk.localParticipant?.setCameraEnabled(false); } }
+    if (prev == 'audio' && mode != 'audio' && _camBeforeAudio && !attendee) { cam = true; await lk.localParticipant?.setCameraEnabled(true); }
+    if (!mounted) return;
+    setState(() {});
+    final msg = {'saver': 'Weak network: video lowered to save bandwidth', 'audio': 'Weak network: switched to audio only (screen share kept)', 'normal': 'Network recovered: full video back'}[mode]!;
+    if (prev != mode) { _snack(auto ? msg : 'Video: ${{'saver': 'data saver', 'audio': 'audio only', 'normal': 'full quality'}[mode]}'); _say(msg); }
+  }
+  Future<void> _netDialog() async {
+    final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: const Text('Network and video'), children: [
+      for (final (k, l, sub) in [('auto', 'Automatic', 'Lower video, then audio only, when your network is weak; back when it recovers'), ('normal', 'Full quality', ''), ('saver', 'Data saver', 'Others\' video in low quality'), ('audio', 'Audio only', 'No video except screen share')])
+        SimpleDialogOption(onPressed: () => Navigator.pop(d, k), child: ListTile(title: Text(l), subtitle: sub.isEmpty ? null : Text(sub), trailing: (k == 'auto' ? netAuto : (!netAuto && net == k)) ? const Icon(Icons.check) : null)),
+    ]));
+    if (v == null) return;
+    if (v == 'auto') { netAuto = true; setState(() {}); return; }
+    netAuto = false; await _setNet(v);
+  }
+  Widget _qualityDot(Participant p) {
+    final q = p.connectionQuality;
+    final (c, t) = switch (q) { ConnectionQuality.excellent => (Colors.green, 'Excellent connection'), ConnectionQuality.good => (Colors.lightGreen, 'Good connection'),
+      ConnectionQuality.poor => (Colors.orange, 'Poor connection'), ConnectionQuality.lost => (Colors.red, 'Connection lost'), _ => (Colors.grey, 'Connection unknown') };
+    return Tooltip(message: t, child: Icon(Icons.signal_cellular_alt, size: 14, color: c, semanticLabel: t));
+  }
 
   // ---------- multi-device handoff (docs/HANDOFF.md) ----------
   void _onDisconnected(RoomDisconnectedEvent e) {
@@ -694,6 +740,7 @@ class _S extends State<CallScreen> {
               case 'webinarreg': _guestLinkDialog(webinar: true);
               case 'qa': _qaSheet();
               case 'tcap': _pickCapLang();
+              case 'net': _netDialog();
               case 'end': _host('end');
             }
           }, itemBuilder: (_) => [
@@ -710,6 +757,7 @@ class _S extends State<CallScreen> {
             if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'guest', child: ListTile(leading: Icon(Icons.public), title: Text('Guest link (browser)'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
+            PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),
             PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
             if (widget.meeting) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
@@ -776,6 +824,7 @@ class _S extends State<CallScreen> {
         Positioned(left: 8, bottom: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(color: cs.surface.withValues(alpha: .85), borderRadius: BorderRadius.circular(8)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _qualityDot(p), const SizedBox(width: 4),
             if (p.isMuted) const Icon(Icons.mic_off, size: 14), const SizedBox(width: 4),
             Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
           ]))),
