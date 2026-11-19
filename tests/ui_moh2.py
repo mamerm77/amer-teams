@@ -78,7 +78,10 @@ async def main():
         t, cont = ev.source.get("type"), ev.source.get("content", {})
         if str(t).startswith("m.key.verification."): state.setdefault("seen", []).append(t); save()
         if t == "m.key.verification.ready" and cont.get("transaction_id") == txid and txid not in c.key_verifications:
-            sas = Sas(ME, c.device_id, c.olm.account.identity_keys["ed25519"], app_dev, transaction_id=txid)
+            # verify the device that actually answered: the SAS info string contains its device id
+            dev = c.device_store[ME].get(cont.get("from_device", ""), app_dev)
+            save(answered_by=dev.device_id)
+            sas = Sas(ME, c.device_id, c.olm.account.identity_keys["ed25519"], dev, transaction_id=txid)
             c.olm.key_verifications[txid] = sas
             await c.to_device(sas.start_verification()); save(stage="started (after ready)")
     c.add_to_device_callback(on_unknown, UnknownToDeviceEvent)

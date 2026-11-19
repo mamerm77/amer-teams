@@ -668,7 +668,9 @@ class _S extends State<ChatScreen> {
         if (status == null && !expired && !confirms.contains(me)) FilledButton.icon(icon: const Icon(Icons.check), label: const Text('Confirm'), onPressed: () async {
           try { final r = await confirmDecision(room, context.read<ApiService>(), e); _ledgerAt = null;
             _snack(r['status'] == 'confirmed' ? 'Confirmed: the decision is in the ledger' : 'Confirmed. Still needs ${r['needs']}.'); }
-          catch (x) { _snack('$x'.replaceFirst('Exception: ', '')); } }),
+          catch (x) { debugPrint('DECISION confirm failed: $x');
+            if (mounted) showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Could not confirm'), content: Text('$x'.replaceFirst('Exception: ', '')),
+              actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))])); } }),
         if (status != 'superseded') TextButton(onPressed: () => proposeDialog(c, room, previous: e), child: const Text('Change (new version)')),
         if (led != null && e.content['owner'] == me && (status == 'confirmed' || status == 'in_progress')) TextButton(onPressed: () async {
           await context.read<ApiService>().decisionStatus('${e.content['decision_id']}', room.id, (e.content['version'] as num).toInt(), 'done'); _ledgerAt = null; setState(() {}); }, child: const Text('Mark done')),

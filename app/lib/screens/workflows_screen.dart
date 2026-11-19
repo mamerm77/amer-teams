@@ -171,7 +171,8 @@ class _E extends State<WorkflowEditor> {
     final cs = Theme.of(c).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(widget.existing == null ? 'New workflow' : 'Edit ${widget.existing!['name']}'), actions: [
-        if (d != null) TextButton(onPressed: () => setState(() { if (raw) _readJson(); else json.text = const JsonEncoder.withIndent('  ').convert(d); raw = !raw; }), child: Text(raw ? 'Flow' : 'JSON'))]),
+        if (d != null) TextButton(onPressed: () => setState(() { if (raw) _readJson(); else json.text = const JsonEncoder.withIndent('  ').convert(d); raw = !raw; }), child: Text(raw ? 'Flow' : 'JSON')),
+        if (d != null) FilledButton(onPressed: busy ? null : _save, child: const Text('Save'))]),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
         if (widget.existing == null) Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(controller: describe, minLines: 2, maxLines: 4, decoration: const InputDecoration(border: OutlineInputBorder(),

@@ -301,7 +301,7 @@ void main() {
     await step('Workflows: create from a template and save', () async {
       await home(); await tap(find.text('Amer'), 'Amer tab'); await tap(find.text('Workflows'), 'Workflows');
       await tap(find.text('New workflow'), 'New workflow'); await tap(find.text('Start from a template'), 'template');
-      await tap(find.text('Save workflow'), 'Save workflow');
+      await tap(find.widgetWithText(FilledButton, 'Save').first, 'Save (top bar)');
       expectFound(await waitFor(find.text('Approval request'), secs: 20), 'saved workflow in the list');
     });
     await step('Workflows: a message triggers an approval card; approving continues the run', () async {
