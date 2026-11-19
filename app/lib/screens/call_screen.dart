@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../services/decisions_tasks.dart';
+import '../services/ai_gate.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:matrix/matrix.dart' as mx;
@@ -333,6 +334,7 @@ class _S extends State<CallScreen> {
   }
   Future<void> _askDialog([String? preset]) async {
     if (!aiOn) { _snack(isHost ? 'Switch Amer on for this meeting first (More → Amer in this meeting)' : 'The host has not switched Amer on for this meeting'); return; }
+    final gate = aiFor(room); if (!gate.allowed) { _snack(gate.where); return; }
     final q = TextEditingController(text: preset);
     final question = preset ?? await showDialog<String>(context: context, builder: (d) => AlertDialog(
       title: const Text('Ask Amer about this meeting'),
@@ -350,6 +352,7 @@ class _S extends State<CallScreen> {
     await showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [const Icon(Icons.auto_awesome), const SizedBox(width: 8), const Expanded(child: Text('Amer', style: TextStyle(fontWeight: FontWeight.w600))),
         Text('Only you can see this', style: TextStyle(fontSize: 12, color: Theme.of(s).colorScheme.outline))]),
+      Text(gate.where, style: const TextStyle(fontSize: 11)),
       const SizedBox(height: 8), Text(question.trim(), style: const TextStyle(fontStyle: FontStyle.italic)),
       const SizedBox(height: 8), Flexible(child: SingleChildScrollView(child: SelectableText(answer))),
       const SizedBox(height: 12),
@@ -366,7 +369,7 @@ class _S extends State<CallScreen> {
     try {
       final people = room.getParticipants().where((u) => u.membership == mx.Membership.join).toList();
       final r = await api.ask('From this meeting, reply ONLY with JSON {"decisions":[{"text":str,"owner":name}],"actions":[{"title":str,"owner":name,"due_days":int}]}. Use only what was said. Names must be from: ${people.map((u) => u.calcDisplayname()).join(', ')}.',
-          context: transcript, agent: 'assist');
+          context: transcript, agent: 'assist', labels: [if (room.getState('com.amerteams.sensitivity')?.content['label'] != null) '${room.getState('com.amerteams.sensitivity')!.content['label']}'], encrypted: room.encrypted);
       final m = RegExp(r'\{.*\}', dotAll: true).firstMatch('${r['answer']}'); if (m == null) return;
       final j = jsonDecode(m.group(0)!) as Map;
       String? who(Object? n) => people.where((u) => u.calcDisplayname().toLowerCase() == '$n'.toLowerCase()).firstOrNull?.id;
@@ -396,7 +399,9 @@ class _S extends State<CallScreen> {
       final full = lines.isEmpty ? transcript.toString() : lines.map((l) => '${l['speaker']}: ${l['text']}').join('\n');
       final ag = agenda; final outline = ag == null ? '' : 'Agenda (use it as the outline): ${(ag['items'] as List).map((x) => x['t']).join('; ')}\nParking lot: ${parking.join('; ')}\n';
       final api = context.read<ApiService>();
-      final r = await api.ask('Write minutes', context: '$outline$full', agent: 'minutes');
+      if (!aiFor(room).allowed) { if (mounted) Navigator.pop(context); return; }
+      final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+      final r = await api.ask('Write minutes', context: '$outline$full', agent: 'minutes', labels: [if (label != null) label], encrypted: room.encrypted);
       await room.sendTextEvent('📝 Minutes by Amer\n\n${r['answer']}');
       if (r['error'] != true && r['blocked'] != true) await _followUp(api, '$outline$full');
     }

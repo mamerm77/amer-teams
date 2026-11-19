@@ -72,6 +72,7 @@ async def call_token(req: CallReq, user=Depends(auth.matrix_user)):
 class AskReq(BaseModel):
     prompt: str
     context: str = ""
+    encrypted: bool = False            # the context came from an end-to-end encrypted chat (policy ai_plain_server)
     labels: list[str] = []
     agent: str | None = None
 
@@ -79,6 +80,8 @@ class AskReq(BaseModel):
 async def ask(req: AskReq, user=Depends(auth.matrix_user)):
     if req.agent and req.agent not in agents.AGENTS:
         raise HTTPException(400, "Unknown agent")
+    if req.encrypted and not (await flags.flags_for(user["user_id"]))["ai_plain_server"]:
+        raise HTTPException(403, "Your organisation does not allow encrypted chats to go to the AI service; an attested enclave is required")
     t0 = time.perf_counter()
     with LAT.labels(req.agent or "auto").time():
         res = await agents.run(req.prompt, req.context, req.labels, req.agent)
@@ -110,6 +113,8 @@ async def bot(req: BotReq, x_bot_secret: str = Header("")):
     import hmac
     if not config.AMER_BOT_SECRET or not hmac.compare_digest(x_bot_secret, config.AMER_BOT_SECRET):
         raise HTTPException(401, "Not the Amer bot")
+    if not (await flags.flags_for(req.user_id))["ai_plain_server"]:
+        return {"answer": "Your organisation does not allow encrypted chats to go to the AI service, so I can't answer here until an attested enclave is deployed.", "agent": "Guardian", "blocked": True}
     history = "\n".join(f"{h.get('sender', '?')}: {h.get('body', '')}" for h in req.history[-20:])
     t0 = time.perf_counter()
     res = await agents.run(req.prompt, f"Recent messages in this chat:\n{history}" if history else "", req.labels, None)
@@ -118,6 +123,12 @@ async def bot(req: BotReq, x_bot_secret: str = Header("")):
     await db.ai_request(req.user_id, res["agent"], status, int((time.perf_counter() - t0) * 1000))
     await audit(req.user_id, "ai.chat", f'{res["agent"]}:{status}')
     return {**res, "answer": _friendly(res["answer"])}
+
+@app.get("/v1/ai/enclave/attestation")
+async def enclave_attestation(user=Depends(auth.matrix_user)):
+    """No confidential-computing enclave is deployed on this server yet. Clients treat this as 'enclave
+    unavailable' and never fall back to the plain server on their own (docs/ENCRYPTED_AI.md)."""
+    raise HTTPException(503, "No attested enclave is deployed on this server")
 
 @app.get("/v1/ai/assistant")
 async def assistant(user=Depends(auth.matrix_user)):

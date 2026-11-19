@@ -38,3 +38,16 @@ def test_push_endpoint_is_never_gated(monkeypatch):
     async def fwd(b): return {"rejected": []}
     monkeypatch.setattr(N, "_forward", fwd)
     assert c.post("/_matrix/push/v1/notify", json={"notification": {"devices": [{"pushkey": "x"}]}}).status_code == 200
+
+def test_plain_server_policy_blocks_encrypted_ai(monkeypatch):
+    c = client(monkeypatch)
+    from app import agents
+    async def run(*a, **k): return {"answer": "ok", "agent": "Amer", "trace": []}
+    async def noop2(*a, **k): pass
+    monkeypatch.setattr(agents, "run", run); monkeypatch.setattr(db, "ai_request", noop2)
+    assert c.post("/v1/ai/ask", json={"prompt": "hi", "context": "chat text", "encrypted": True}).status_code == 200
+    c.put("/v1/admin/flags", json={"tenant": "*", "feature": "ai_plain_server", "enabled": False})
+    assert c.post("/v1/ai/ask", json={"prompt": "hi", "context": "chat text", "encrypted": True}).status_code == 403
+    assert c.post("/v1/ai/ask", json={"prompt": "hi"}).status_code == 200                   # not chat content: allowed
+    assert c.post("/v1/ai/digest", json={"rooms": []}).status_code == 403
+    assert c.get("/v1/ai/enclave/attestation").status_code == 503

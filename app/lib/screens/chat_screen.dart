@@ -28,6 +28,7 @@ import 'tasks_screen.dart';
 import 'security_badge.dart';
 import '../services/quick_views.dart';
 import '../services/feature_flags.dart';
+import '../services/ai_gate.dart';
 import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
@@ -177,12 +178,13 @@ class _S extends State<ChatScreen> {
         _snack('I will remind you in ${m.group(1)} minutes');
       case '/ask':
         if (arg.isEmpty) { _snack('Write a question after /ask'); return true; }
+        final g = aiFor(room); if (!g.allowed) { _snack(g.where); return true; }
         final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
         final ctx = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(30).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
         try {
-          final r = await context.read<ApiService>().ask(arg, context: 'Recent messages in this chat:\n$ctx', labels: [if (label != null) label]);
+          final r = await context.read<ApiService>().ask(arg, context: 'Recent messages in this chat:\n$ctx', labels: [if (label != null) label], encrypted: room.encrypted);
           if (mounted) showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Amer · only you can see this', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 8), SelectableText('${r['answer']}')])));
+            const Text('Amer · only you can see this', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 8), SelectableText('${r['answer']}'), const SizedBox(height: 8), Text(g.where, style: const TextStyle(fontSize: 12))])));
         } catch (e) { _snack('Amer could not answer: $e'); }
       default:
         final near = slash.keys.where((k) => k.startsWith(cmd.substring(0, min(3, cmd.length)))).join(', ');
@@ -331,9 +333,12 @@ class _S extends State<ChatScreen> {
   Future<void> summarise() async {
     final text = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(80).toList().reversed
         .map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${e.body}').join('\n');
-    final r = await context.read<ApiService>().ask('Summarise this thread', context: text, agent: 'summ');
+    final g = aiFor(room); if (!g.allowed) { _snack(g.where); return; }
+    final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;    // Guardian blocks Confidential/Restricted
+    final r = await context.read<ApiService>().ask('Summarise this thread', context: text, agent: 'summ', labels: [if (label != null) label], encrypted: room.encrypted);
     if (!mounted) return;
-    showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SingleChildScrollView(child: Text(r['answer']))));
+    showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(r['answer']), const SizedBox(height: 8), Text(g.where, style: const TextStyle(fontSize: 12))]))));
   }
 
   Future<void> _actions(Event e) async {
@@ -392,13 +397,15 @@ class _S extends State<ChatScreen> {
     if ((a == 'translate' || a == 'suggest') && mounted) {
       try {
         final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final gate = aiFor(room, small: true);
+        if (!gate.allowed) { _snack(gate.where); return; }
         final r = a == 'translate' && _translated.containsKey(e.eventId) ? {'answer': _translated[e.eventId]}
             : await context.read<ApiService>().ask(a == 'translate' ? 'Translate to ${Localizations.localeOf(context).languageCode == 'ar' ? 'English' : 'Arabic'}' : 'Suggest a short, polite reply to this message',
-            context: plainMentions(_text(e)), agent: a == 'translate' ? 'trans' : 'assist', labels: [if (label != null) label]);
+            context: plainMentions(_text(e)), agent: a == 'translate' ? 'trans' : 'assist', labels: [if (label != null) label], encrypted: room.encrypted);
         if (a == 'translate' && r['blocked'] != true) _translated[e.eventId] = '${r['answer']}';
         if (!mounted) return;
         if (a == 'suggest') { setState(() => input.text = r['answer'] as String); } else {
-          showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SelectableText(r['answer'] as String)));
+          showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText(r['answer'] as String), const SizedBox(height: 8), Text(gate.where, style: const TextStyle(fontSize: 12))])));
         }
       } catch (err) { _snack('$err'); }
     }

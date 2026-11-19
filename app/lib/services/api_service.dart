@@ -20,8 +20,9 @@ class ApiService {
   Future<Map<String, dynamic>> callToken(String roomId, String callId, String name) =>
       _post('/v1/calls/token', {'room_id': roomId, 'call_id': callId, 'display_name': name});
 
-  Future<Map<String, dynamic>> ask(String prompt, {String context = '', String? agent, List<String> labels = const []}) =>
-      _post('/v1/ai/ask', {'prompt': prompt, 'context': context, 'agent': agent, 'labels': labels});
+  /// [encrypted]: the context came from an end-to-end encrypted chat; the server applies the organisation's policy.
+  Future<Map<String, dynamic>> ask(String prompt, {String context = '', String? agent, List<String> labels = const [], bool encrypted = false}) =>
+      _post('/v1/ai/ask', {'prompt': prompt, 'context': context, 'agent': agent, 'labels': labels, 'encrypted': encrypted});
 
   Future<List<dynamic>> agents() async {
     final r = await http.get(_u('/v1/agents'), headers: _h);

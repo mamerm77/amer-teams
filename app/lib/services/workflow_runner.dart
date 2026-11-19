@@ -172,7 +172,7 @@ class WorkflowRunner {
         r['cur'] = wfNext(_steps(r), s['id'] as String, ctx);       // continue after the wait
         return null;
       case 'run_agent':
-        final a = await api!.ask(wfRender('${s['prompt'] ?? ''}', ctx), agent: 'assist');
+        final a = await api!.ask(wfRender('${s['prompt'] ?? ''}', ctx), agent: 'assist', encrypted: true);   // may carry chat text: the organisation's policy applies
         if (a['error'] == true) throw Exception('Amer could not answer: ${a['answer']}');
         return {'answer': a['answer']};
       case 'create_task':

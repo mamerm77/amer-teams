@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 from . import agents, auth, config, db
 
 from . import flags
-router = APIRouter(dependencies=[Depends(flags.require("meeting_agent"))])
+router = APIRouter(dependencies=[Depends(flags.require("meeting_agent")), Depends(flags.require("ai_plain_server"))])
 WINDOW_S, MAX_LINES = 20 * 60, 600
 STATE = "com.amerteams.meeting.ai"
 

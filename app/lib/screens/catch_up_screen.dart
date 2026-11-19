@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/catch_up.dart';
 import '../services/matrix_service.dart';
+import '../services/feature_flags.dart';
 import 'chat_screen.dart';
 
 /// "What did I miss": one card per chat with unread messages, ranked mentions first, then direct chats.
@@ -16,6 +17,7 @@ class _S extends State<CatchUpScreen> {
   @override void initState() { super.initState(); _run(); }
 
   Future<void> _run({bool refresh = false}) async {
+    if (!Flags.instance.on('ai_plain_server')) { setState(() => err = 'Your organisation does not allow encrypted chats to go to the AI service. Catch me up needs an attested enclave, which is not deployed yet.'); return; }
     setState(() { busy = true; err = null; });
     try {
       final r = await CatchUp(context.read<MatrixService>().client, context.read<ApiService>()).run(refresh: refresh);
@@ -71,7 +73,7 @@ class _S extends State<CatchUpScreen> {
               style: Theme.of(c).textTheme.titleSmall)),
             Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: Text(
               noAi ? 'AI summaries are not set up on this server, so chats are listed by priority without summaries.'
-                   : 'Unread messages were decrypted on this device and sent to the AI engine only for this digest. Confidential and Restricted chats are never sent.',
+                   : 'Unread messages were decrypted on this device and sent to your organisation\'s AI service only for this digest (not end-to-end encrypted; no enclave yet). Confidential and Restricted chats are never sent.',
               style: TextStyle(fontSize: 12, color: Theme.of(c).colorScheme.outline))),
             for (final x in cards) _card(c, x),
             if (more.isNotEmpty) ...[
