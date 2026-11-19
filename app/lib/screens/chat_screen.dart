@@ -259,6 +259,12 @@ class _S extends State<ChatScreen> {
     } catch (e) { _snack('Could not draft the review: $e'); }
   }
 
+  /// Threads open beside the chat on wide screens ("pop out"), and full screen on phones.
+  String? sideThread;
+  void _openThread(String id) {
+    if (widget.threadRootId == null && MediaQuery.of(context).size.width >= 1100) { setState(() => sideThread = id); return; }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: id)));
+  }
   List<Event> privateNotes = [];
   Future<void> _loadPrivate() async { final n = await PrivateNotes.forRoom(room.client, room.id); if (mounted) setState(() => privateNotes = n); }
 
@@ -482,7 +488,7 @@ class _S extends State<ChatScreen> {
     }
     if (a == 'edit') setState(() { editing = e; replyTo = null; input.text = _text(e); });
     if (a == 'delete') await room.redactEvent(e.eventId);
-    if (a == 'thread' && mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId)));
+    if (a == 'thread' && mounted) _openThread(e.eventId);
     if (a == 'star' && mounted) { await StarService(context.read<MatrixService>()).toggle(room.id, e.eventId); _snack('Saved messages updated'); }
     if (a == 'forward' && mounted) {
       final rooms = context.read<MatrixService>().chats;
@@ -538,7 +544,7 @@ class _S extends State<ChatScreen> {
     final typers = room.typingUsers.where((u) => u.id != me).map((u) => u.calcDisplayname()).toList();
     final members = room.summary.mJoinedMemberCount ?? 0;
 
-    return Scaffold(
+    final page = Scaffold(
       appBar: AppBar(
         title: searching
             ? TextField(controller: searchCtl, autofocus: true, decoration: const InputDecoration(hintText: 'Search messages', border: InputBorder.none), onChanged: (_) => setState(() {}))
@@ -684,6 +690,10 @@ class _S extends State<ChatScreen> {
                       child: IconButton.filled(tooltip: 'Send (long-press to schedule)', icon: Icon(editing != null ? Icons.check : Icons.send), onPressed: send))]))),
       ]),
     );
+    if (sideThread == null) return page;
+    return Row(children: [Expanded(child: page), const VerticalDivider(width: 1),
+      SizedBox(width: 420, child: Stack(children: [ChatScreen(key: ValueKey(sideThread), roomId: room.id, threadRootId: sideThread),
+        Positioned(top: 8, right: 8, child: SafeArea(child: IconButton.filledTonal(tooltip: 'Close thread', icon: const Icon(Icons.close), onPressed: () => setState(() => sideThread = null))))]))]);
   }
 
   /// Delivery status of my own message: 🕓 sending · ✓ on the server · ✓✓ read · ⚠ failed (tap: retry or delete).
@@ -972,7 +982,7 @@ class _S extends State<ChatScreen> {
               child: Tooltip(message: 'Reply, react, forward, edit, delete…', child: Icon(Icons.more_horiz, size: 18, color: cs.onSurfaceVariant))),
           ]),
           if (widget.threadRootId == null && _replyCount(e) > 0) TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
-            onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId))),
+            onPressed: () => _openThread(e.eventId),
             icon: const Icon(Icons.forum_outlined, size: 16), label: Text('${_replyCount(e)} repl${_replyCount(e) == 1 ? 'y' : 'ies'}')),
           if (reactions.isNotEmpty) Wrap(spacing: 4, children: [for (final r in reactions.entries) Chip(visualDensity: VisualDensity.compact, padding: EdgeInsets.zero,
             label: Text('${r.key} ${r.value}'))]),
