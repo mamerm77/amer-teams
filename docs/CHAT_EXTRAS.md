@@ -16,7 +16,7 @@
 - **Reminders** are an in-app banner, not an OS notification (no local-notification plugin yet).
 - **Translation** runs through the AI engine, not on the device or in an enclave (Encrypted AI item). Labelled
   chats are blocked rather than translated on the device.
-- **@role and @channel mentions**, **syntax highlighting** by language, **tables** in messages, **legal hold**
+- **Syntax highlighting** by language, **tables** in messages, **legal hold**
   on retention, and **tenant retention policy** precedence are not built yet.
 - `/premortem` and marketplace commands arrive with those features.
 
@@ -29,3 +29,10 @@
 - Chat list chips: **@Mentions** (chats with unread mentions), **Drafts** (unsent text per chat, kept on this device and restored when the chat opens), **Followed threads**.
 - In a thread: **Follow** or **Mute** (bell icon). The state is kept in account data (ids and times only). Followed threads list how many replies came since you last opened each. Replies in muted threads are left out of Activity.
 - Gap: pop-out threads into their own desktop window are not built.
+
+## Group mentions (added)
+- Typing `@` also offers **@channel**, **@here** (everyone in the chat), **@moderators** (power 50+) and **@admins** (power 100).
+- @channel / @here are sent as Matrix `@room`. Only members at the room's `notifications.room` power level (default 50) may send them; otherwise the message is not sent and the text is kept.
+- Role mentions expand on send into one pill per member holding the role (sender excluded), so each person gets a normal mention.
+- Messages with `m.mentions.room` or `@room` count as mentioning you (highlight, Activity, @Mentions chip).
+- Logic: `services/group_mentions.dart`, unit tests in `app/test/group_mentions_test.dart`. Custom named roles (beyond power levels) are not built.

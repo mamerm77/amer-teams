@@ -5,6 +5,7 @@ import 'matrix_service.dart';
 import '../config.dart';
 export 'later.dart' show ScheduledSender, Reminders;
 import 'quick_views.dart';
+import 'group_mentions.dart';
 
 const kStarredType = 'com.amerteams.starred';
 const kChecklistEvent = 'com.amerteams.checklist';
@@ -47,7 +48,7 @@ String mentionMarkdown(String name, String userId) => '[$name](https://matrix.to
 String plainMentions(String body) => body.replaceAllMapped(mentionLink, (m) => '@${m[1]}');
 bool mentionsMe(Event e, String me) {
   final ids = (e.content.tryGetMap<String, Object?>('m.mentions')?['user_ids'] as List?)?.cast<String>() ?? const [];
-  return ids.contains(me) || e.body.contains(me);
+  return ids.contains(me) || e.body.contains(me) || mentionsRoom(e.content, e.body);   // @channel / @here arrive as @room
 }
 
 /// Saved / starred messages, kept in the user's (server-side, per-account) account data.
