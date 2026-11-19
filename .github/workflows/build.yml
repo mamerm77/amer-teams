@@ -241,6 +241,8 @@ jobs:
             SHOTS=$GITHUB_WORKSPACE/shots xvfb-run -a -s '-screen 0 1440x900x24' flutter test integration_test/app_flow_test.dart -d linux \
             --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}" 2>&1 | tee $GITHUB_WORKSPACE/shots/flutter.log || true
           grep -E "^(PASS|FAIL)|IN-USE RESULT" $GITHUB_WORKSPACE/shots/flutter.log || true
+          # a test that did not compile or never ran must not look green (individual step failures are reported above)
+          if ! grep -qE "^PASS " $GITHUB_WORKSPACE/shots/flutter.log; then echo "::error::The in-use test did not run (compile error or crash)"; grep -E "Error:|error •" $GITHUB_WORKSPACE/shots/flutter.log | head -20; exit 1; fi
       - name: Encryption audit of the app's own events (Synapse database)
         if: always()
         run: |
