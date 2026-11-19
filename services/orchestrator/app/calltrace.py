@@ -123,6 +123,9 @@ async def livekit_webhook(request: Request):
              (call_id, p.get("identity"), ev.get("event", "unknown"), json.dumps(detail)))
     if ev.get("event") == "participant_joined":
         await _q("UPDATE call_records SET participants=participants+1 WHERE call_id=%s", (call_id,))
+    if room.startswith("phone-in-"):                     # inbound phone calls for the hunt group (docs/PHONE_DIALIN.md)
+        from . import phone_lines
+        await phone_lines.inbound_event(ev.get("event", ""), room, p.get("identity", ""))
     return {"ok": True}
 
 # ---------------- admin views ----------------

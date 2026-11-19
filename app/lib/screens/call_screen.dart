@@ -24,6 +24,7 @@ import 'prejoin_screen.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'whiteboard_screen.dart';
+import 'phone_screen.dart';
 
 /// Encrypted call or meeting: video grid, participants, in-meeting chat, raise hand, reactions,
 /// screen share, camera switch, on-device captions, waiting room for the host, Amer minutes.
@@ -577,6 +578,21 @@ class _S extends State<CallScreen> {
     try { await _send(await GuestKeys.wrap(k, pk, call!.keyIndex, ident)); } catch (_) { admitted.remove(ident); }
   }
   Future<void> _admit(String ident) async { final g = lobby.remove(ident); if (g != null) { await _sendKey(ident, g.$1); setState(() {}); } }
+  /// Phone dial-in (docs/PHONE_DIALIN.md): a separate, labelled bridge, since phones cannot join end-to-end encryption.
+  Future<void> _dialIn() async {
+    try {
+      final r = await context.read<ApiService>().postMap('/v1/phone/dialin', {'room_id': widget.roomId});
+      if (!mounted) return;
+      await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Phone dial-in'),
+        content: SelectableText('Dial ${r['number']}\nPIN ${r['pin']}#\n\nPhone callers join a separate phone bridge for this meeting. ${r['security']}: people who want to talk with them join the bridge too.'),
+        actions: [
+          TextButton(onPressed: () async { Navigator.pop(d); await context.read<ApiService>().deletePath('/v1/phone/dialin/${Uri.encodeComponent(widget.roomId)}'); _snack('Dial-in closed'); }, child: const Text('Close dial-in')),
+          TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: 'Dial ${r['number']}, PIN ${r['pin']}#')); Navigator.pop(d); }, child: const Text('Copy')),
+          FilledButton(onPressed: () { Navigator.pop(d); Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneScreen(bridgeRoomId: widget.roomId))); }, child: const Text('Join the phone bridge')),
+        ]));
+    } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
+  }
+
   Future<void> _guestLinkDialog({bool webinar = false}) async {
     final api = context.read<ApiService>();
     try {
@@ -795,6 +811,7 @@ class _S extends State<CallScreen> {
               case 'rec': rec.recording ? _stopRec('stopped by host') : _askRecord();
               case 'withdraw': _withdraw();
               case 'guest': _guestLinkDialog();
+              case 'dialin': _dialIn();
               case 'webinarreg': _guestLinkDialog(webinar: true);
               case 'qa': _qaSheet();
               case 'tcap': _pickCapLang();
@@ -813,6 +830,7 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'rec', child: ListTile(leading: Icon(rec.recording ? Icons.stop : Icons.fiber_manual_record, color: Colors.red), title: Text(rec.recording ? 'Stop recording' : 'Record (with consent)'))),
             if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
+            if (isHost && widget.meeting) const PopupMenuItem(value: 'dialin', child: ListTile(leading: Icon(Icons.dialpad), title: Text('Phone dial-in'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'guest', child: ListTile(leading: Icon(Icons.public), title: Text('Guest link (browser)'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
             PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),

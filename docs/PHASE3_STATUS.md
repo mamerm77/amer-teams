@@ -39,7 +39,7 @@ Each built feature has a doc listing its open gaps.
 | Live translated captions | Built: per-listener language, label-aware AI translation of shared captions, right-to-left lines; AI engine, not on device (TRANSLATED_CAPTIONS.md) |
 | Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
 | Deepfake detection | Built as impersonation protection: per-tile identity badges from device verification, and a live challenge sent encrypted to the person's own account; no synthetic-media detector, by design (IDENTITY_CHECK.md) |
-| AI call handling for phone lines | Not started |
+| AI call handling for phone lines | Partial: inbound calls to the company line reach a hunt group with first-to-answer; the AI receptionist needs server speech-to-text and text-to-speech, not deployed (PHONE_DIALIN.md) |
 | Room devices and booking | Built: booking with no double booking (database constraint), private titles, check-in and no-show release, paired room display; tested 12/12 (ROOMS.md) |
 | Frontline shifts and walkie-talkie | Built: manager-published shifts, no overlaps, clock in/out, approved swaps (tested 8/8); encrypted push-to-talk with floor control; no background PTT (FRONTLINE.md) |
 | DLP and inherited sensitivity labels | Partial: chat labels block AI (Guardian); DLP not started |
@@ -76,7 +76,7 @@ Each built feature has a doc listing its open gaps.
 | Slash commands | Built |
 | Meeting templates with agenda timer | Built: shared timer, 80% warning, parking lot (MEETING_AGENDA.md) |
 | Browser join for guests | Built: /join page, lobby, call key wrapped to the guest's one-time key; a real Chromium decrypts real E2EE video locally (GUESTS.md) |
-| Phone dial-in | Not started (SIP dial-out exists) |
+| Phone dial-in | Built: number + PIN per meeting (LiveKit SIP dispatch rule) into a labelled phone bridge; tested 9/9 with real LiveKit API and webhooks, not with a carrier (PHONE_DIALIN.md) |
 | Recordings with consent | Built, not tested on a device: everyone agrees first, recorded on the host's phone, shared encrypted, audit trail (RECORDINGS.md) |
 | Whiteboard templates | Built: retro, SWOT, optical/IP network sketch, text labels |
 | Automatic follow-up | Built: minutes follow the agenda; decisions become proposals, actions become tasks. Email to external invitees not built |
