@@ -24,7 +24,7 @@ const _ar = {
   'Language': 'اللغة', 'System': 'لغة الجهاز', 'Out of office': 'خارج المكتب', 'My tasks': 'مهامي', 'My decisions': 'قراراتي',
   'Message': 'رسالة', 'Nothing new': 'لا جديد', "You're all caught up": 'لا يوجد ما فاتك', 'Amer co-pilot': 'المساعد عامر',
   'All': 'الكل', 'Unread': 'غير المقروءة', 'People': 'الأشخاص', 'Groups': 'المجموعات', 'Pinned': 'المثبتة', 'Archived': 'المؤرشفة', 'Drafts': 'المسودات',
-  '@Mentions': 'الإشارات', 'Followed threads': 'المحادثات المتابَعة', 'Search messages, files and people': 'ابحث في الرسائل والملفات والأشخاص',,
+  '@Mentions': 'الإشارات', 'Followed threads': 'المحادثات المتابَعة', 'Search messages, files and people': 'ابحث في الرسائل والملفات والأشخاص',
   // Phase 3 screens and buttons
   "Acknowledge": "تأكيد الاستلام",
   "Add": "إضافة",
