@@ -25,6 +25,9 @@
 		reverse_proxy grafana:3000
 	}
 	# Browser join for guests and webinar registration (docs/GUESTS.md)
+	handle /hooks/* {
+		reverse_proxy connectors:8070
+	}
 	handle /join* {
 		reverse_proxy orchestrator:8080
 	}

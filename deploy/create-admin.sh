@@ -23,5 +23,8 @@ if ! grep -q '^AMER_BOT_SECRET=' .env; then
 fi
 . ./.env
 docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u "$AMER_BOT_USER" -p "$AMER_BOT_PASSWORD" --no-admin http://localhost:8008 >/dev/null 2>&1 || true
-docker compose up -d orchestrator amer-bot
+grep -q '^AMER_CONNECTOR_SECRET=' .env || printf 'AMER_CONNECTOR_USER=connectors\nAMER_CONNECTOR_PASSWORD=Cn%s!Q\nAMER_CONNECTOR_SECRET=%s\n' "$(openssl rand -hex 10)" "$(openssl rand -hex 24)" >> .env
+. ./.env
+docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u "$AMER_CONNECTOR_USER" -p "$AMER_CONNECTOR_PASSWORD" --no-admin http://localhost:8008 >/dev/null 2>&1 || true
+docker compose up -d orchestrator amer-bot connectors
 echo "Amer assistant started: users can open Amer > Chat with Amer, or @mention Amer in a group."

@@ -74,6 +74,19 @@ services:
       orchestrator: {condition: service_healthy}
     restart: unless-stopped
 
+  # Tool connectors (docs/TOOL_CONNECTORS.md): webhooks from Jira, GitHub, Alertmanager… posted encrypted into chats
+  connectors:
+    build: ../services/connectors
+    env_file: .env
+    environment:
+      HS: http://synapse:8008
+      ORCH: http://orchestrator:8080
+      SERVER_NAME: ${SERVER_NAME}
+    volumes: [connectors:/data/connectors]
+    depends_on:
+      orchestrator: {condition: service_healthy}
+    restart: unless-stopped
+
   # Compliance archiver for business tenants (docs/COMPLIANCE.md). Off by default:
   #   docker compose --profile compliance up -d archiver   (needs ARCHIVER_USER / ARCHIVER_PASSWORD in .env)
   archiver:
@@ -159,4 +172,4 @@ services:
     depends_on: [synapse, livekit, orchestrator, sygnal]
     restart: unless-stopped
 
-volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}, archiver: {}, amerbot: {}, agentops: {}}
+volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}, archiver: {}, amerbot: {}, agentops: {}, connectors: {}}

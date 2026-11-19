@@ -1,3 +1,4 @@
+import 'connectors_screen.dart';
 import '../services/locale.dart';
 import '../services/labels.dart';
 import 'files_screen.dart';
@@ -582,11 +583,13 @@ class _S extends State<ChatScreen> {
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => FilesScreen(room: room)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
             if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
+            if (v == 'connectors') Navigator.push(c, MaterialPageRoute(builder: (_) => ConnectorsScreen(room: room)));
             if (v == 'twin') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingTwinScreen(room: room)));
             if (v == 'shifts') Navigator.push(c, MaterialPageRoute(builder: (_) => ShiftsScreen(room: room)));
             if (v == 'ptt') Navigator.push(c, MaterialPageRoute(builder: (_) => WalkieTalkieScreen(room: room)));
           }, itemBuilder: (_) => [
             const PopupMenuItem(value: 'twin', child: Text('Meeting twin')),
+            if (room.encrypted) const PopupMenuItem(value: 'connectors', child: Text('Connectors')),
             const PopupMenuItem(value: 'shifts', child: Text('Shifts')),
             if (room.encrypted) const PopupMenuItem(value: 'ptt', child: Text('Walkie-talkie')),
             if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),
