@@ -11,6 +11,7 @@ import '../services/call_controller.dart';
 import '../services/call_manager.dart';
 import '../services/call_service.dart';
 import '../services/call_signaling.dart';
+import 'prejoin_screen.dart';
 import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'whiteboard_screen.dart';
@@ -118,7 +119,19 @@ class _S extends State<CallScreen> {
   mx.Room get room => _room = context.read<MatrixService>().client.getRoomById(widget.roomId) ?? _room ?? (throw StateError('This chat is no longer available'));
   MeetingService get meetings => MeetingService(context.read<MatrixService>());
 
-  @override void initState() { super.initState(); cam = widget.video; _start(); tick = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); }); }
+  PreJoinChoice? _pre;
+  @override void initState() {
+    super.initState(); cam = widget.video;
+    if (widget.meeting) {
+      // meetings: pre-join first (preview, devices), as in Teams and Zoom
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final ch = await showPreJoin(context, title: 'Join ${room.getLocalizedDisplayname()}', video: widget.video);
+        if (!mounted) return;
+        if (ch == null) { Navigator.of(context).maybePop(); return; }
+        _pre = ch; cam = ch.cam; _start();
+      });
+    } else { _start(); }
+    tick = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); }); }
 
   Future<void> _start() async {
     final api = context.read<ApiService>(); cm = context.read<CallManager>();
@@ -132,7 +145,7 @@ class _S extends State<CallScreen> {
     if (widget.meeting) cm!.inCall = true;
     try {
       final id = widget.meeting ? 'meet-${widget.roomId}' : widget.callId;   // same on every device
-      call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: widget.video)
+      call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: _pre?.cam ?? widget.video)
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
           : await SecureCall.join(api, room, widget.callId!, video: widget.video);
       call!.lk.addListener(_refresh);
@@ -141,8 +154,35 @@ class _S extends State<CallScreen> {
       cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
       mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
       for (final w in call!.deviceWarnings) { _snack(w); }
+      await _applyPreJoin();
       setState(() {});
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
+  }
+
+  /// Devices and microphone choice from the pre-join screen (best effort: a device may have gone away).
+  Future<void> _applyPreJoin() async {
+    final p = _pre, lk = call?.lk; if (p == null || lk == null) return;
+    try {
+      if (p.micId != null) await lk.setAudioInputDevice(MediaDevice(p.micId!, '', 'audioinput', null));
+      if (p.camId != null && p.cam) await lk.setVideoInputDevice(MediaDevice(p.camId!, '', 'videoinput', null));
+      if (p.speakerId != null) await lk.setAudioOutputDevice(MediaDevice(p.speakerId!, '', 'audiooutput', null));
+    } catch (_) {}
+    if (!p.mic) { mic = false; await lk.localParticipant?.setMicrophoneEnabled(false); }
+  }
+
+  /// In-meeting audio and video settings.
+  Future<void> _deviceSettings() async {
+    final lk = call?.lk; if (lk == null) return;
+    final d = await Hardware.instance.enumerateDevices();
+    if (!mounted) return;
+    Widget sec(String t, IconData i, String kind, Future<void> Function(MediaDevice) set) => ExpansionTile(leading: Icon(i), title: Text(t), children: [
+      for (final x in d.where((x) => x.kind == kind)) ListTile(dense: true, title: Text(x.label.isEmpty ? t : x.label), onTap: () async { Navigator.pop(context); try { await set(x); _snack('$t: ${x.label}'); } catch (e) { _snack('Could not switch: $e'); } })]);
+    await showModalBottomSheet(context: context, builder: (s) => SafeArea(child: ListView(shrinkWrap: true, children: [
+      const ListTile(title: Text('Audio and video settings')),
+      sec('Microphone', Icons.mic_none, 'audioinput', lk.setAudioInputDevice),
+      sec('Camera', Icons.videocam_outlined, 'videoinput', lk.setVideoInputDevice),
+      sec('Speaker', Icons.volume_up_outlined, 'audiooutput', lk.setAudioOutputDevice),
+    ])));
   }
   void _refresh() { if (mounted) setState(() {}); }
 
@@ -273,6 +313,7 @@ class _S extends State<CallScreen> {
           ]),
         ]),
         actions: [
+          if (widget.meeting) Padding(padding: const EdgeInsets.only(right: 4), child: FilledButton.tonalIcon(onPressed: _shareLink, icon: const Icon(Icons.person_add_alt_1, size: 18), label: const Text('Invite'))),
           if (mid != null) TextButton.icon(icon: const Icon(Icons.copy, size: 16), label: Text(MeetingService.format(mid)),
             onPressed: () { Clipboard.setData(ClipboardData(text: MeetingService.format(mid))); ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Meeting ID copied'))); }),
           IconButton(tooltip: grid ? 'Speaker view' : 'Grid view', icon: Icon(grid ? Icons.person : Icons.grid_view), onPressed: () => setState(() => grid = !grid)),
@@ -281,6 +322,7 @@ class _S extends State<CallScreen> {
           IconButton(tooltip: 'Chat', icon: const Icon(Icons.chat), onPressed: () => setState(() => panel = panel == _Panel.chat ? _Panel.none : _Panel.chat)),
           PopupMenuButton<String>(tooltip: 'More', onSelected: (v) {
             switch (v) {
+              case 'devices': _deviceSettings();
               case 'wb': Navigator.push(c, MaterialPageRoute(builder: (_) => WhiteboardScreen(roomId: widget.roomId)));
               case 'share': _shareLink();
               case 'breakout': _breakouts();
@@ -290,6 +332,7 @@ class _S extends State<CallScreen> {
               case 'end': _host('end');
             }
           }, itemBuilder: (_) => [
+            const PopupMenuItem(value: 'devices', child: ListTile(leading: Icon(Icons.settings_voice), title: Text('Audio and video settings'))),
             const PopupMenuItem(value: 'wb', child: ListTile(leading: Icon(Icons.draw), title: Text('Whiteboard'))),
             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share), title: Text('Copy invitation'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'breakout', child: ListTile(leading: Icon(Icons.call_split), title: Text('Breakout rooms'))),
@@ -301,6 +344,9 @@ class _S extends State<CallScreen> {
         ]),
       body: Column(children: [
         if (attendee) MaterialBanner(content: const Text('You are an attendee in this webinar. Raise your hand to ask to speak.'), actions: [TextButton(onPressed: _toggleHand, child: Text(myHand ? 'Lower hand' : 'Raise hand'))]),
+        if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
+          content: Text("You're the only one here.${mid != null ? ' Share meeting ID ${MeetingService.format(mid)} or invite people.' : ' Invite people to join.'}"),
+          actions: [FilledButton.tonal(onPressed: _shareLink, child: const Text('Invite people'))]),
         if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. The on-device transcript goes to the AI engine when you leave.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: const Text('Stop'))]),
         Expanded(child: wide || panel == _Panel.none
             ? Row(children: [Expanded(child: stage), if (panel != _Panel.none) SizedBox(width: 340, child: _panel(people, waiting))])
@@ -322,8 +368,11 @@ class _S extends State<CallScreen> {
     );
   }
 
-  Widget _btn(IconData i, String tip, VoidCallback f, {bool off = false}) => IconButton.filledTonal(tooltip: tip, onPressed: f,
-      style: off ? IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer) : null, icon: Icon(i));
+  /// Control with a text label under the icon (Teams/Zoom style); tooltip kept for accessibility.
+  Widget _btn(IconData i, String tip, VoidCallback f, {bool off = false}) => SizedBox(width: 76, child: Column(mainAxisSize: MainAxisSize.min, children: [
+    IconButton.filledTonal(tooltip: tip, onPressed: f,
+      style: off ? IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer) : null, icon: Icon(i)),
+    Text(tip, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall)]));
 
   Widget _tile(Participant p) {
     final vt = p.videoTrackPublications.where((x) => !x.muted).map((x) => x.track).whereType<VideoTrack>().firstOrNull;
