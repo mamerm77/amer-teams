@@ -4,7 +4,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest
 import asyncio
-from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace
+from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace, compliance
 from .admin import require_admin
 
 app = FastAPI(title="Amer Teams Orchestrator", version="0.5.0")
@@ -13,6 +13,7 @@ app.include_router(admin.router)
 app.include_router(sip.router)
 app.include_router(meetings.router)
 app.include_router(calltrace.router)
+app.include_router(compliance.router)
 
 @app.on_event("startup")
 async def _start():

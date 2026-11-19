@@ -223,6 +223,16 @@ jobs:
             SHOTS=$GITHUB_WORKSPACE/shots xvfb-run -a -s '-screen 0 1440x900x24' flutter test integration_test/app_flow_test.dart -d linux \
             --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}" 2>&1 | tee $GITHUB_WORKSPACE/shots/flutter.log || true
           grep -E "^(PASS|FAIL)|IN-USE RESULT" $GITHUB_WORKSPACE/shots/flutter.log || true
+      - name: Encryption audit of the app's own events (Synapse database)
+        if: always()
+        run: |
+          # every non-state event the app (user moh) sent must be encrypted; redactions are cleartext by protocol
+          cd deploy
+          Q="SELECT type, count(*) FROM events WHERE sender='@moh:amer.test' AND state_key IS NULL AND type NOT IN ('m.room.encrypted','m.room.redaction') GROUP BY type"
+          OUT=$(docker compose -f docker-compose.yml -f docker-compose.local.yml exec -T postgres psql -U synapse -d synapse -tAc "$Q")
+          ENC=$(docker compose -f docker-compose.yml -f docker-compose.local.yml exec -T postgres psql -U synapse -d synapse -tAc "SELECT count(*) FROM events WHERE sender='@moh:amer.test' AND type='m.room.encrypted'")
+          mkdir -p ../shots; echo "encrypted=$ENC unencrypted=[$OUT]" | tee ../shots/encryption-audit.txt
+          if [ -n "$OUT" ]; then echo "ENCRYPTION AUDIT: FAIL — the app sent unencrypted events: $OUT"; else echo "ENCRYPTION AUDIT: PASS — all $ENC app events encrypted"; fi
       - name: Collect logs
         if: always()
         run: |

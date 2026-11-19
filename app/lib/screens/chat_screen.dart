@@ -19,6 +19,7 @@ import 'call_screen.dart';
 import 'chat_info_screen.dart';
 import '../services/chat_extras.dart';
 import '../services/outbox.dart';
+import '../services/compliance_service.dart';
 
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
@@ -338,6 +339,14 @@ class _S extends State<ChatScreen> {
             PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
+        ListenableBuilder(listenable: ComplianceService.instance, builder: (_, __) {
+          final cp = ComplianceService.instance;
+          if (!cp.enabled || !cp.archives(room)) return const SizedBox.shrink();
+          return Container(width: double.infinity, color: cs.tertiaryContainer, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(children: [const Icon(Icons.policy_outlined, size: 16), const SizedBox(width: 8), Expanded(child: Text(
+              'This chat is archived by ${cp.orgName ?? 'your organisation'} for compliance (kept ${cp.retentionDays} days). Messages stay end-to-end encrypted in transit.',
+              style: Theme.of(c).textTheme.labelSmall))]));
+        }),
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
           // a read receipt on a message means everything before it has been read too (newest-first list)

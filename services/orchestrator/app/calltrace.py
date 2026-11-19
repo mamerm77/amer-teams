@@ -235,7 +235,9 @@ async def retention_loop():
     import asyncio, logging
     while True:
         try:
+            from . import compliance
             r = await purge_once()
+            r["compliance_archive"] = await compliance.purge_once()
             if any(isinstance(v, int) and v for v in r.values()): logging.info("call-trace retention purge: %s", r)
         except Exception as e:
             logging.warning("call-trace retention purge failed: %s", e)

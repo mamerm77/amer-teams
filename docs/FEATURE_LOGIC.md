@@ -59,7 +59,7 @@ proves it, and the status. Enforcement levels:
 | Invite-only sign-up | Teams (tenant), Zoom (account) | Registration token required, with a password policy | **Server** | registration_test (26) | Server-tested |
 | Admin-only tools | All | Users, invites, audit, agent switches and call trace need server-admin rights | **Server** | registration_test, call_trace_test 3, 17, 18 | Server-tested |
 | Call trace | Teams Call Quality Dashboard | Signalling, media events, quality and MOS, metadata only. Opening a trace is itself audited. | **Server** | call_trace_test (18) | Server-tested |
-| Compliance archiving per tenant | Teams Purview | Off for public users (enforced). Opt-in for business tenants, and users are told. | **Server** | call_trace_test 13–16 | Server-tested; archiver service is a gap |
+| Compliance archiving per tenant | Teams Purview | Off for public users (enforced). Opt-in for business tenants, and users are told. | **Server** | call_trace_test 13–16 | Server-tested; archiver live-tested (compliance_test 20/20) |
 | App lock | WhatsApp, Signal: PIN, lockout after failed attempts | PIN stored as PBKDF2-HMAC-SHA256 (150 000 iterations, random salt). Failed attempts persist across restarts, escalating lockout 30 s → 5 min → 1 h. Turning it off needs the PIN. Locks after 1 min in the background. | App | app_lock_test (RFC 7914 vectors), in-use "App lock" ×3 | Testing |
 | Device verification, key backup | WhatsApp, Signal | Emoji verification (SAS), recovery key (SSSS) | Protocol | in-use "Verify a new device" (against matrix-nio's independent SAS implementation, emoji compared), "Set up backup", "Server holds backup", "Restore" | Testing |
 
@@ -79,3 +79,11 @@ proves it, and the status. Enforcement levels:
 | Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
 |---|---|---|---|---|---|
 | Message rate | Business chat tools do not visibly throttle normal use | 10 messages/s, burst 100. Synapse's default of 0.2/s with burst 10 throttled meeting creation in the in-use test. | **Server** | in-use (Meet now) | Testing |
+
+## Compliance archiving
+| Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
+|---|---|---|---|---|---|
+| Archive for e-discovery | Teams: Purview retention, eDiscovery; deleted and edited messages retained | Business tenants only. The archiving account is a normal encrypted member. Edits, reactions and deletions are kept. Public users are never archived. | Archiver + orchestrator | compliance_test 1–10 | Server-tested (live) |
+| Tamper evidence | Purview: immutable retention | Per-tenant hash chain. UPDATE refused. DELETE only by the retention purge, after retention. A database administrator's edit is detected. | **PostgreSQL** | compliance_test 15, 17–20 | Server-tested (live) |
+| Admin search and export | Purview eDiscovery: search, export, audited | Text, person, chat and date filters. NDJSON export with hashes. Every search and export is audited. | **Server** | compliance_test 11–16 | Server-tested (live) |
+| App never sends cleartext | Signal, WhatsApp: everything encrypted | CI audits Synapse's database after the in-use run: every non-state event the app sent must be `m.room.encrypted` (redactions excepted by protocol) | CI | in-use "Encryption audit" | Testing |

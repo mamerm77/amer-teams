@@ -11,9 +11,18 @@ import 'admin_screen.dart';
 import 'calls_screen.dart';
 import 'activity_screen.dart';
 import 'security_screen.dart';
+import '../services/api_service.dart';
+import '../services/compliance_service.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> {
+  @override void initState() {
+    super.initState();
+    final m = context.read<MatrixService>();
+    ComplianceService.instance.start(m.client, ApiService(m));     // business tenants with archiving: add the archiver to chats
+  }
+  @override void dispose() { ComplianceService.instance.stop(); super.dispose(); }
+
   int i = 0;
   static const _dest = [
     (Icons.notifications_none, 'Activity'), (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),

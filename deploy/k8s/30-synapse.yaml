@@ -8,6 +8,17 @@ data:
     redis: {enabled: true, host: redis-0.redis, port: 6379}
     instance_map:
       main: {host: synapse-main, port: 9093}
+    # Business policies (same as the Docker setup): every room encrypted, invite-only registration,
+    # directory, disappearing messages, and messaging rates that do not throttle active chats and meetings.
+    encryption_enabled_by_default_for_room_type: all
+    enable_registration: true
+    registration_requires_token: true
+    password_config:
+      enabled: true
+      policy: {enabled: true, minimum_length: 10, require_digit: true, require_symbol: true, require_lowercase: true, require_uppercase: true}
+    user_directory: {enabled: true, search_all_users: true, prefer_local_users: true}
+    retention: {enabled: true, purge_jobs: [{interval: 1h}]}
+    rc_message: {per_second: 10, burst_count: 100}
   worker.yaml: |
     worker_app: synapse.app.generic_worker
     worker_listeners:
