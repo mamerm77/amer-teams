@@ -76,7 +76,7 @@ String friendlyAuthError(Object e) {
       case MatrixError.M_USER_DEACTIVATED: return 'This account has been deactivated. Contact your administrator.';
       case MatrixError.M_USER_IN_USE: return 'That username is taken. Choose another.';
       case MatrixError.M_INVALID_USERNAME: return 'Usernames can use lower-case letters, digits, dots, hyphens and underscores.';
-      case MatrixError.M_WEAK_PASSWORD: return 'Password too weak: use at least 10 characters with upper and lower case, a digit and a symbol.';
+      case MatrixError.M_UNKNOWN when e.errorMessage.toLowerCase().contains('password'): return 'Password too weak: use at least 10 characters with upper and lower case, a digit and a symbol.';
       default: return e.errorMessage;
     }
   }
