@@ -19,6 +19,7 @@ data:
     user_directory: {enabled: true, search_all_users: true, prefer_local_users: true}
     retention: {enabled: true, purge_jobs: [{interval: 1h}]}
     rc_message: {per_second: 10, burst_count: 100}
+    room_list_publication_rules: [{action: allow}]
   worker.yaml: |
     worker_app: synapse.app.generic_worker
     worker_listeners:

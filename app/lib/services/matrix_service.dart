@@ -98,19 +98,60 @@ class MatrixService extends ChangeNotifier {
       .map((c) => c.roomId == null ? null : client.getRoomById(c.roomId!)).whereType<Room>().toList();
   List<Room> get chats => rooms.where((r) => !r.isSpace).toList();
 
-  Future<String> createTeam(String name, List<String> invite) async {
-    final id = await client.createRoom(name: name, invite: invite, preset: CreateRoomPreset.privateChat,
+  /// Teams (Matrix spaces), as in Microsoft Teams:
+  /// - Private team: invite only. Public team: listed in the directory; anyone on this server can join.
+  /// - Channels use the `restricted` join rule, so every team member can open every channel, including people
+  ///   added to the team later. Each channel is end-to-end encrypted.
+  Future<String> createTeam(String name, List<String> invite, {String description = '', bool public = false}) async {
+    final id = await client.createRoom(name: name, topic: description.isEmpty ? null : description, invite: invite,
+        preset: public ? CreateRoomPreset.publicChat : CreateRoomPreset.privateChat,
+        visibility: public ? Visibility.public : Visibility.private,
         creationContent: {'type': 'm.space'});
     await createChannel(id, 'General');
     return id;
   }
 
-  Future<String> createChannel(String teamId, String name) async {
+  Future<String> createChannel(String teamId, String name, {String description = ''}) async {
     final team = client.getRoomById(teamId)!;
-    final invite = team.getParticipants().map((u) => u.id).where((u) => u != userId).toList();
-    final id = await client.createGroupChat(groupName: name, invite: invite, enableEncryption: true, preset: CreateRoomPreset.privateChat);
+    final invite = team.getParticipants().where((u) => u.membership == Membership.join || u.membership == Membership.invite)
+        .map((u) => u.id).where((u) => u != userId).toList();
+    final id = await client.createRoom(name: name, topic: description.isEmpty ? null : description, invite: invite,
+        preset: CreateRoomPreset.privateChat,
+        initialState: [
+          StateEvent(type: EventTypes.Encryption, stateKey: '', content: {'algorithm': AlgorithmTypes.megolmV1AesSha2}),
+          StateEvent(type: EventTypes.RoomJoinRules, stateKey: '', content: {'join_rule': 'restricted',
+            'allow': [{'type': 'm.room_membership', 'room_id': teamId}]}),
+        ]);
     await team.setSpaceChild(id);
     return id;
+  }
+
+  /// Adds people to a team and invites them to every channel.
+  Future<void> addTeamMembers(Room team, List<String> users) async {
+    for (final u in users) {
+      try { await team.invite(u); } catch (_) {}
+      for (final ch in channelsOf(team)) { try { await ch.invite(u); } catch (_) {} }
+    }
+  }
+
+  /// Joins a team and all of its channels (restricted: allowed because we are now a member).
+  Future<void> joinTeam(String teamId) async {
+    await client.joinRoom(teamId);
+    for (var i = 0; i < 20 && client.getRoomById(teamId)?.membership != Membership.join; i++) { await Future.delayed(const Duration(milliseconds: 300)); }
+    final team = client.getRoomById(teamId); if (team == null) return;
+    for (final c in team.spaceChildren) { if (c.roomId != null) { try { await client.joinRoom(c.roomId!); } catch (_) {} } }
+  }
+
+  /// Leaves a team and its channels.
+  Future<void> leaveTeam(Room team) async {
+    for (final ch in channelsOf(team)) { try { await ch.leave(); } catch (_) {} }
+    await team.leave();
+  }
+
+  /// Public teams on this server that the user has not joined.
+  Future<List<PublishedRoomsChunk>> discoverTeams({String search = ''}) async {
+    final r = await client.queryPublicRooms(limit: 50, filter: PublicRoomQueryFilter(roomTypes: ['m.space'], genericSearchTerm: search.isEmpty ? null : search));
+    return r.chunk.where((c) => client.getRoomById(c.roomId)?.membership != Membership.join).toList();
   }
 
   // ---------- Encrypted files: the SDK encrypts with AES-256-CTR before upload ----------

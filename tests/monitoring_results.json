@@ -1,0 +1,92 @@
+[
+ {
+  "check": "1. All 6 targets scraped",
+  "pass": true,
+  "detail": "ai-engine=up, chat=up, media=up, postgres=up, prometheus=up, redis=up"
+ },
+ {
+  "check": "2. AI engine reports 3/3 services up",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "3. Chat server metrics present",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "4. Media server metrics present",
+  "pass": true,
+  "detail": "101 series"
+ },
+ {
+  "check": "5. PostgreSQL and Redis exporters report up",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "6. Audit-integrity metric is 1",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "7. 8 alert rules loaded",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "8. Media outage: ServiceDown alert fires",
+  "pass": true,
+  "detail": "after 66 s"
+ },
+ {
+  "check": "9. Media outage: MetricsUnavailable warning fires (metrics scrape also fails)",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "10. Alertmanager received the alerts",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "11. Alert written to tamper-evident audit log",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "12. App Health screen API lists the alert",
+  "pass": true,
+  "detail": "['MetricsUnavailable', 'ServiceDown']"
+ },
+ {
+  "check": "13. Media restored: alerts resolve",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "14. Resolution recorded in audit log",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "15. Redis outage: RedisDown alert fires",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "16. Redis restored: alert resolves",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "17. Tampered audit row: AuditLogTampered alert fires",
+  "pass": true,
+  "detail": ""
+ },
+ {
+  "check": "18. Restored row: integrity metric back to 1",
+  "pass": true,
+  "detail": ""
+ }
+]

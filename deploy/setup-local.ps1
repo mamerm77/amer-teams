@@ -45,6 +45,9 @@ if ($hsText -notmatch "(?m)^user_directory") {
   Add-Content -Encoding ascii $hsPath "`nuser_directory: {enabled: true, search_all_users: true, prefer_local_users: true}"
   Write-Host "Enabled the people directory (everyone can find each other)."
 }
+if ((Get-Content $hsPath -Raw) -notmatch "(?m)^room_list_publication_rules") {
+  Add-Content -Encoding ascii $hsPath "`n# public teams appear in Discover teams`nroom_list_publication_rules: [{action: allow}]"
+}
 if ((Get-Content $hsPath -Raw) -notmatch "(?m)^rc_message") {
   Add-Content -Encoding ascii $hsPath "`n# business messaging rates (Synapse default 0.2/s, burst 10, throttles active chats and meetings)`nrc_message: {per_second: 10, burst_count: 100}"
 }
