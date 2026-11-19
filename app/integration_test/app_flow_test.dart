@@ -466,6 +466,15 @@ void main() {
       await type(field('Current PIN'), '4826', 'current PIN'); await tap(find.text('Turn off'), 'Turn off');
       expectFound(await waitFor(find.text('App lock off'), secs: 30), 'App lock off');
     });
+    await step('Arabic: the layout mirrors right to left, then back to English', () async {
+      await home(); await tap(find.text('Security'), 'Security tab');
+      await tap(find.text('Language'), 'Language'); await tap(find.textContaining('العربية'), 'Arabic'); await wait(2);
+      expectFound(await waitFor(find.text('الأمان'), secs: 10), 'navigation in Arabic');
+      final dir = Directionality.of(t.element(find.text('الأمان').first));
+      expectFound(dir == TextDirection.rtl, 'right-to-left layout');
+      await tap(find.text('اللغة'), 'Language (Arabic)'); await tap(find.text('English'), 'English'); await wait(2);
+      expectFound(await waitFor(find.text('Security'), secs: 10), 'back in English');
+    });
 
     // ---------------- device verification and key backup ----------------
     final moh2Out = '$shots/moh2.json';

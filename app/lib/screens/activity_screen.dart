@@ -8,6 +8,7 @@ import 'saved_screen.dart';
 import 'catch_up_screen.dart';
 import 'tasks_screen.dart';
 import '../services/feature_flags.dart';
+import '../services/locale.dart';
 
 /// Activity feed (as in Teams): mentions, replies to you, reactions to your messages, missed calls.
 class ActivityScreen extends StatefulWidget { const ActivityScreen({super.key}); @override State<ActivityScreen> createState() => _S(); }
@@ -17,8 +18,8 @@ class _S extends State<ActivityScreen> {
   void _load() => setState(() { f = ActivityService(context.read<MatrixService>()).load(); });
   static const icons = {'mention': Icons.alternate_email, 'reply': Icons.reply, 'reaction': Icons.emoji_emotions_outlined, 'missed_call': Icons.call_missed};
   @override Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Activity'), actions: [
-      if (Flags.instance.on('catch_up')) TextButton.icon(icon: const Icon(Icons.auto_awesome), label: const Text('Catch me up'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CatchUpScreen()))),
+    appBar: AppBar(title: Text(t(c, 'Activity')), actions: [
+      if (Flags.instance.on('catch_up')) TextButton.icon(icon: const Icon(Icons.auto_awesome), label: Text(t(c, 'Catch me up')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CatchUpScreen()))),
       if (Flags.instance.on('decisions')) IconButton(tooltip: 'My tasks', icon: const Icon(Icons.task_alt), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const TasksScreen()))),
       if (Flags.instance.on('decisions')) IconButton(tooltip: 'My decisions', icon: const Icon(Icons.gavel), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const MyDecisionsScreen()))),
       IconButton(tooltip: 'Saved messages', icon: const Icon(Icons.bookmark_outline), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SavedScreen()))),

@@ -6,6 +6,7 @@ import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
 import '../services/app_lock.dart';
 import '../services/matrix_service.dart';
+import '../services/locale.dart';
 
 /// Security: your devices (verify with emoji, sign out), encrypted key backup with a recovery key,
 /// and app lock.
@@ -153,6 +154,14 @@ class _S extends State<SecurityScreen> {
             itemBuilder: (_) => [if (dk != null && !dk.verified) const PopupMenuItem(value: 'verify', child: Text('Verify')), const PopupMenuItem(value: 'out', child: Text('Sign out'))]));
       }(),
       const Divider(),
+      ListTile(leading: const Icon(Icons.language), title: Text(t(context, 'Language')),
+        subtitle: Text({'system': t(context, 'System'), 'en': 'English', 'ar': 'العربية'}[AppLocale.instance.mode]!),
+        onTap: () async {
+          final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: Text(t(context, 'Language')), children: [
+            for (final (k, l) in [('system', t(context, 'System')), ('en', 'English'), ('ar', 'العربية (من اليمين إلى اليسار)')])
+              SimpleDialogOption(onPressed: () => Navigator.pop(d, k), child: Text(l))]));
+          if (v != null) { await AppLocale.instance.set(v); if (mounted) setState(() {}); }
+        }),
       SwitchListTile(secondary: const Icon(Icons.pin), title: const Text('App lock'), subtitle: const Text('Ask for a PIN when you return to the app'),
         value: lockOn ?? false, onChanged: (v) async { if (v) { await _setPin(); } else { await _disableLock(); } }),
     ])));

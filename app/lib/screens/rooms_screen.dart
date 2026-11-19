@@ -10,6 +10,7 @@ import 'people_picker.dart';
 import 'notifications_screen.dart';
 import 'partners_screen.dart';
 import 'search_screen.dart';
+import '../services/locale.dart';
 import 'followed_threads_screen.dart';
 import '../services/quick_views.dart';
 
@@ -48,10 +49,10 @@ class _RS extends State<RoomsScreen> {
     if (q.text.isNotEmpty) list = list.where((r) => r.getLocalizedDisplayname().toLowerCase().contains(q.text.toLowerCase())).toList();
     list = [...list.where((x) => x.isFavourite), ...list.where((x) => !x.isFavourite)];
     return Scaffold(
-      appBar: AppBar(title: searching ? TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'Search chats', border: InputBorder.none), onChanged: (_) => setState(() {})) : const Text('Chats'),
+      appBar: AppBar(title: searching ? TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'Search chats', border: InputBorder.none), onChanged: (_) => setState(() {})) : Text(t(c, 'Chats')),
         bottom: PreferredSize(preferredSize: const Size.fromHeight(48), child: SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
           for (final (k, l) in [('all', 'All'), ('unread', 'Unread'), ('mentions', '@Mentions'), ('drafts', 'Drafts'), ('people', 'People'), ('groups', 'Groups'), ('pinned', 'Pinned'), ('archived', 'Archived')])
-            Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ChoiceChip(label: Text(l), selected: filter == k, onSelected: (_) async { if (k == 'drafts') await Drafts.instance.load(); setState(() => filter = k); })),
+            Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ChoiceChip(label: Text(t(c, l)), selected: filter == k, onSelected: (_) async { if (k == 'drafts') await Drafts.instance.load(); setState(() => filter = k); })),
           Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ActionChip(avatar: const Icon(Icons.forum_outlined, size: 16), label: const Text('Followed threads'),
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FollowedThreadsScreen()))))]))),
         actions: [
@@ -66,7 +67,7 @@ class _RS extends State<RoomsScreen> {
             actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Set'))]));
           if (ok == true) await m.client.setPresence(m.userId, PresenceType.online, statusMsg: ctl.text.trim());
         })]),
-      floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: const Text('New encrypted chat'), onPressed: () => _new(c, m)),
+      floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: Text(t(c, 'New encrypted chat')), onPressed: () => _new(c, m)),
       body: Builder(builder: (_) {
         final cs = Theme.of(c).colorScheme; final me = m.userId;
         final invites = m.client.rooms.where((r) => r.membership == Membership.invite && !r.isSpace).toList();

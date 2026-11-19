@@ -25,6 +25,7 @@ import '../services/ooo.dart';
 import '../services/feature_flags.dart';
 import '../services/enclave_client.dart';
 import '../services/search_index.dart';
+import '../services/locale.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -88,7 +89,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
         NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all,
           leading: const Tooltip(message: 'Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', child: Text('b${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')}', style: TextStyle(fontSize: 10))),
           trailing: IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => confirmSignOut(c)),
-          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(d.$2))]))))),
+          destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(t(c, d.$2)))]))))),
         const VerticalDivider(width: 1), Expanded(child: body)]));
     }
     // Phones: first four tabs plus "More" for Control, Health and Users.
@@ -98,15 +99,15 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
       onDestinationSelected: (v) async {
         if (v < main) { setState(() => i = v); return; }
         final pick = await showModalBottomSheet<int>(context: c, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (var k = main; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(_dest[k].$2), onTap: () => Navigator.pop(s, k)),
+          for (var k = main; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(t(c, _dest[k].$2)), onTap: () => Navigator.pop(s, k)),
           const ListTile(leading: Icon(Icons.info_outline), title: Text('About Amer Teams'),
             subtitle: Text('Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}')),
-          ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () { Navigator.pop(s); confirmSignOut(c); }),
+          ListTile(leading: const Icon(Icons.logout), title: Text(t(c, 'Sign out')), onTap: () { Navigator.pop(s); confirmSignOut(c); }),
         ])));
         if (pick != null) setState(() => i = pick);
       },
-      destinations: [for (var k = 0; k < main; k++) NavigationDestination(icon: Icon(_dest[k].$1), label: _dest[k].$2),
-        const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More')]));
+      destinations: [for (var k = 0; k < main; k++) NavigationDestination(icon: Icon(_dest[k].$1), label: t(c, _dest[k].$2)),
+        NavigationDestination(icon: const Icon(Icons.more_horiz), label: t(c, 'More'))]));
   }
 }
 

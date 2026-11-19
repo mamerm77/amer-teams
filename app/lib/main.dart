@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'services/locale.dart';
 import 'package:provider/provider.dart';
 import 'services/matrix_service.dart';
 import 'services/api_service.dart';
@@ -16,6 +18,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final matrix = MatrixService();
   await matrix.init();
+  await AppLocale.instance.load();
   runApp(MultiProvider(providers: [
     ChangeNotifierProvider.value(value: matrix),
     ProxyProvider<MatrixService, ApiService>(update: (_, m, __) => ApiService(m)),
@@ -28,7 +31,10 @@ class AmerTeamsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = context.watch<MatrixService>();
-    return MaterialApp(
+    return ListenableBuilder(listenable: AppLocale.instance, builder: (_, __) => MaterialApp(
+      locale: AppLocale.instance.locale,
+      supportedLocales: const [Locale('en'), Locale('ar')],
+      localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
       navigatorKey: navigatorKey,
       title: 'Amer Teams',
       debugShowCheckedModeBanner: false,
@@ -36,7 +42,7 @@ class AmerTeamsApp extends StatelessWidget {
       darkTheme: amerTheme(Brightness.dark),
       builder: (ctx, child) => LockGate(child: child!),
       home: m.isLoggedIn ? const _VerificationListener(child: HomeScreen()) : const LoginScreen(),
-    );
+    ));
   }
 }
 
