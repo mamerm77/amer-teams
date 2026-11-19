@@ -9,6 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: pip install -r services/orchestrator/requirements.txt && cd services/orchestrator && pytest -q
@@ -16,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - uses: actions/setup-java@v4
         with: {distribution: temurin, java-version: '17'}
       - uses: subosito/flutter-action@v2
@@ -26,7 +32,7 @@ jobs:
           python3 ../tools/patch_native.py android
           flutter pub get
           flutter analyze --no-fatal-infos --no-fatal-warnings
-          flutter build apk --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          flutter build apk --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
       - name: Name the APK
         run: cp app/build/app/outputs/flutter-apk/app-release.apk amer-teams-android.apk
       - uses: actions/upload-artifact@v4
@@ -51,6 +57,9 @@ jobs:
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'   # Firebase C++ SDK still declares an old CMake minimum
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - uses: subosito/flutter-action@v2
         with: {channel: stable}
       - name: Build Windows app
@@ -60,7 +69,7 @@ jobs:
           flutter create . --org com.amerteams --project-name amer_teams --platforms=windows
           python ../tools/patch_native.py windows
           flutter pub get
-          flutter build windows --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          flutter build windows --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
       - name: Add Visual C++ runtime next to the app
         shell: pwsh
         run: |
@@ -115,6 +124,9 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - uses: subosito/flutter-action@v2
         with: {channel: stable}
       - name: Create iOS project
@@ -127,7 +139,7 @@ jobs:
         if: env.APPLE_TEAM_ID == ''
         working-directory: app
         run: |
-          flutter build ios --release --no-codesign --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}   # Flutter resolves iOS packages itself (Swift Package Manager / CocoaPods)
+          flutter build ios --release --no-codesign --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}   # Flutter resolves iOS packages itself (Swift Package Manager / CocoaPods)
           mkdir -p build/unsigned/Payload && cp -R build/ios/iphoneos/Runner.app build/unsigned/Payload/
           cd build/unsigned && zip -qr ../AmerTeams-unsigned.ipa Payload
       - name: Upload unsigned IPA (install free with Sideloadly + Apple ID)
@@ -162,7 +174,7 @@ jobs:
       - name: Build signed IPA
         if: env.APPLE_TEAM_ID != ''
         working-directory: app
-        run: flutter build ipa --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }} --export-options-plist=$RUNNER_TEMP/export.plist --build-number=${{ github.run_number }}
+        run: flutter build ipa --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }} --export-options-plist=$RUNNER_TEMP/export.plist --build-number=${{ github.run_number }}
       - name: Upload to TestFlight
         if: env.APPLE_TEAM_ID != ''
         env:
@@ -180,6 +192,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - run: sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev libjsoncpp-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
       - uses: subosito/flutter-action@v2
         with: {channel: stable}
@@ -188,7 +203,7 @@ jobs:
           flutter create . --org com.amerteams --project-name amer_teams --platforms=linux
           flutter pub get
           flutter test          # includes ML-KEM / hybrid key vectors shared with the Python reference
-          flutter build linux --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          flutter build linux --release --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}
       - uses: actions/upload-artifact@v4
         with: {name: amer-teams-linux, path: app/build/linux/x64/release/bundle/}
   in-use:
@@ -197,6 +212,9 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Pin the AI proxy measurement (docs/ENCRYPTED_AI.md)
+        shell: bash
+        run: python3 -c "import hashlib,subprocess;print('ENCLAVE_MEASUREMENT='+hashlib.sha256(subprocess.check_output(['git','show','HEAD:services/enclave/enclave.py'])).hexdigest())" >> $GITHUB_ENV
       - run: |
           sudo apt-get update && sudo apt-get install -y ninja-build libgtk-3-dev libsecret-1-dev libjsoncpp-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev xvfb imagemagick gnome-keyring dbus-x11 pulseaudio libolm-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good network-manager
           sudo systemctl start NetworkManager || sudo NetworkManager || true
@@ -221,7 +239,7 @@ jobs:
           pulseaudio --start --exit-idle-time=-1 && pactl load-module module-null-sink sink_name=virt && pactl load-module module-virtual-source source_name=mic master=virt.monitor || true
           dbus-run-session -- bash -c "echo amer | gnome-keyring-daemon --unlock --components=secrets >/dev/null; \
             SHOTS=$GITHUB_WORKSPACE/shots xvfb-run -a -s '-screen 0 1440x900x24' flutter test integration_test/app_flow_test.dart -d linux \
-            --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}" 2>&1 | tee $GITHUB_WORKSPACE/shots/flutter.log || true
+            --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}" 2>&1 | tee $GITHUB_WORKSPACE/shots/flutter.log || true
           grep -E "^(PASS|FAIL)|IN-USE RESULT" $GITHUB_WORKSPACE/shots/flutter.log || true
       - name: Encryption audit of the app's own events (Synapse database)
         if: always()

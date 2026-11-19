@@ -16,6 +16,7 @@ dependencies:
   provider: ^6.1.2
   speech_to_text: ^7.0.0          # on-device captions (text stays local)
   crypto: ^3.0.6
+  cryptography: ^2.7.0          # X25519, HKDF, AES-GCM for the AI enclave proxy (docs/ENCRYPTED_AI.md)
   pqcrypto: ^0.4.4
   record: ^6.2.1                  # voice messages
   audioplayers: ^6.8.1            # voice message playback               # ML-KEM-768 (FIPS 203), pure Dart

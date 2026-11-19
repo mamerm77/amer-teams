@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'matrix_service.dart';
+import 'enclave_client.dart';
+import 'feature_flags.dart';
 import '../config.dart';
 
 /// Talks to the Amer orchestrator (AI engine + call token service).
@@ -8,6 +10,8 @@ class ApiService {
   ApiService(this.m);
   final MatrixService m;
   Uri _u(String p) => m.homeserver!.replace(path: '$kApiPath$p');
+  Uri url(String p) => _u(p);
+  Map<String, String> get headers => _h;
   Map<String, String> get _h => {'Authorization': 'Bearer ${m.accessToken}', 'Content-Type': 'application/json'};
 
   Future<Map<String, dynamic>> _post(String p, Map body) async {
@@ -21,8 +25,22 @@ class ApiService {
       _post('/v1/calls/token', {'room_id': roomId, 'call_id': callId, 'display_name': name});
 
   /// [encrypted]: the context came from an end-to-end encrypted chat; the server applies the organisation's policy.
-  Future<Map<String, dynamic>> ask(String prompt, {String context = '', String? agent, List<String> labels = const [], bool encrypted = false}) =>
-      _post('/v1/ai/ask', {'prompt': prompt, 'context': context, 'agent': agent, 'labels': labels, 'encrypted': encrypted});
+  Future<Map<String, dynamic>> ask(String prompt, {String context = '', String? agent, List<String> labels = const [], bool encrypted = false}) async {
+    // encrypted-chat content goes through the enclave proxy when it is usable (docs/ENCRYPTED_AI.md)
+    if (encrypted && await EnclaveClient.instance.check(this, unattestedAllowed: Flags.instance.on('ai_unattested_enclave'))) {
+      final blocked = labels.any((l) => const {'confidential', 'restricted'}.contains(l.toLowerCase()));
+      if (blocked) return {'answer': 'Blocked by policy: content labelled ${labels.first} cannot be sent to AI agents.', 'agent': 'Guardian', 'blocked': true};
+      final a = await EnclaveClient.instance.ask(this, prompt: prompt, context: context, system: kAgentPrompts[agent] ?? kAgentPrompts['assist']!);
+      return {'answer': a, 'agent': agent ?? 'Amer', 'route': 'enclave'};
+    }
+    return _post('/v1/ai/ask', {'prompt': prompt, 'context': context, 'agent': agent, 'labels': labels, 'encrypted': encrypted});
+  }
+  /// The agents' instructions (as in services/orchestrator/app/agents.py), for requests that go through the enclave.
+  static const kAgentPrompts = {
+    'summ': 'You summarise workplace conversations and meeting transcripts. Output: 3-6 bullet key points, then "Decisions:" and "Actions:" with owners. British English. Be concise.',
+    'trans': 'You translate faithfully between Arabic, English and Chinese. Keep technical terms (e.g. OSNR, ROADM) untranslated. Output only the translation.',
+    'minutes': 'You write formal meeting minutes from a transcript: Attendees, Agenda, Discussion, Decisions, Actions (owner, due). British English.',
+    'assist': 'You are Amer, the assistant inside Amer Teams. Be direct and technically precise. British English.'};
 
   Future<List<dynamic>> agents() async {
     final r = await http.get(_u('/v1/agents'), headers: _h);

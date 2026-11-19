@@ -29,13 +29,36 @@ Phase 3, creative feature 3, and the foundation behind every AI feature (docs/PH
 - **Fixed while doing this:** *Summarise with Amer* and the meeting follow-up did not pass the chat's sensitivity
   label, so Guardian could not block them on Confidential chats. Both now pass it.
 
+## The AI proxy (enclave software), built and running locally
+`services/enclave/enclave.py` is a separate service (Docker Compose `enclave`; `ENCLAVE_URL` for the
+orchestrator).
+- **Keys.** An X25519 key pair is made at start and kept in memory only. `/attestation` gives the public key, the
+  **measurement** (SHA-256 of `enclave.py`) and the attestation type.
+- **The app encrypts each request to the proxy.** X25519 with a one-time key, HKDF-SHA256 (salt = both public
+  keys) and AES-256-GCM. The orchestrator relays **ciphertext only** (`/v1/ai/enclave/infer`) and records only
+  sizes and token counts. The answer comes back encrypted to the app's one-time key.
+- **The proxy** applies Guardian's redaction (card numbers, IBANs, Emirates IDs), calls the model, and logs one
+  line of sizes, tokens and time. No content.
+- **The app checks the attestation before sending.**
+  - The measurement must equal the one **pinned in this build**: CI computes the SHA-256 of `enclave.py` from git
+    and passes it as `ENCLAVE_MEASUREMENT`. A changed proxy is refused.
+  - On ordinary hardware the type is `none`. The app then uses the proxy only if the organisation allows it (flag
+    `ai_unattested_enclave`, off by default) and labels answers "🔐 Ran in the AI proxy: encrypted past this
+    server, not hardware-attested".
+  - It is never used for Confidential or Restricted chats.
+- **Checked:**
+  - `services/enclave/test_enclave.py`: a real round trip, no content in the ciphertext or the logs, a tampered
+    request refused, redaction applied.
+  - **On the local stack**: through the real orchestrator, which relayed ciphertext only; its log contains
+    neither the text nor the card number.
+
 ## What is not built (open)
 - **No on-device model** is installed yet. Choosing one (a small quantised model for translation and short
   summaries, through a native runtime on iOS, Android and Windows) is the next step.
-- **No enclave.** The spec's design (confidential VMs, AMD SEV-SNP or Intel TDX, in a UAE region, running a
+- **No hardware enclave.** The proxy above is the software that would run in it. The spec's design (confidential VMs, AMD SEV-SNP or Intel TDX, in a UAE region, running a
   pinned inference proxy; HPKE to the enclave key; attestation checked against a pinned measurement and under
   24 h old; no content logs) needs confidential-computing hardware. Neither this build environment nor CI has
-  it, so none of it can be honestly tested here. Until it exists, Confidential chats get no AI, and General chats
+  it, so hardware attestation cannot be honestly tested here; the app refuses hardware reports until it can verify them. Until it exists, Confidential chats get no AI, and General chats
   get AI only where the organisation allows the plain path.
 - **Default.** `ai_plain_server` is *on*, so today's AI features keep working. Switching it off for every tenant
   is one row (`*`, `ai_plain_server`, off).

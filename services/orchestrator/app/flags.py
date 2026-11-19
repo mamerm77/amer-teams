@@ -23,7 +23,9 @@ FEATURES: dict[str, tuple[bool, str]] = {
     "search": (True, "Search everywhere"), "file_preview": (True, "File previews"),
     # Encrypted AI policy (docs/ENCRYPTED_AI.md): may text from end-to-end encrypted chats labelled General go to the
     # AI service when no attested enclave exists? On by default so the AI features work; off = refuse until an enclave runs.
-    "ai_plain_server": (True, "AI on the server for General encrypted chats (no enclave)")}
+    "ai_plain_server": (True, "AI on the server for General encrypted chats (no enclave)"),
+    # use the enclave proxy even without hardware attestation (encrypted past this server; not hardware-protected)
+    "ai_unattested_enclave": (False, "AI enclave proxy without hardware attestation")}
 
 def bucket(user: str, feature: str) -> int:
     return int(hashlib.sha256(f"{feature}|{user}".encode()).hexdigest()[:8], 16) % 100

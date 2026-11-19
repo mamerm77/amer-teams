@@ -125,11 +125,36 @@ async def bot(req: BotReq, x_bot_secret: str = Header("")):
     await audit(req.user_id, "ai.chat", f'{res["agent"]}:{status}')
     return {**res, "answer": _friendly(res["answer"])}
 
+ENCLAVE_URL = __import__("os").getenv("ENCLAVE_URL", "")
+
 @app.get("/v1/ai/enclave/attestation")
 async def enclave_attestation(user=Depends(auth.matrix_user)):
-    """No confidential-computing enclave is deployed on this server yet. Clients treat this as 'enclave
-    unavailable' and never fall back to the plain server on their own (docs/ENCRYPTED_AI.md)."""
-    raise HTTPException(503, "No attested enclave is deployed on this server")
+    """The enclave proxy's attestation, passed through unchanged; the app verifies it (docs/ENCRYPTED_AI.md)."""
+    if not ENCLAVE_URL: raise HTTPException(503, "No enclave is deployed on this server")
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5) as c: r = await c.get(f"{ENCLAVE_URL}/attestation")
+        return r.json()
+    except Exception: raise HTTPException(503, "The enclave is not reachable")
+
+class SealedReq(BaseModel):
+    v: int = 1
+    epk: str
+    nonce: str
+    ct: str
+
+@app.post("/v1/ai/enclave/infer")
+async def enclave_infer(req: SealedReq, user=Depends(auth.matrix_user)):
+    """Relays ciphertext only: this server cannot read the request or the answer."""
+    if not ENCLAVE_URL: raise HTTPException(503, "No enclave is deployed on this server")
+    import httpx
+    t0 = time.perf_counter()
+    async with httpx.AsyncClient(timeout=90) as c: r = await c.post(f"{ENCLAVE_URL}/infer", json=req.model_dump())
+    if r.status_code != 200: raise HTTPException(r.status_code, "The enclave refused the request")
+    j = r.json()
+    await db.ai_request(user["user_id"], "Enclave", "ok", int((time.perf_counter() - t0) * 1000))
+    await audit(user["user_id"], "ai.enclave", f"bytes={len(req.ct)} tokens={sum((j.get('tokens') or {}).get(k, 0) for k in ('input_tokens', 'output_tokens'))}")
+    return {"v": 1, "nonce": j["nonce"], "ct": j["ct"]}
 
 @app.get("/v1/ai/assistant")
 async def assistant(user=Depends(auth.matrix_user)):

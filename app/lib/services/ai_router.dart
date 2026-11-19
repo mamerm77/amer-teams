@@ -4,7 +4,7 @@
 /// Restricted chats.
 library;
 
-enum AiRoute { device, enclave, server, refuse }
+enum AiRoute { device, enclave, proxy, server, refuse }
 
 class AiDecision {
   const AiDecision(this.route, this.why);
@@ -13,11 +13,12 @@ class AiDecision {
   /// The line shown with every AI answer.
   String get where => switch (route) {
     AiRoute.device => '🔒 Ran on this device', AiRoute.enclave => '🔒 Ran in the attested enclave',
+    AiRoute.proxy => '🔐 Ran in the AI proxy: encrypted past this server, not hardware-attested',
     AiRoute.server => 'Ran on your organisation\'s AI service (not end-to-end encrypted)', AiRoute.refuse => why };
 }
 
 /// [label]: the chat's sensitivity label. [small]: translate, classify or a short summary (under ~4k tokens).
-AiDecision routeAi({required bool encrypted, String? label, bool small = false, bool deviceModel = false, bool enclaveAttested = false, bool plainServerAllowed = false, int batteryPct = 100}) {
+AiDecision routeAi({required bool encrypted, String? label, bool small = false, bool deviceModel = false, bool enclaveAttested = false, bool unattestedProxy = false, bool plainServerAllowed = false, int batteryPct = 100}) {
   final l = (label ?? '').toLowerCase();
   if (!encrypted) return const AiDecision(AiRoute.server, 'Not end-to-end encrypted content');
   if (l == 'restricted') {
@@ -26,6 +27,7 @@ AiDecision routeAi({required bool encrypted, String? label, bool small = false, 
   }
   if (small && deviceModel && batteryPct > 20) return const AiDecision(AiRoute.device, 'Small task on this device');
   if (enclaveAttested) return const AiDecision(AiRoute.enclave, 'Enclave attestation verified');
+  if (l != 'confidential' && unattestedProxy) return const AiDecision(AiRoute.proxy, 'Organisation policy allows the unattested AI proxy');
   if (l == 'confidential') return const AiDecision(AiRoute.refuse, 'This chat is Confidential: AI may only run in an attested enclave, and none is available. Try again later.');
   if (plainServerAllowed) return const AiDecision(AiRoute.server, 'Organisation policy allows the AI service for General chats');
   return const AiDecision(AiRoute.refuse, 'No on-device model or attested enclave is available, and your organisation does not allow encrypted chats to go to the AI service.');

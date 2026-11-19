@@ -19,6 +19,11 @@ void main() {
     expect(routeAi(encrypted: true).route, AiRoute.refuse);
     expect(routeAi(encrypted: true, plainServerAllowed: true).route, AiRoute.server);      // only by explicit policy
   });
+  test('unattested proxy: used for General chats when allowed, never for Confidential or Restricted', () {
+    expect(routeAi(encrypted: true, unattestedProxy: true, plainServerAllowed: true).route, AiRoute.proxy);
+    expect(routeAi(encrypted: true, label: 'Confidential', unattestedProxy: true).route, AiRoute.refuse);
+    expect(routeAi(encrypted: true, label: 'Restricted', unattestedProxy: true).route, AiRoute.refuse);
+  });
   test('unencrypted content uses the normal path', () {
     expect(routeAi(encrypted: false, label: 'Restricted').route, AiRoute.server);
   });

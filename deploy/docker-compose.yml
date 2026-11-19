@@ -38,10 +38,17 @@ services:
     depends_on: [redis]
     restart: unless-stopped
 
+  enclave:
+    # AI proxy that requests are encrypted to (docs/ENCRYPTED_AI.md); on a confidential VM it reports hardware attestation
+    build: ../services/enclave
+    environment: {ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}", LLM_MODEL: "${LLM_MODEL:-claude-sonnet-4-5}"}
+    restart: unless-stopped
+
   orchestrator:
     build: ../services/orchestrator
     env_file: .env
     environment:
+      ENCLAVE_URL: http://enclave:8090
       SYNAPSE_URL: http://synapse:8008
       LIVEKIT_PUBLIC_URL: wss://${DOMAIN}/livekit
       LIVEKIT_HTTP_URL: http://livekit:7880
