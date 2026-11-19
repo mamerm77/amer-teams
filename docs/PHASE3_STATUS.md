@@ -31,7 +31,7 @@ Each built feature has a doc listing its open gaps.
 | No-code workflows | Built |
 | Agent messages visible to one user | Built: notes in your own encrypted room, shown inline in the chat on all your devices, share or dismiss; /ask uses it (PRIVATE_AGENT_MESSAGES.md) |
 | Canvases / Loop | Built |
-| Shared files tab with versions | Existing files view; versions and grouping not started |
+| Shared files tab with versions | Built: files grouped by kind, versions by name with history, preview any version; on-device from encrypted history (FILES.md) |
 | Drafts, mentions, followed quick views | Built |
 | Shared channels across organisations | Built (see top five) |
 | Webinars and town halls | Built: registration page with capacity, attendee-only join links, Q&A with votes; tested 12/12 on the real stack with a browser. HLS not built (WEBINARS.md) |

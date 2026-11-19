@@ -1,3 +1,4 @@
+import 'files_screen.dart';
 import '../services/private_notes.dart';
 import 'meeting_twin_screen.dart';
 import 'team_room_bar.dart';
@@ -559,7 +560,7 @@ class _S extends State<ChatScreen> {
           PopupMenuButton<String>(tooltip: 'Chat menu', onSelected: (v) {
             if (v == 'sum') summarise();
             if (v == 'info') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatInfoScreen(roomId: room.id)));
-            if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
+            if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => FilesScreen(room: room)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
             if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
             if (v == 'twin') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingTwinScreen(room: room)));
