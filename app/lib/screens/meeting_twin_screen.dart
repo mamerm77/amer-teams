@@ -1,3 +1,4 @@
+import '../ui/depth.dart';
 import '../services/labels.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
@@ -58,7 +59,7 @@ class _S extends State<MeetingTwinScreen> {
       const SizedBox(height: 8),
       TextField(controller: q, decoration: InputDecoration(hintText: 'Ask the meeting\'s history, e.g. "What did we decide about the Nokia spares?"',
         suffixIcon: asking ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))) : IconButton(tooltip: 'Ask', icon: const Icon(Icons.send), onPressed: _ask)), onSubmitted: (_) => _ask()),
-      if (answer != null) Card(child: Padding(padding: const EdgeInsets.all(12), child: SelectableText(answer!))),
+      if (answer != null) DepthCard(child: Padding(padding: const EdgeInsets.all(12), child: SelectableText(answer!))),
       if (recurring.isNotEmpty) ...[const ListTile(title: Text('Keeps coming back')), Wrap(spacing: 6, children: [for (final (t, n) in recurring) Chip(label: Text('$t ×$n'))])],
       ExpansionTile(title: Text('Open actions (${open.length})'), initiallyExpanded: open.isNotEmpty, children: [for (final t in open) ListTile(dense: true, leading: Icon(t.overdue ? Icons.warning_amber : Icons.radio_button_unchecked, color: t.overdue ? Colors.red : null),
         title: Text(t.title), subtitle: Text('${widget.room.unsafeGetUserFromMemoryOrFallback(t.owner).calcDisplayname()}${t.due != null ? ' · due ${d(t.due!)}' : ''}'))]),

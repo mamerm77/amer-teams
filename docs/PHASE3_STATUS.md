@@ -95,6 +95,6 @@ Each built feature has a doc listing its open gaps.
 ## Platform
 | Item | Status |
 |---|---|
-| Modern 3D UI with 2.5D and flat fallbacks | Not started |
+| Modern 3D UI with 2.5D and flat fallbacks | Built: 3D pointer-tilt cards and depth page turns, 2.5D layered cards, flat with reduced motion or high contrast; automatic by device (UI_3D.md) |
 | Feature flags per tenant | Built: per tenant, stable rollout %, server-gated, admin screen (FEATURE_FLAGS.md) |
 | Arabic and English strings (ARB), RTL | Partial: locale switch, RTL, Flutter widgets localised; navigation, titles and buttons translated (about 200 strings); longer help texts still English |

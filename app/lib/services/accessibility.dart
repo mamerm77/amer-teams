@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import '../ui/depth.dart';
 
 /// Accessibility settings (docs/ACCESSIBILITY.md), on top of what the operating system already provides
 /// (screen readers, system text size, system high contrast): these apply inside Amer Teams on every platform.
@@ -57,6 +58,7 @@ class _S extends State<A11yScreen> {
     ListTile(title: const Text('Text size'), subtitle: Slider(value: a.textScale, min: 0.85, max: 2.0, divisions: 23, label: '${(a.textScale * 100).round()}%',
       semanticFormatterCallback: (v) => '${(v * 100).round()} percent', onChanged: (v) => _set(() => a.textScale = v))),
     Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Text('Preview: Messages, meetings and menus use this size.', style: Theme.of(c).textTheme.bodyLarge)),
+    const DepthSetting(),
     SwitchListTile(title: const Text('High contrast'), subtitle: const Text('Stronger colours, borders and focus outlines'), value: a.highContrast, onChanged: (v) => _set(() => a.highContrast = v)),
     SwitchListTile(title: const Text('Bold text'), value: a.boldText, onChanged: (v) => _set(() => a.boldText = v)),
     SwitchListTile(title: const Text('Reduce motion'), subtitle: const Text('No animated transitions or floating reactions'), value: a.reduceMotion, onChanged: (v) => _set(() => a.reduceMotion = v)),

@@ -1,3 +1,4 @@
+import '../ui/depth.dart';
 import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -34,7 +35,7 @@ class _S extends State<CatchUpScreen> {
     final cs = Theme.of(c).colorScheme;
     final dec = (x['decisions'] as List? ?? const []).cast<String>(), reply = (x['needs_reply'] as List? ?? const []).cast<String>();
     final st = x['status'] as String;
-    return Card(margin: const EdgeInsets.fromLTRB(12, 6, 12, 6), child: InkWell(borderRadius: BorderRadius.circular(12),
+    return DepthCard(margin: const EdgeInsets.fromLTRB(12, 6, 12, 6), child: InkWell(borderRadius: BorderRadius.circular(12),
       onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: x['room_id'] as String))),
       child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [

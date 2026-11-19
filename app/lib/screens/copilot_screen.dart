@@ -1,3 +1,4 @@
+import '../ui/depth.dart';
 import '../services/locale.dart';
 import 'expertise_screen.dart';
 import 'skills_screen.dart';
@@ -44,7 +45,7 @@ class _S extends State<CopilotScreen> {
       Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: Text(L.t(context, 'Chat with Amer'))))]),
     body: Column(children: [
     const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Tip: chat with Amer like a colleague, or @mention Amer in any group chat after adding it to the group.')),
-    Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [for (final m in msgs) Align(alignment: m.$1 ? Alignment.centerRight : Alignment.centerLeft, child: Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [for (final m in msgs) Align(alignment: m.$1 ? Alignment.centerRight : Alignment.centerLeft, child: DepthCard(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SelectableText(m.$2),
       if (m.$3.isNotEmpty) Wrap(spacing: 4, children: [for (final s in m.$3) Chip(visualDensity: VisualDensity.compact, label: Text('${s['agent']}${s['ms'] > 0 ? ' · ${s['ms']} ms' : ''}'))])]))))])),
     if (busy) const LinearProgressIndicator(),

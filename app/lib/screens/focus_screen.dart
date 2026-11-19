@@ -1,3 +1,4 @@
+import '../ui/depth.dart';
 import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -33,7 +34,7 @@ class _S extends State<FocusScreen> {
   Widget build(BuildContext c) {
     final u = f.until; final w = week;
     return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Focus and wellbeing'))), body: ListView(padding: const EdgeInsets.all(12), children: [
-      Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      DepthCard(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(u == null ? 'Focus session' : 'Focusing until ${TimeOfDay.fromDateTime(u).format(c)}', style: Theme.of(c).textTheme.titleLarge),
         const SizedBox(height: 6),
         const Text('Notifications wait (even mentions) except from your priority senders; your status shows you are focusing; direct messages get one automatic reply; find-a-time sees you as busy.'),
@@ -42,7 +43,7 @@ class _S extends State<FocusScreen> {
         else FilledButton.icon(onPressed: _stop, icon: const Icon(Icons.stop), label: Text(L.t(context, 'End focus now'))),
         if (summary != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(summary!)),
       ]))),
-      Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      DepthCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const ListTile(title: Text('Your last 7 days'), subtitle: Text('Worked out on this device from your calendar and the messages you sent. Nobody else can see this, your manager included.')),
         if (w == null) const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()) else ...[
           _row('Meeting hours', w.meetingHours.toStringAsFixed(1)), _row('Back-to-back meetings', '${w.backToBack}'),
