@@ -7,6 +7,20 @@ from nio import (AsyncClient, AsyncClientConfig, KeyVerificationAccept, KeyVerif
                  KeyVerificationMac, ToDeviceError, UnknownToDeviceEvent)
 from nio.crypto.sas import Sas
 from nio.event_builders import ToDeviceMessage
+from nio.crypto.olm_machine import Olm
+from nio.events.to_device import ToDeviceEvent, KeyVerificationEvent
+
+# matrix-nio decrypts Olm to-device messages but keeps only room-key types and drops the rest ("unsupported Olm
+# event"). The app (matrix-dart-sdk) sends verification messages Olm-encrypted, which the spec allows, so feed
+# decrypted verification messages to nio's own SAS state machine and to the callbacks.
+_orig_handle = Olm._handle_olm_event
+def _handle_olm_event(self, sender, sender_key, payload):
+    if str(payload.get("type", "")).startswith("m.key.verification."):
+        ev = ToDeviceEvent.parse_event({"sender": sender, "type": payload["type"], "content": payload.get("content", {})})
+        if isinstance(ev, KeyVerificationEvent): self.handle_key_verification(ev)
+        return ev
+    return _orig_handle(self, sender, sender_key, payload)
+Olm._handle_olm_event = _handle_olm_event
 
 HS = os.getenv("HS", "http://localhost"); SERVER = os.getenv("SERVER_NAME", "amer.test")
 ME = f"@moh:{SERVER}"; OUT = os.getenv("OUT", "moh2.json")
