@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import '../services/matrix_service.dart';
+import '../services/ooo.dart';
 
 /// Working hours, time zone and prayer/Ramadan settings, kept on this device and published with free/busy.
 class CalendarPrefs {
@@ -134,4 +135,26 @@ Future<void> showCalendarSettings(BuildContext context) async {
     ])), actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () async { await p.save(); if (d.mounted) Navigator.pop(d); }, child: const Text('Save'))]);
   }));
   if (context.mounted) await CalendarPrefs.publish(context.read<MatrixService>(), context.read<ApiService>()).catchError((_) {});
+}
+
+/// Out of office: dates, automatic reply and delegate (docs/NOTIFICATIONS.md).
+Future<void> showOutOfOffice(BuildContext context) async {
+  final o = OutOfOffice.instance; final cur = o.settings ?? const {};
+  var on = cur['enabled'] == true;
+  var from = DateTime.tryParse('${cur['start'] ?? ''}') ?? DateTime.now();
+  var to = DateTime.tryParse('${cur['end'] ?? ''}') ?? DateTime.now().add(const Duration(days: 5));
+  final msg = TextEditingController(text: '${cur['message'] ?? ''}'); final del = TextEditingController(text: '${cur['delegate'] ?? ''}');
+  final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Out of office'),
+    content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+      SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('On'), value: on, onChanged: (v) => set(() => on = v)),
+      ListTile(contentPadding: EdgeInsets.zero, title: Text('${DateFormat('d MMM').format(from)} – ${DateFormat('d MMM yyyy').format(to)}'), trailing: const Icon(Icons.date_range),
+        onTap: () async { final r = await showDateRangePicker(context: d, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 365)), initialDateRange: DateTimeRange(start: from, end: to));
+          if (r != null) set(() { from = r.start; to = r.end; }); }),
+      TextField(controller: msg, maxLines: 3, decoration: const InputDecoration(labelText: 'Automatic reply (direct chats, once a day per person)')),
+      TextField(controller: del, decoration: const InputDecoration(labelText: 'Delegate (e.g. @sara:your.server)')),
+    ])),
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
+  if (ok != true) return;
+  await o.save(enabled: on, start: DateTime(from.year, from.month, from.day), end: DateTime(to.year, to.month, to.day), message: msg.text.trim(), delegate: del.text.trim().isEmpty ? null : del.text.trim());
+  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(on ? (o.active ? 'Out of office is on: ${o.statusText()}' : 'Out of office set for ${DateFormat('d MMM').format(from)}') : 'Out of office is off')));
 }

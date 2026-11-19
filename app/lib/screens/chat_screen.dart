@@ -26,6 +26,7 @@ import 'canvas_screen.dart';
 import 'find_time_screen.dart';
 import 'tasks_screen.dart';
 import 'security_badge.dart';
+import '../services/quick_views.dart';
 import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
@@ -75,13 +76,17 @@ class _S extends State<ChatScreen> {
   @override void initState() {
     super.initState();
     outbox = Outbox(room)..addListener(() { if (mounted) setState(() {}); })..load();
+    if (widget.threadRootId == null && !widget.filesOnly) {
+      Drafts.instance.load().then((_) { final d = Drafts.instance.of(room.id); if (d != null && input.text.isEmpty && mounted) setState(() => input.text = d); });
+    }
+    if (widget.threadRootId != null) Threads.markSeen(room.client, room.id, widget.threadRootId!).catchError((_) {});
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       tl = await room.getTimeline(onUpdate: () { if (mounted) setState(() {}); _markRead(); });
       final dm = room.directChatMatrixID; if (dm != null) _presence = room.client.fetchCurrentPresence(dm);
       _markRead(); setState(() {});
     });
   }
-  @override void dispose() { tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) _safeTyping(false); outbox.dispose(); _rec.dispose(); _player.dispose(); super.dispose(); }
+  @override void dispose() { if (widget.threadRootId == null && !widget.filesOnly && editing == null) Drafts.instance.set(room.id, input.text); tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) _safeTyping(false); outbox.dispose(); _rec.dispose(); _player.dispose(); super.dispose(); }
 
   // ---------- voice messages ----------
   Future<void> _toggleRecord() async {
@@ -444,6 +449,10 @@ class _S extends State<ChatScreen> {
                 }),
               ]))]),
         actions: [
+          if (widget.threadRootId != null) PopupMenuButton<String>(tooltip: 'Thread notifications', icon: Icon(switch (Threads.mode(room.client, room.id, widget.threadRootId!)) {
+              'follow' => Icons.notifications_active, 'mute' => Icons.notifications_off, _ => Icons.notifications_none }),
+            onSelected: (v) async { await Threads.setMode(room.client, room.id, widget.threadRootId!, v == 'none' ? null : v); if (mounted) setState(() {}); },
+            itemBuilder: (_) => const [PopupMenuItem(value: 'follow', child: Text('Follow this thread')), PopupMenuItem(value: 'mute', child: Text('Mute this thread')), PopupMenuItem(value: 'none', child: Text('Default'))]),
           IconButton(tooltip: 'Encryption details', icon: Icon(room.encrypted ? Icons.lock : Icons.lock_open, color: room.encrypted ? Colors.green : Theme.of(c).colorScheme.error), onPressed: () => showSecurityDetails(c, room)),
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
           IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),

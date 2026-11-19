@@ -4,6 +4,7 @@ import 'call_manager.dart';
 import 'matrix_service.dart';
 import '../config.dart';
 export 'later.dart' show ScheduledSender, Reminders;
+import 'quick_views.dart';
 
 const kStarredType = 'com.amerteams.starred';
 const kChecklistEvent = 'com.amerteams.checklist';
@@ -107,7 +108,7 @@ class ActivityService {
           } else if (e.type == EventTypes.Message) {
             final replyTo = rel?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'];
             if (mentionsMe(e, me)) { out.add(Activity('mention', r, e, '$who mentioned you: ${plainMentions(e.body)}')); }
-            else if (replyTo != null && mine.contains(replyTo)) { out.add(Activity('reply', r, e, '$who replied: ${plainMentions(e.body).split('\n').where((l) => !l.startsWith('> ')).join(' ')}')); }
+            else if (replyTo != null && mine.contains(replyTo) && !(e.relationshipType == RelationshipTypes.thread && Threads.mode(r.client, r.id, '${e.relationshipEventId}') == 'mute')) { out.add(Activity('reply', r, e, '$who replied: ${plainMentions(e.body).split('\n').where((l) => !l.startsWith('> ')).join(' ')}')); }
           }
         }
       } finally { tl.cancelSubscriptions(); }

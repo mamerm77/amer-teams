@@ -353,6 +353,24 @@ void main() {
       expectFound(find.textContaining('Your message key: created').evaluate().isNotEmpty, 'rotation info');
       await t.pageBack(); await wait(1);
     });
+    await step('Chat notifications: Mentions only', () async {
+      await chatInfo(); await tap(find.text('Notifications'), 'Notifications'); await tap(find.text('Mentions only'), 'Mentions only');
+      expectFound(await waitFor(find.text('Mentions only'), secs: 10), 'level shown'); await home();
+    });
+    await step('Quiet hours saved on the server', () async {
+      await home(); await tap(find.text('Chat'), 'Chat tab'); await tap(find.byTooltip('Notifications'), 'Notifications');
+      await tap(find.text('Quiet hours'), 'Quiet hours'); await tap(find.text('Save'), 'Save');
+      expectFound(await waitFor(find.text('Notification settings saved'), secs: 15), 'saved'); await home();
+    });
+    await step('Out of office: automatic reply to Bob, once', () async {
+      await home(); await tap(find.text('Calendar'), 'Calendar tab'); await tap(find.byTooltip('Out of office'), 'Out of office');
+      await tap(find.text('On'), 'On'); await tap(find.text('Save'), 'Save');
+      expectFound(await waitFor(find.textContaining('Out of office is on'), secs: 15), 'out of office on');
+      await home(); await openChat(); await sendText('bob: in 8s post updates');
+      expectFound(await waitFor(find.textContaining('Automatic reply'), secs: 40), 'automatic reply sent');
+      await home(); await tap(find.text('Calendar'), 'Calendar tab'); await tap(find.byTooltip('Out of office'), 'Out of office');
+      await tap(find.text('On'), 'Off'); await tap(find.text('Save'), 'Save'); await home();
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

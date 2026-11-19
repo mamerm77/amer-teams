@@ -21,6 +21,7 @@ import '../services/glass_box.dart';
 import '../services/later.dart';
 import 'chat_screen.dart';
 import 'find_time_screen.dart';
+import '../services/ooo.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -33,10 +34,11 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     GlassBox.instance.start(m, ApiService(m));                     // personal agents' approvals; approved actions run here
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
+    OutOfOffice.instance.start(m.client);
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
   }
-  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); super.dispose(); }
+  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

@@ -24,3 +24,8 @@
 - `/announce` posts the card with "0 of 1 acknowledged". Bob acknowledges from his device, and the sender
   sees "1 of 1 acknowledged".
 - `/later` schedules a message, the chip lists it, *Send now* sends it, and it appears in the chat.
+
+## Quick views and threads (added)
+- Chat list chips: **@Mentions** (chats with unread mentions), **Drafts** (unsent text per chat, kept on this device and restored when the chat opens), **Followed threads**.
+- In a thread: **Follow** or **Mute** (bell icon). The state is kept in account data (ids and times only). Followed threads list how many replies came since you last opened each. Replies in muted threads are left out of Activity.
+- Gap: pop-out threads into their own desktop window are not built.

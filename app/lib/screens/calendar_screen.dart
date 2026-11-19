@@ -37,6 +37,7 @@ class _S extends State<CalendarScreen> {
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: const Text('Calendar'), actions: [
       TextButton.icon(icon: const Icon(Icons.manage_search), label: const Text('Find a time'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
+      IconButton(tooltip: 'Out of office', icon: const Icon(Icons.beach_access_outlined), onPressed: () => showOutOfOffice(c)),
       IconButton(tooltip: 'Working hours and prayer times', icon: const Icon(Icons.schedule), onPressed: () => showCalendarSettings(c)),
       IconButton(icon: const Icon(Icons.refresh), onPressed: _reload)]),
     floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.auto_awesome), label: const Text('Schedule with Amer'), onPressed: _new),

@@ -7,6 +7,7 @@ import 'package:sqflite/sqflite.dart' as sqflite;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:flutter_vodozemac/flutter_vodozemac.dart' as vod;
 import 'push_service.dart';
+import 'api_service.dart';
 
 /// Wraps the Matrix client. Encryption is enforced: every room we create is E2EE.
 class MatrixService extends ChangeNotifier {
@@ -41,7 +42,7 @@ class MatrixService extends ChangeNotifier {
     await client.login(LoginType.mLoginPassword,
         identifier: AuthenticationUserIdentifier(user: user), password: password,
         initialDeviceDisplayName: 'Amer Teams ${Platform.operatingSystem}');
-    await PushService.register(client, gateway: Uri.parse(server));
+    await PushService.register(client, gateway: Uri.parse(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
     notifyListeners();
   }
 
@@ -74,7 +75,7 @@ class MatrixService extends ChangeNotifier {
     if (displayName != null && displayName.isNotEmpty) {
       await client.setProfileField(client.userID!, 'displayname', {'displayname': displayName});
     }
-    await PushService.register(client, gateway: Uri.parse(server));
+    await PushService.register(client, gateway: Uri.parse(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
     notifyListeners();
   }
 

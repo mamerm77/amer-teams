@@ -7,6 +7,7 @@ import '../services/matrix_service.dart';
 import '../services/meeting_service.dart';
 import 'chat_screen.dart';
 import 'people_picker.dart';
+import 'notifications_screen.dart';
 
 /// Chat / group info: name, description, members and roles, notifications, disappearing messages,
 /// announcement mode, shared files, invite, archive, block, leave.
@@ -74,6 +75,9 @@ class _S extends State<ChatInfoScreen> {
             if (mounted) setState(() {});
           },
           items: const [DropdownMenuItem(value: 'General', child: Text('General')), DropdownMenuItem(value: 'Confidential', child: Text('Confidential')), DropdownMenuItem(value: 'Restricted', child: Text('Restricted'))])),
+      ListTile(leading: const Icon(Icons.notifications_outlined), title: const Text('Notifications'),
+        subtitle: Text(switch (room.pushRuleState) { PushRuleState.notify => 'All messages', PushRuleState.mentionsOnly => 'Mentions only', _ => 'Off' }),
+        onTap: () async { await chooseChatNotifications(c, room); if (mounted) setState(() {}); }),
       ListTile(leading: const Icon(Icons.timer_outlined), title: const Text('Disappearing messages'), subtitle: Text(lifetimeMs == null ? 'Off' : 'After ${_dur(lifetimeMs!)}'),
         enabled: room.canChangeStateEvent('m.room.retention'),
         onTap: () async {

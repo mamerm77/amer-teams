@@ -7,6 +7,9 @@ import 'package:intl/intl.dart';
 import '../services/call_manager.dart' show peerName;
 import 'copilot_screen.dart' show openAmerChat;
 import 'people_picker.dart';
+import 'notifications_screen.dart';
+import 'followed_threads_screen.dart';
+import '../services/quick_views.dart';
 
 /// One-line preview of a chat's last event, as a person reads it (technical events never shown).
 String previewOf(Event? e, Room r, String me) {
@@ -38,16 +41,20 @@ class _RS extends State<RoomsScreen> {
     bool archived(r) => r.tags.containsKey(TagType.lowPriority);
     var list = m.chats.where((r) => switch (filter) {
       'unread' => r.notificationCount > 0 || r.isUnread, 'people' => r.isDirectChat, 'groups' => !r.isDirectChat,
+      'mentions' => r.highlightCount > 0, 'drafts' => Drafts.instance.of(r.id) != null,
       'pinned' => r.isFavourite, 'archived' => archived(r), _ => !archived(r) }).toList();
     if (q.text.isNotEmpty) list = list.where((r) => r.getLocalizedDisplayname().toLowerCase().contains(q.text.toLowerCase())).toList();
     list = [...list.where((x) => x.isFavourite), ...list.where((x) => !x.isFavourite)];
     return Scaffold(
       appBar: AppBar(title: searching ? TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'Search chats', border: InputBorder.none), onChanged: (_) => setState(() {})) : const Text('Chats'),
         bottom: PreferredSize(preferredSize: const Size.fromHeight(48), child: SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
-          for (final (k, l) in [('all', 'All'), ('unread', 'Unread'), ('people', 'People'), ('groups', 'Groups'), ('pinned', 'Pinned'), ('archived', 'Archived')])
-            Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ChoiceChip(label: Text(l), selected: filter == k, onSelected: (_) => setState(() => filter = k)))]))),
+          for (final (k, l) in [('all', 'All'), ('unread', 'Unread'), ('mentions', '@Mentions'), ('drafts', 'Drafts'), ('people', 'People'), ('groups', 'Groups'), ('pinned', 'Pinned'), ('archived', 'Archived')])
+            Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ChoiceChip(label: Text(l), selected: filter == k, onSelected: (_) async { if (k == 'drafts') await Drafts.instance.load(); setState(() => filter = k); })),
+          Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ActionChip(avatar: const Icon(Icons.forum_outlined, size: 16), label: const Text('Followed threads'),
+            onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FollowedThreadsScreen()))))]))),
         actions: [
         IconButton(icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; q.clear(); })),
+        IconButton(tooltip: 'Notifications', icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
         IconButton(tooltip: 'Set your status', icon: const Icon(Icons.emoji_emotions_outlined), onPressed: () async {
           final ctl = TextEditingController();
           final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: const Text('Your status'),

@@ -19,7 +19,7 @@ spec:
         paths:
           - {path: /_matrix/client/v3/sync, pathType: Prefix, backend: {service: {name: synapse-worker, port: {number: 8008}}}}
           - {path: /_matrix/client/r0/sync, pathType: Prefix, backend: {service: {name: synapse-worker, port: {number: 8008}}}}
-          - {path: /_matrix/push, pathType: Prefix, backend: {service: {name: sygnal, port: {number: 5000}}}}
+          - {path: /_matrix/push, pathType: Prefix, backend: {service: {name: orchestrator, port: {number: 8080}}}}
           - {path: /_matrix, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
           - {path: /_synapse/client, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
           - {path: /api, pathType: Prefix, backend: {service: {name: orchestrator, port: {number: 8080}}}}

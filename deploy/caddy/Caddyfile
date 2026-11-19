@@ -12,9 +12,9 @@
 		header Content-Type application/json
 		respond `{"m.homeserver":{"base_url":"https://{$DOMAIN}"},"org.amerteams.api":{"base_url":"https://{$DOMAIN}/api"}}`
 	}
-	# Push gateway (APNs / FCM)
+	# Push: the orchestrator's quiet-hours filter, which forwards event and room ids to Sygnal (APNs / FCM)
 	handle /_matrix/push/* {
-		reverse_proxy sygnal:5000
+		reverse_proxy orchestrator:8080
 	}
 	# LiveKit signalling (media itself goes over UDP 50000-50100)
 	handle_path /livekit/* {
