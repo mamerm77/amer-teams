@@ -93,4 +93,6 @@ class ApiService {
       return r.statusCode == 200 ? (jsonDecode(r.body)['count'] as num).toInt() : 0;
     } catch (_) { return 0; }
   }
+  /// The Amer assistant account on this server (a chat participant).
+  Future<Map<String, dynamic>> assistant() async => jsonDecode((await http.get(_u('/v1/ai/assistant'), headers: _h)).body);
 }

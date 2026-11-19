@@ -1,5 +1,5 @@
 import secrets, time
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import Header, FastAPI, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest
@@ -72,6 +72,42 @@ async def ask(req: AskReq, user=Depends(auth.matrix_user)):
     await db.ai_request(user["user_id"], res["agent"], status, int((time.perf_counter() - t0) * 1000))
     await audit(user["user_id"], "ai.ask", f'{res["agent"]}:{status}')
     return res
+
+# ---------- Amer as a chat participant ----------
+class BotReq(BaseModel):
+    user_id: str
+    room_id: str
+    prompt: str
+    history: list[dict] = []          # [{"sender": "...", "body": "..."}], oldest first, from the encrypted chat
+    labels: list[str] = []
+
+def _friendly(answer: str) -> str:
+    if "ANTHROPIC_API_KEY is not set" in answer:
+        return "I'm not set up on this server yet: an administrator needs to add an AI provider key (ANTHROPIC_API_KEY)."
+    if answer.startswith("LLM error"):
+        return "I couldn't reach the AI service just now. Please try again in a minute."
+    return answer
+
+@app.post("/v1/ai/bot")
+async def bot(req: BotReq, x_bot_secret: str = Header("")):
+    """Called only by the Amer bot service. The request is attributed to and audited for the user who asked."""
+    import hmac
+    if not config.AMER_BOT_SECRET or not hmac.compare_digest(x_bot_secret, config.AMER_BOT_SECRET):
+        raise HTTPException(401, "Not the Amer bot")
+    history = "\n".join(f"{h.get('sender', '?')}: {h.get('body', '')}" for h in req.history[-20:])
+    t0 = time.perf_counter()
+    res = await agents.run(req.prompt, f"Recent messages in this chat:\n{history}" if history else "", req.labels, None)
+    status = "blocked" if res.get("blocked") else "error" if res.get("error") else "ok"
+    REQ.labels(res["agent"]).inc()
+    await db.ai_request(req.user_id, res["agent"], status, int((time.perf_counter() - t0) * 1000))
+    await audit(req.user_id, "ai.chat", f'{res["agent"]}:{status}')
+    return {**res, "answer": _friendly(res["answer"])}
+
+@app.get("/v1/ai/assistant")
+async def assistant(user=Depends(auth.matrix_user)):
+    """Who to chat with: the Amer account on this server."""
+    domain = user["user_id"].split(":", 1)[1]
+    return {"user_id": f"@{config.AMER_BOT_USER}:{domain}", "available": bool(config.AMER_BOT_SECRET)}
 
 # ---------- Control plane ----------
 @app.get("/v1/agents")

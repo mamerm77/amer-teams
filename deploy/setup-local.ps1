@@ -19,6 +19,10 @@ LLM_MODEL=claude-sonnet-4-5
 GUARDIAN_BLOCK_LABELS=Confidential,Restricted
 "@ | Set-Content -Encoding ascii .env
 }
+# Amer chat assistant: its own account and a secret it uses to call the AI engine (added once, kept on re-runs)
+if (-not (Select-String -Path .env -Pattern "^AMER_BOT_SECRET=" -Quiet)) {
+  Add-Content -Encoding ascii .env "AMER_BOT_USER=amer`nAMER_BOT_PASSWORD=Am$(Rand 20)!Q`nAMER_BOT_SECRET=$(Rand 48)"
+}
 $envs = @{}; Get-Content .env | ForEach-Object { if ($_ -match "^(\w+)=(.*)$") { $envs[$matches[1]] = $matches[2] } }
 (Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" -replace "api_key: LK_API_KEY", "api_key: $($envs.LIVEKIT_API_KEY)" | Set-Content -Encoding ascii livekit.yaml
 if (-not (Test-Path synapse/homeserver.yaml)) {
@@ -70,6 +74,10 @@ $login = Invoke-RestMethod -Method Post -Uri "http://localhost/_matrix/client/v3
   -Body (@{type="m.login.password"; identifier=@{type="m.id.user"; user="admin"}; password=$pw; initial_device_display_name="Amer AI engine"} | ConvertTo-Json)
 Add-Content -Encoding ascii .env "SYNAPSE_ADMIN_TOKEN=$($login.access_token)"
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d orchestrator
+# create the Amer account (ignored if it already exists) and start the assistant
+docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u $envs.AMER_BOT_USER -p $envs.AMER_BOT_PASSWORD --no-admin http://localhost:8008 2>$null | Out-Null
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d amer-bot
+Write-Host "Amer assistant started: users can open Amer > Chat with Amer, or @mention Amer in a group."
 Start-Sleep 8
 try {
   $inv = Invoke-RestMethod -Method Post -Uri "http://localhost/api/v1/admin/invites" -ContentType "application/json" `

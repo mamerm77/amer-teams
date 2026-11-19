@@ -1,6 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:matrix/matrix.dart';
 import '../services/api_service.dart';
+import '../services/matrix_service.dart';
+import 'chat_screen.dart';
+
+/// Opens (or creates) the encrypted direct chat with the Amer assistant account.
+Future<void> openAmerChat(BuildContext c) async {
+  final m = c.read<MatrixService>(); final nav = Navigator.of(c); final msg = ScaffoldMessenger.of(c);
+  try {
+    final a = await c.read<ApiService>().assistant();
+    if (a['available'] != true) { msg.showSnackBar(const SnackBar(content: Text('Amer chat is not set up on this server yet (administrator: start the amer-bot service).'))); return; }
+    final uid = a['user_id'] as String;
+    final roomId = m.client.getDirectChatFromUserId(uid) ?? await m.client.startDirectChat(uid, enableEncryption: true);
+    nav.push(MaterialPageRoute(builder: (_) => ChatScreen(roomId: roomId)));
+  } catch (e) { msg.showSnackBar(SnackBar(content: Text('Could not open the chat with Amer: $e'))); }
+}
 
 class CopilotScreen extends StatefulWidget { const CopilotScreen({super.key}); @override State<CopilotScreen> createState() => _S(); }
 class _S extends State<CopilotScreen> {
@@ -13,7 +28,10 @@ class _S extends State<CopilotScreen> {
     catch (e) { msgs.add((false, 'Error: $e', [])); }
     setState(() => busy = false);
   }
-  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Amer co-pilot')), body: Column(children: [
+  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Amer co-pilot'), actions: [
+      Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with Amer')))]),
+    body: Column(children: [
+    const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Tip: chat with Amer like a colleague, or @mention Amer in any group chat after adding it to the group.')),
     Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [for (final m in msgs) Align(alignment: m.$1 ? Alignment.centerRight : Alignment.centerLeft, child: Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SelectableText(m.$2),
       if (m.$3.isNotEmpty) Wrap(spacing: 4, children: [for (final s in m.$3) Chip(visualDensity: VisualDensity.compact, label: Text('${s['agent']}${s['ms'] > 0 ? ' · ${s['ms']} ms' : ''}'))])]))))])),

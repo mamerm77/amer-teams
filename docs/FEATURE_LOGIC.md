@@ -87,3 +87,10 @@ proves it, and the status. Enforcement levels:
 | Tamper evidence | Purview: immutable retention | Per-tenant hash chain. UPDATE refused. DELETE only by the retention purge, after retention. A database administrator's edit is detected. | **PostgreSQL** | compliance_test 15, 17–20 | Server-tested (live) |
 | Admin search and export | Purview eDiscovery: search, export, audited | Text, person, chat and date filters. NDJSON export with hashes. Every search and export is audited. | **Server** | compliance_test 11–16 | Server-tested (live) |
 | App never sends cleartext | Signal, WhatsApp: everything encrypted | CI audits Synapse's database after the in-use run: every non-state event the app sent must be `m.room.encrypted` (redactions excepted by protocol) | CI | in-use "Encryption audit" | Testing |
+
+## Amer AI assistant in chat
+| Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
+|---|---|---|---|---|---|
+| Chat with the assistant | Teams Copilot chat; WhatsApp Meta AI chat | `@amer` is an encrypted participant. It answers every message in a direct chat, and only when @mentioned in groups (as a reply), with recent context. It tells users once that content goes to the AI service. | Bot + orchestrator | amer_bot_test 1–9 | Server-tested (live, 12/12) |
+| Sensitivity labels | Teams / Purview sensitivity labels block Copilot | Chat info → General, Confidential or Restricted. Guardian refuses Confidential and Restricted chats. PII is redacted. | **Server** (Guardian) | amer_bot_test 10 | Server-tested |
+| Operator control and audit | Copilot admin controls | The admin switch pauses chat answers. Each question is audited for the asker. The bot endpoint needs the service secret. | **Server** | amer_bot_test 7, 11, 12 | Server-tested |

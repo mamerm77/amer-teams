@@ -13,3 +13,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://amer:amer-pass@127.0.0.1:
 SYNAPSE_ADMIN_TOKEN = os.getenv("SYNAPSE_ADMIN_TOKEN", "")
 SERVER_NAME = os.getenv("SERVER_NAME", "amer.test")
 ALERTMANAGER_URL = os.getenv("ALERTMANAGER_URL", "")
+
+# Amer chat assistant (services/amer-bot): the bot authenticates to the orchestrator with this shared secret
+AMER_BOT_SECRET = os.getenv("AMER_BOT_SECRET", "")
+AMER_BOT_USER = os.getenv("AMER_BOT_USER", "amer")

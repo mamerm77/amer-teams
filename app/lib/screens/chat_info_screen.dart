@@ -63,6 +63,17 @@ class _S extends State<ChatInfoScreen> {
       ListTile(leading: const Icon(Icons.notifications_outlined), title: const Text('Notifications'),
         trailing: DropdownButton<PushRuleState>(value: room.pushRuleState, underline: const SizedBox(), onChanged: (v) async { if (v != null) { await room.setPushRuleState(v); setState(() {}); } },
           items: const [DropdownMenuItem(value: PushRuleState.notify, child: Text('All')), DropdownMenuItem(value: PushRuleState.mentionsOnly, child: Text('Mentions only')), DropdownMenuItem(value: PushRuleState.dontNotify, child: Text('Muted'))])),
+      ListTile(leading: const Icon(Icons.shield_outlined), title: const Text('Sensitivity label'),
+        subtitle: const Text('Confidential and Restricted chats are never sent to Amer or other AI agents'),
+        enabled: room.canChangeStateEvent('com.amerteams.sensitivity'),
+        trailing: DropdownButton<String>(value: (room.getState('com.amerteams.sensitivity')?.content['label'] as String?) ?? 'General', underline: const SizedBox(),
+          onChanged: !room.canChangeStateEvent('com.amerteams.sensitivity') ? null : (v) async {
+            if (v == null) return;
+            await room.client.setRoomStateWithKey(room.id, 'com.amerteams.sensitivity', '', {'label': v});
+            await room.sendTextEvent('🛡 Sensitivity label set to $v');
+            if (mounted) setState(() {});
+          },
+          items: const [DropdownMenuItem(value: 'General', child: Text('General')), DropdownMenuItem(value: 'Confidential', child: Text('Confidential')), DropdownMenuItem(value: 'Restricted', child: Text('Restricted'))])),
       ListTile(leading: const Icon(Icons.timer_outlined), title: const Text('Disappearing messages'), subtitle: Text(lifetimeMs == null ? 'Off' : 'After ${_dur(lifetimeMs!)}'),
         enabled: room.canChangeStateEvent('m.room.retention'),
         onTap: () async {

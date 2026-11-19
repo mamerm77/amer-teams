@@ -16,3 +16,12 @@ CODE=$(curl -fsS -XPOST "https://${DOMAIN}/api/v1/admin/invites" -H "Authorizati
   -d '{"uses_allowed": 10, "expiry_days": 30}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])' || true)
 [ -n "$CODE" ] && echo "First invite code (10 sign-ups, valid 30 days): $CODE"
 echo "Done. Sign in to the app as '$U'. More invite codes: Users > New invite code."
+
+# Amer chat assistant: its own account, a secret for the AI engine, then start it (kept on re-runs)
+if ! grep -q '^AMER_BOT_SECRET=' .env; then
+  printf 'AMER_BOT_USER=amer\nAMER_BOT_PASSWORD=Am%s!Q\nAMER_BOT_SECRET=%s\n' "$(openssl rand -hex 10)" "$(openssl rand -hex 24)" >> .env
+fi
+. ./.env
+docker compose exec -T synapse register_new_matrix_user -c /data/homeserver.yaml -u "$AMER_BOT_USER" -p "$AMER_BOT_PASSWORD" --no-admin http://localhost:8008 >/dev/null 2>&1 || true
+docker compose up -d orchestrator amer-bot
+echo "Amer assistant started: users can open Amer > Chat with Amer, or @mention Amer in a group."

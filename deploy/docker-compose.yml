@@ -53,6 +53,19 @@ services:
     healthcheck: {test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"], interval: 10s, retries: 5}
     restart: unless-stopped
 
+  # Amer, the AI assistant, as an encrypted chat participant (docs/AMER_CHAT.md). Created by the setup scripts.
+  amer-bot:
+    build: ../services/amer-bot
+    env_file: .env
+    environment:
+      HS: http://synapse:8008
+      ORCH: http://orchestrator:8080
+      SERVER_NAME: ${SERVER_NAME}
+    volumes: [amerbot:/data/amer-bot]           # keeps Amer's device and keys across restarts
+    depends_on:
+      orchestrator: {condition: service_healthy}
+    restart: unless-stopped
+
   # Compliance archiver for business tenants (docs/COMPLIANCE.md). Off by default:
   #   docker compose --profile compliance up -d archiver   (needs ARCHIVER_USER / ARCHIVER_PASSWORD in .env)
   archiver:
@@ -138,4 +151,4 @@ services:
     depends_on: [synapse, livekit, orchestrator, sygnal]
     restart: unless-stopped
 
-volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}, archiver: {}}
+volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}, archiver: {}, amerbot: {}}
