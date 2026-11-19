@@ -350,12 +350,31 @@ void main() {
       if (v['status'] != 200 || v['algorithm'] != 'm.megolm_backup.v1.curve25519-aes-sha2') throw StateError('no backup on server: $v');
       if ((v['count'] as num? ?? 0) < 1) throw StateError('backup holds no keys: $v');
     });
-    await step('Restore backup with the recovery key', () async {
+    await step('Restore on the same device says keys are already here', () async {
       await tap(find.text('Restore here'), 'Restore here');
-      if (await waitFor(find.text('Enter your recovery key'), secs: 30)) {
-        await type(find.byType(TextField).last, recoveryKey ?? '', 'recovery key'); await tap(find.text('Unlock'), 'Unlock');
-      }
-      expectFound(await waitFor(find.textContaining('Backup unlocked'), secs: 60), 'Backup unlocked');
+      expectFound(await waitFor(find.textContaining('already unlocked'), secs: 30), 'already unlocked');
+    });
+    await step('Sign out warns and confirms', () async {
+      await wait(4); await tap(find.byTooltip('Sign out'), 'Sign out');
+      expectFound(await waitFor(find.textContaining('backed up')), 'backup-aware warning');
+      await tap(find.widgetWithText(FilledButton, 'Sign out'), 'confirm');
+      expectFound(await waitFor(field('Server'), secs: 60), 'sign-in screen');
+    });
+    await step('New device: old messages locked before restore', () async {
+      await type(field('Server'), 'http://localhost', 'Server'); await type(field('Username'), 'moh', 'Username');
+      await type(field('Password'), 'Moh-Pass-123!', 'Password'); await tap(find.widgetWithText(FilledButton, 'Sign in'), 'Sign in');
+      expectFound(await waitFor(find.text('Chat'), secs: 60), 'home');
+      await tap(find.text('Chat'), 'Chat'); await tap(find.text('Bob Tester'), 'chat');
+      await wait(5);
+      if (find.text('pong from Bob').evaluate().isNotEmpty) throw StateError('old message readable before restore: keys leaked to the new device');
+    });
+    await step('New device: restore with the recovery key, old messages readable', () async {
+      await home(); await tap(find.text('Security'), 'Security tab');
+      await tap(find.text('Restore here'), 'Restore here');
+      await type(find.byType(TextField).last, recoveryKey ?? '', 'recovery key'); await tap(find.text('Unlock'), 'Unlock');
+      expectFound(await waitFor(find.textContaining('Backup unlocked'), secs: 90), 'Backup unlocked');
+      await home(); await tap(find.text('Chat'), 'Chat'); await tap(find.text('Bob Tester'), 'chat');
+      expectFound(await waitFor(find.text('pong from Bob'), secs: 60), 'old message decrypted from backup');
     });
 
     FlutterError.onError = prevOnError;

@@ -2,8 +2,11 @@
 records the 7 emoji it computed to $OUT, confirms them, and reports whether the app's device ended up verified.
 Uses matrix-nio's own SAS implementation, so the app is checked against an independent implementation of the spec."""
 import asyncio, json, os, sys, tempfile
+import time, uuid
 from nio import (AsyncClient, AsyncClientConfig, KeyVerificationAccept, KeyVerificationCancel, KeyVerificationKey,
-                 KeyVerificationMac, ToDeviceError)
+                 KeyVerificationMac, ToDeviceError, UnknownToDeviceEvent)
+from nio.crypto.sas import Sas
+from nio.event_builders import ToDeviceMessage
 
 HS = os.getenv("HS", "http://localhost"); SERVER = os.getenv("SERVER_NAME", "amer.test")
 ME = f"@moh:{SERVER}"; OUT = os.getenv("OUT", "moh2.json")
@@ -41,7 +44,19 @@ async def main():
     c.add_to_device_callback(on_mac, KeyVerificationMac)
     c.add_to_device_callback(on_cancel, KeyVerificationCancel)
 
-    await c.start_key_verification(app_dev); save(stage="started")
+    # Current spec (v1.1+): request -> ready -> start. matrix-nio only implements start onwards, so the request /
+    # ready step is done here and nio's SAS then runs on the same transaction.
+    txid = uuid.uuid4().hex
+    async def on_unknown(ev):
+        t, cont = ev.source.get("type"), ev.source.get("content", {})
+        if t == "m.key.verification.ready" and cont.get("transaction_id") == txid and txid not in c.key_verifications:
+            sas = Sas(ME, c.device_id, c.olm.account.identity_keys["ed25519"], app_dev, transaction_id=txid)
+            c.olm.key_verifications[txid] = sas
+            await c.to_device(sas.start_verification()); save(stage="started (after ready)")
+    c.add_to_device_callback(on_unknown, UnknownToDeviceEvent)
+    await c.to_device(ToDeviceMessage("m.key.verification.request", ME, app_dev.device_id,
+        {"from_device": c.device_id, "methods": ["m.sas.v1"], "timestamp": int(time.time() * 1000), "transaction_id": txid}))
+    save(stage="requested")
     for _ in range(90):                                                      # up to ~3 minutes
         await c.sync(timeout=2000)
         if state["stage"] in ("done", "cancelled", "error"): break

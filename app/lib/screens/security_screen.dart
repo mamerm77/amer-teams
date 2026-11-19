@@ -82,6 +82,24 @@ class _S extends State<SecurityScreen> {
     } catch (e) { _msg(e); }
     setState(() {});
   }
+  /// Restore on this device: unlock the encrypted backup with the recovery key and load all old message keys.
+  Future<void> _restore() async {
+    final enc = c.encryption; if (enc == null) { _msg('Encryption is not ready yet'); return; }
+    if (await enc.keyManager.isCached() && await enc.crossSigning.isCached()) {
+      _msg('Backup already unlocked on this device: old messages open here');
+      return;
+    }
+    final key = await _askRecoveryKey(); if (key == null || key.isEmpty) return;
+    try {
+      await enc.ssss.open().unlock(keyOrPassphrase: key);        // also caches the secrets and self-signs this device
+      await enc.keyManager.loadAllKeys();
+      _msg('Backup unlocked: old messages will now decrypt on this device');
+    } catch (e) {
+      _msg('That recovery key did not unlock your backup');
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<String?> _askRecoveryKey() async {
     final k = TextEditingController();
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Enter your recovery key'),
@@ -122,7 +140,7 @@ class _S extends State<SecurityScreen> {
       ListTile(leading: Icon(backup && crossSigned ? Icons.cloud_done : Icons.cloud_off, color: backup && crossSigned ? Colors.green : Colors.orange),
         title: Text(backup && crossSigned ? 'Chat history is backed up' : 'Set up secure backup'),
         subtitle: const Text('Keeps your encryption keys in an encrypted backup so old messages open on a new device'),
-        trailing: FilledButton.tonal(onPressed: _backup, child: Text(backup && crossSigned ? 'Restore here' : 'Set up'))),
+        trailing: FilledButton.tonal(onPressed: backup && crossSigned ? _restore : _backup, child: Text(backup && crossSigned ? 'Restore here' : 'Set up'))),
       const Divider(),
       ListTile(title: Text('Your devices', style: Theme.of(ctx).textTheme.titleSmall), subtitle: const Text('Verify new devices by comparing emoji, so nobody can impersonate you')),
       for (final d in devices) () {

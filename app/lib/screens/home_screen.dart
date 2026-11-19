@@ -27,7 +27,7 @@ class _S extends State<HomeScreen> {
       return Scaffold(body: Row(children: [
         NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all,
           leading: const Tooltip(message: 'Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}', child: Text('b${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')}', style: TextStyle(fontSize: 10))),
-          trailing: IconButton(icon: const Icon(Icons.logout), onPressed: () => c.read<MatrixService>().logout()),
+          trailing: IconButton(tooltip: 'Sign out', icon: const Icon(Icons.logout), onPressed: () => confirmSignOut(c)),
           destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), label: Text(d.$2))]),
         const VerticalDivider(width: 1), Expanded(child: body)]));
     }
@@ -41,11 +41,25 @@ class _S extends State<HomeScreen> {
           for (var k = main; k < _dest.length; k++) ListTile(leading: Icon(_dest[k].$1), title: Text(_dest[k].$2), onTap: () => Navigator.pop(s, k)),
           const ListTile(leading: Icon(Icons.info_outline), title: Text('About Amer Teams'),
             subtitle: Text('Build ${String.fromEnvironment('BUILD_ID', defaultValue: 'dev')} · ${String.fromEnvironment('BUILD_DATE', defaultValue: 'local')}')),
-          ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () { Navigator.pop(s); c.read<MatrixService>().logout(); }),
+          ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () { Navigator.pop(s); confirmSignOut(c); }),
         ])));
         if (pick != null) setState(() => i = pick);
       },
       destinations: [for (var k = 0; k < main; k++) NavigationDestination(icon: Icon(_dest[k].$1), label: _dest[k].$2),
         const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More')]));
   }
+}
+
+
+/// Sign out, with a warning when this device holds the only copy of the encryption keys (no backup).
+Future<void> confirmSignOut(BuildContext c) async {
+  final m = c.read<MatrixService>();
+  final backedUp = (m.client.encryption?.keyManager.enabled ?? false) && (m.client.encryption?.crossSigning.enabled ?? false);
+  final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: const Text('Sign out?'),
+    content: Text(backedUp
+        ? 'Your encrypted chat history is backed up. On your next sign-in, use your recovery key in Security to read old messages.'
+        : 'You have not set up encrypted backup. If you sign out, old encrypted messages cannot be read on this or any new device. Set up backup in Security first.'),
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Sign out'))]));
+  if (ok == true) await m.logout();
 }
