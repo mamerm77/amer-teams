@@ -87,7 +87,7 @@ Each built feature has a doc listing its open gaps.
 | Unified search | Built: on-device FTS index, filters, people (SEARCH.md); transcripts not indexed |
 | Notification settings and quiet hours | Built: server push filter, per-chat levels, priority senders (NOTIFICATIONS.md) |
 | Accessibility | Built: text size, high contrast, bold, reduce motion, captions by default, call shortcuts, screen-reader announcements; not yet audited with assistive-technology users (ACCESSIBILITY.md) |
-| Multi-device handoff | Not started |
+| Multi-device handoff | Built for meetings and group calls: other devices offer "Move it here", old device disconnects; 1:1 calls not yet (HANDOFF.md) |
 | Calendar and tool connectors | Partial: any calendar by ICS (Outlook, Google, iCloud), fetched on the device, busy times only to find-a-time; read only, no tool connectors yet (CONNECTORS.md) |
 | Usage analytics | Built: active people, calls, quality, AI, feature adoption; small groups folded (k = 5); checked on the real database (ANALYTICS.md) |
 | Guest accounts and UAE data residency | Not started |

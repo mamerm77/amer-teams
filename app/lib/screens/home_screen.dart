@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'call_screen.dart';
+import '../services/handoff.dart';
 import '../services/calendar_connector.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -44,8 +47,18 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
+    _handoffSub = m.client.onSync.stream.listen((_) => _checkHandoff());
   }
-  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(); super.dispose(); }
+  StreamSubscription? _handoffSub; int? _handoffShown;
+  void _checkHandoff() {
+    final m = context.read<MatrixService>(); final h = Handoff.elsewhere(m.client);
+    if (h == null || h['since'] == _handoffShown || !mounted) return;
+    _handoffShown = h['since'] as int; final sm = ScaffoldMessenger.of(context);
+    sm.showMaterialBanner(MaterialBanner(leading: const Icon(Icons.devices), content: Text('You are in a ${h['meeting'] == true ? 'meeting' : 'call'} on ${h['device_name']}.'), actions: [
+      TextButton(onPressed: sm.hideCurrentMaterialBanner, child: const Text('Not now')),
+      FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: const Text('Move it here'))]));
+  }
+  @override void dispose() { _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

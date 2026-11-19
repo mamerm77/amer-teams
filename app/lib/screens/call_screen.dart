@@ -11,6 +11,7 @@ import 'package:livekit_client/livekit_client.dart';
 import 'package:amer_background/amer_background.dart';
 import '../services/recording.dart';
 import '../services/guest_keys.dart';
+import '../services/handoff.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -218,7 +219,7 @@ class _S extends State<CallScreen> {
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
           : await SecureCall.join(api, room, widget.callId!, video: widget.video);
       call!.lk.addListener(_refresh);
-      ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
+      ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData)..on<RoomDisconnectedEvent>(_onDisconnected);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
       _parkTl = await room.getTimeline(onUpdate: _refresh);
       cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
@@ -226,6 +227,7 @@ class _S extends State<CallScreen> {
       for (final w in call!.deviceWarnings) { _snack(w); }
       await _applyPreJoin();
       if (A11y.instance.captionsByDefault && !captions) unawaited(_toggleCaptions());
+      if (ctl == null) unawaited(Handoff.announce(room.client, roomId: widget.roomId, callId: widget.meeting ? null : call!.callId, meeting: widget.meeting));
       setState(() {});
     } catch (e) { setState(() => err = '$e'.replaceFirst('Bad state: ', '')); }
   }
@@ -401,6 +403,7 @@ class _S extends State<CallScreen> {
   }
 
   Future<void> _leave() async {
+    unawaited(Handoff.clear(room.client));
     if (rec.recording && isHost) await _stopRec('host left');
     if (ctl != null) {                         // 1:1: signalling sends hangup + end and tears media down
       await stt.stop(); await ev?.dispose(); ev = null; await ctl!.hangup(); return;
@@ -420,6 +423,14 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- multi-device handoff (docs/HANDOFF.md) ----------
+  void _onDisconnected(RoomDisconnectedEvent e) {
+    if (e.reason != DisconnectReason.duplicateIdentity || !mounted) return;
+    _say('Call moved to your other device');
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This call moved to your other device')));
+    stt.stop(); tick?.cancel(); Navigator.of(context).maybePop();
+  }
 
   // ---------- accessibility (docs/ACCESSIBILITY.md) ----------
   Widget _shortcuts(Widget child) => CallbackShortcuts(bindings: {
