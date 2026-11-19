@@ -1,3 +1,4 @@
+import 'analytics_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -53,6 +54,7 @@ class _S extends State<AdminScreen> {
           OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: const Text('Create user')),
           OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CallTraceScreen())), icon: const Icon(Icons.timeline), label: const Text('Call trace')),
           OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FlagsScreen())), icon: const Icon(Icons.flag_outlined), label: const Text('Feature flags')),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const AnalyticsScreen())), icon: const Icon(Icons.insights), label: const Text('Usage analytics')),
           OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PartnersScreen())), icon: const Icon(Icons.handshake_outlined), label: const Text('Partners'))]),
         const SizedBox(height: 16), Text('Accounts (${users.length})', style: Theme.of(c).textTheme.titleMedium),
         for (final u in users) ListTile(

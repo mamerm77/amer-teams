@@ -89,7 +89,7 @@ Each built feature has a doc listing its open gaps.
 | Accessibility | Not started (beyond tooltips and labels) |
 | Multi-device handoff | Not started |
 | Calendar and tool connectors | Partial: any calendar by ICS (Outlook, Google, iCloud), fetched on the device, busy times only to find-a-time; read only, no tool connectors yet (CONNECTORS.md) |
-| Usage analytics | Not started |
+| Usage analytics | Built: active people, calls, quality, AI, feature adoption; small groups folded (k = 5); checked on the real database (ANALYTICS.md) |
 | Guest accounts and UAE data residency | Not started |
 
 ## Platform

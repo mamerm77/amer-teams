@@ -152,6 +152,13 @@ class ApiService {
   Future<Map<String, dynamic>> dial(String number) => _post('/v1/phone/dial', {'number': number});
 
   // ---------- Administration (server admins only) ----------
+  Future<Map<String, dynamic>> getMap(String p) async {
+    final r = await http.get(_u(p), headers: _h);
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j as Map<String, dynamic>;
+  }
+  Future<Map<String, dynamic>> analytics(int days) => getMap('/v1/admin/analytics?days=$days');
   Future<List<dynamic>> _get(String p) async {
     final r = await http.get(_u(p), headers: _h);
     final j = jsonDecode(utf8.decode(r.bodyBytes));
