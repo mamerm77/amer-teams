@@ -18,10 +18,11 @@ async def main():
         await h.put(f"{ORCH}/v1/expertise/me", headers=B, json={"topics": [f"{tag} roadm integration", "IP/MPLS"]})
         me = (await h.get(f"{ORCH}/v1/expertise/me", headers=A)).json()
         check("1. Topics are published as the person typed them (tidied)", me["topics"] == ["coherent 800g", "dwdm", f"{tag} roadm"], me)
-        r = (await h.get(f"{ORCH}/v1/expertise", headers=C, params={"q": f"{tag} roadm"})).json()
+        mine = lambda rows: [x for x in rows if x["user_id"] in (a, b)]          # earlier runs' people also know about ROADM
+        r = mine((await h.get(f"{ORCH}/v1/expertise", headers=C, params={"q": f"{tag} roadm"})).json())
         check("2. Search ranks the exact match first", [x["user_id"] for x in r] == [a, b], [(x["user_id"], x["score"]) for x in r])
         await h.put(f"{ORCH}/v1/expertise/me", headers=A, json={"topics": []})
-        r = (await h.get(f"{ORCH}/v1/expertise", headers=C, params={"q": f"{tag} roadm"})).json()
+        r = mine((await h.get(f"{ORCH}/v1/expertise", headers=C, params={"q": f"{tag} roadm"})).json())
         check("3. Withdrawing removes the person from the map at once", [x["user_id"] for x in r] == [b], r)
     json.dump(R, open(os.getenv("OUT", "/opt/amer/expertise_test.json"), "w"), indent=1)
     print(f"{sum(r['pass'] for r in R)}/{len(R)} passed"); sys.exit(0 if all(r["pass"] for r in R) else 1)
