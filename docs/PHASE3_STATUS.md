@@ -68,7 +68,7 @@ Each built feature has a doc listing its open gaps.
 |---|---|
 | Scheduled send and reminders | Built (CHAT_EXTRAS.md). Reminders are per device and in-app, not OS notifications |
 | Follow, mute, pop-out threads | Built: follow and mute, Followed threads view; pop-out not started |
-| Rich text, code blocks, role mentions | Partial: Markdown and code blocks with copy; role and channel mentions not started |
+| Rich text, code blocks, role mentions | Built: Markdown, code blocks with copy, @channel/@here and @moderators/@admins mentions (CHAT_EXTRAS.md); syntax highlighting and tables not started |
 | Translate on tap | Partial: label-aware and cached, via the AI engine |
 | Bookmarks and folders | Existing saved messages; folders not started |
 | Announcements with acknowledgement | Built |
