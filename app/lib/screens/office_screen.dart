@@ -106,7 +106,7 @@ class _Floor extends StatelessWidget {
               Text('${a['name']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13), overflow: TextOverflow.ellipsis),
               Text('${a['role']}', style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 10), overflow: TextOverflow.ellipsis),
             ])),
-        ]))))));
+        ])))));
       }
     }
     return SizedBox(width: size.width, height: size.height, child: Stack(children: [
