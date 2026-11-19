@@ -61,7 +61,7 @@ proves it, and the status. Enforcement levels:
 | Call trace | Teams Call Quality Dashboard | Signalling, media events, quality and MOS, metadata only. Opening a trace is itself audited. | **Server** | call_trace_test (18) | Server-tested |
 | Compliance archiving per tenant | Teams Purview | Off for public users (enforced). Opt-in for business tenants, and users are told. | **Server** | call_trace_test 13–16 | Server-tested; archiver service is a gap |
 | App lock | WhatsApp, Signal: PIN, lockout after failed attempts | PIN stored as PBKDF2-HMAC-SHA256 (150 000 iterations, random salt). Failed attempts persist across restarts, escalating lockout 30 s → 5 min → 1 h. Turning it off needs the PIN. Locks after 1 min in the background. | App | app_lock_test (RFC 7914 vectors), in-use "App lock" ×3 | Testing |
-| Device verification, key backup | WhatsApp, Signal | Emoji verification (SAS), recovery key (SSSS) | Protocol | none yet | Gap: needs a second device of the same user in the test |
+| Device verification, key backup | WhatsApp, Signal | Emoji verification (SAS), recovery key (SSSS) | Protocol | in-use "Verify a new device" (against matrix-nio's independent SAS implementation, emoji compared), "Set up backup", "Server holds backup", "Restore" | Testing |
 
 ## Sources
 - WhatsApp edit window, 15 min: [TechCrunch](https://techcrunch.com/2023/05/22/whatsapp-now-lets-you-edit-messages-with-a-15-minute-time-limit)

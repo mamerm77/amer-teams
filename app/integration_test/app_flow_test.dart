@@ -299,6 +299,60 @@ void main() {
       expectFound(await waitFor(find.text('App lock off'), secs: 30), 'App lock off');
     });
 
+    // ---------------- device verification and key backup ----------------
+    final moh2Out = '$shots/moh2.json';
+    Map<String, dynamic> moh2() { try { return jsonDecode(File(moh2Out).readAsStringSync()) as Map<String, dynamic>; } catch (_) { return {}; } }
+    await step('Verify a new device with emoji (SAS)', () async {
+      await home();
+      await Process.start('python3', ['-u', '../tests/ui_moh2.py'], environment: {'HS': 'http://localhost', 'OUT': moh2Out}, mode: ProcessStartMode.detached);
+      expectFound(await waitFor(find.text('Start'), secs: 90), 'incoming verification request');
+      await tap(find.text('Start'), 'Start');
+      expectFound(await waitFor(find.text('They match'), secs: 60), 'emoji comparison');
+      for (var i = 0; i < 20 && (moh2()['emoji'] as List? ?? const []).isEmpty; i++) { await wait(1); }
+      final emoji = (moh2()['emoji'] as List? ?? const []).cast<String>();
+      if (emoji.length != 7) throw StateError('second device did not compute 7 emoji: ${moh2()}');
+      final missing = emoji.where((e) => find.text(e).evaluate().isEmpty).toList();
+      if (missing.isNotEmpty) throw StateError('emoji differ between devices; app is missing $missing of $emoji');
+      await shot('verification-emoji-match');
+      await tap(find.text('They match'), 'They match');
+      expectFound(await waitFor(find.textContaining('Verified.'), secs: 60), 'Verified');
+      for (var i = 0; i < 30 && moh2()['stage'] != 'done'; i++) { await wait(1); }
+      if (moh2()['verified'] != true) throw StateError('second device did not mark the app verified: ${moh2()}');
+      await tap(find.text('Done'), 'Done');
+    });
+    String? recoveryKey;
+    await step('Set up encrypted key backup', () async {
+      await home(); await tap(find.text('Security'), 'Security tab');
+      await tap(find.text('Set up'), 'Set up backup');
+      expectFound(await waitFor(find.text('Save your recovery key'), secs: 90), 'recovery key dialog');
+      recoveryKey = find.byType(SelectableText).evaluate().map((e) => (e.widget as SelectableText).data ?? '').firstWhere((x) => x.startsWith('Es'), orElse: () => '');
+      if (recoveryKey!.isEmpty) throw StateError('recovery key not shown');
+      await tap(find.text('I have saved it'), 'I have saved it');
+      expectFound(await waitFor(find.text('Chat history is backed up'), secs: 30), 'backup status');
+    });
+    await step('Server holds the encrypted backup', () async {
+      final h = HttpClient();
+      Future<Map<String, dynamic>> req(String m, String path, [Object? body, String? tok]) async {
+        final r = await h.openUrl(m, Uri.parse('http://localhost$path'));
+        r.headers.contentType = ContentType.json; if (tok != null) r.headers.set('Authorization', 'Bearer $tok');
+        if (body != null) r.write(jsonEncode(body));
+        final res = await r.close(); final txt = await res.transform(utf8.decoder).join();
+        return {'status': res.statusCode, ...((txt.isNotEmpty ? jsonDecode(txt) : {}) as Map<String, dynamic>)};
+      }
+      final login = await req('POST', '/_matrix/client/v3/login', {'type': 'm.login.password', 'identifier': {'type': 'm.id.user', 'user': 'moh'}, 'password': 'Moh-Pass-123!', 'initial_device_display_name': 'backup check (deleted)'});
+      final v = await req('GET', '/_matrix/client/v3/room_keys/version', null, login['access_token'] as String);
+      await req('POST', '/_matrix/client/v3/logout', {}, login['access_token'] as String);
+      if (v['status'] != 200 || v['algorithm'] != 'm.megolm_backup.v1.curve25519-aes-sha2') throw StateError('no backup on server: $v');
+      if ((v['count'] as num? ?? 0) < 1) throw StateError('backup holds no keys: $v');
+    });
+    await step('Restore backup with the recovery key', () async {
+      await tap(find.text('Restore here'), 'Restore here');
+      if (await waitFor(find.text('Enter your recovery key'), secs: 30)) {
+        await type(find.byType(TextField).last, recoveryKey ?? '', 'recovery key'); await tap(find.text('Unlock'), 'Unlock');
+      }
+      expectFound(await waitFor(find.textContaining('Backup unlocked'), secs: 60), 'Backup unlocked');
+    });
+
     FlutterError.onError = prevOnError;
     results.add({'step': 'No app errors during the run', 'pass': appErrors.isEmpty, 'error': appErrors.toSet().join(' || ')});
     File('$shots/results.json').writeAsStringSync(const JsonEncoder.withIndent(' ').convert(results));
