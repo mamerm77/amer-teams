@@ -1,6 +1,6 @@
 # Phase 3 status register
 
-Against docs/PHASE3_REQUIREMENTS.docx (60 features). Updated 19 Nov 2026.
+Against docs/PHASE3_REQUIREMENTS.docx (60 features). Updated 20 Nov 2026. Real-stack tests run locally against Synapse, LiveKit, PostgreSQL and the orchestrator; the app itself is compiled and tested in CI.
 
 **Status:**
 - **Built** — code, server tests and an in-use (real stack) test step exist.
@@ -49,7 +49,7 @@ Each built feature has a doc listing its open gaps.
 |---|---|---|
 | 1 | Personal agent team | Built |
 | 2 | Agent glass box | Built |
-| 3 | Encrypted AI (on device or enclave) | Partial: routing table, no silent fallback, server-enforced policy, where-it-ran labels. No on-device model or enclave yet (ENCRYPTED_AI.md) |
+| 3 | Encrypted AI (on device or enclave) | Partial: routing with no silent fallback, server-enforced policy, where-it-ran labels, and an enclave proxy (sealed X25519 + AES-GCM requests, measurement pinned) used when policy allows; no hardware attestation (needs a confidential VM) and no on-device model (ENCRYPTED_AI.md) |
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |
 | 5 | Meeting digital twin | Built: on-device view of all minutes, decisions, open/overdue actions, recurring topics, and ask-the-history with dates (MEETING_TWIN.md) |
 | 6 | Pre-mortem agent | Built: /premortem, ranked plan-specific risks, share or turn mitigations into tasks (PREMORTEM.md) |
