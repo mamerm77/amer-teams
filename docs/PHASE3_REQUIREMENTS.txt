@@ -1,0 +1,1976 @@
+Amer Teams — Consolidated Requirements (Single Phase)
+
+Nov 19, 2026 · @Moh Amer
+
+Summary
+
+Amer Teams already matches competitors on encrypted chat, calls,
+meetings, scheduling and a basic co-pilot. It goes beyond them in three
+places: post-quantum call keys, real-telemetry operations and Agent Ops.
+The biggest gaps are AI that acts across the workspace, structured
+collaboration (canvases, loops, workflows), large events, and external
+collaboration.
+
+The competition moved in 2026 from "AI that summarises" to "AI agents
+that do the work". In March 2026 Salesforce launched more than 30 new AI
+features for Slackbot, positioning Slack as an agentic workflow platform
+(source). Zoom repositioned Workplace with AI Companion 3.0, workflow
+automation and custom AI agents (source). Microsoft Teams added
+interactive Copilot agents inside meetings and AI catch-up summaries for
+chats (source).
+
+Amer Teams' winning position: the only collaboration suite where every
+agent is encrypted end-to-end, observable live, and accountable. Every
+creative feature below builds on that.
+
+Top 5 to build first:
+
+1.  Catch-up digest and an agent you can talk to inside a meeting
+    (closes the biggest AI gap)
+
+2.  Workflows: no-code automations driven by plain language
+
+3.  Shared live canvases attached to chats and meetings
+
+4.  Secure external collaboration between organisations
+
+5.  Agent Ops for everyone: a personal agent team per user, shown live
+
+Scope of this phase
+
+This document holds every requirement agreed for Amer Teams in this
+round, delivered in one phase (Phase 3, about 6 months):
+
+1.  Agent Ops: an AI agent team that delivers any project, with a live
+    interface that shows the agents' real status. Built first; see
+    below.
+
+2.  Competitor parity: 20 features from Teams, Slack, Zoom, Google Meet
+    and Webex.
+
+3.  Creative features: 15 features unique to Amer Teams.
+
+4.  Practical features: 25 everyday features.
+
+5.  Logic and detailed specs for every feature.
+
+6.  Modern 3D UI across the app, with 2.5D and flat fallbacks.
+
+Baseline: features already in Amer Teams (Phases 1 and 2)
+
+These stay in scope: Phase 3 builds on them and must not break them.
+Source: the repository README.
+
+  -----------------------------------------------------------------------
+  Area            Existing features
+  --------------- -------------------------------------------------------
+  Foundation      End-to-end encryption for every chat, call and meeting;
+                  unencrypted rooms refused; post-quantum hybrid call
+                  keys (ML-KEM-768); safety codes; app lock
+
+  AI engine       Amer co-pilot (real LLM); thread summaries;
+                  translation; meeting minutes (opt-in) posted back into
+                  the encrypted room; Scheduler agent that turns plain
+                  language into a meeting; Guardian policy that blocks AI
+                  on Confidential and Restricted labels and redacts
+                  sensitive data
+
+  AI control      Control centre: agents on/off, call counts, errors,
+                  latency, tamper-evident audit log
+
+  Chat            People search, 1:1 and group chats, replies, reactions,
+                  edit, delete for everyone, typing indicator, read
+                  receipts, photo previews, encrypted files, voice
+                  messages, polls, message search, pinned chats, status
+                  and presence
+
+  Calls           Voice and video calls from any chat or the Calls tab,
+                  incoming ringing with accept/decline, call history with
+                  missed calls and redial
+
+  Meetings        Meet now with a 9-digit ID, join with ID through a
+                  host-controlled waiting room, scheduling with invitees,
+                  Calendar with Join button
+
+  In a call       Grid or speaker view, active-speaker highlight,
+                  participant list, meeting chat, raise hand, reactions,
+                  screen share, camera switch, mute, on-device live
+                  captions, Amer minutes, safety code, host controls
+
+  Teams           Teams with encrypted channels (Matrix spaces)
+
+  Phone           Calls to ordinary numbers through a company SIP trunk
+
+  Whiteboard      Shared whiteboard screen
+
+  Operations      Health screen with live probes, latency, availability
+                  and active calls; alerts from Alertmanager; Prometheus
+                  metrics; Grafana dashboards; call trace and call
+                  quality
+
+  Admin           Invite codes; create, reset and deactivate users;
+                  tenants and compliance archiving options
+
+  Platforms       iOS, Android, Windows, macOS, Linux apps; Windows
+                  installer; push notifications with content-free
+                  payloads; Docker Compose and Kubernetes deployment with
+                  high availability
+  -----------------------------------------------------------------------
+
+Agent Ops: AI agent team with live status
+
+Requirement: a team of AI agents that can deliver any project,
+integrated into Amer Teams, with an interface like the Claude
+plugins-graph video that reflects the agents' real state, never a
+simulation.
+
+Status: built and submitted as pull request #1 on branch
+feature/agent-ops; backend tests and Android, iOS, Windows and Linux
+builds pass. Not yet run against a live API key.
+
+  -----------------------------------------------------------------------
+  Part                 Requirement as built
+  -------------------- --------------------------------------------------
+  Team                 Amer (orchestrator) plus analyst, architect,
+                       developer, tester, reviewer and documenter, on the
+                       Claude Agent SDK; defined in
+                       services/orchestrator/app/agentops/team.py
+
+  Orchestrator loop    Publish the plan, delegate each phase, send
+                       defects back to the developer (max 3 loops),
+                       report honestly
+
+  Truth sources        SDK hooks for agent start/stop, every tool call,
+                       durations and errors; plan from the orchestrator's
+                       TodoWrite; tokens from SDK usage; exact cost only
+                       from the final result
+
+  API                  /v1/agentops/team, projects, projects/{id}/stop,
+                       replay, events, stream (Server-Sent Events,
+                       resumable by sequence number)
+
+  Storage              PostgreSQL tables agentops_projects and
+                       agentops_events (migration 004), shared by all
+                       replicas
+
+  Security             Start and stop for administrators only, written to
+                       the audit log; 503 if no API key is configured
+
+  App screen           Agent Ops tab: live agent graph with handoff
+                       pulses and files, role cards, plan, live tool log,
+                       agent messages, KPIs (active agents, tool calls,
+                       failures, tokens, plan, exact cost)
+
+  Honesty              Sample replay always labelled REPLAY · SAMPLE,
+                       never LIVE, never shows a cost
+
+  Deployment           agentops volume; claude-agent-sdk dependency; turn
+                       cap AGENTOPS_MAX_TURNS
+  -----------------------------------------------------------------------
+
+Still to do in this phase: Kubernetes volume for /data/agentops, a
+container per project for agent shell commands, the glass-box approvals,
+personal agent teams and the 3D Agent Ops view (all specified below).
+
+Competitor features Amer Teams lacks
+
+Twenty gaps, grouped by area and marked with the competitor that sets
+the bar. Amer Teams' current scope comes from the repository README.
+
+  ---------------------------------------------------------------------------------
+  Area            Feature                   Who has it    Why it matters   Effort
+  --------------- ------------------------- ------------- ---------------- --------
+  AI              Catch-up digest: "what    Teams         Daily-use AI     M
+                  did I miss" across all    Copilot,      hook; highest    
+                  chats, channels and       Slackbot      perceived value  
+                  meetings                                                 
+
+  AI              Agent you can ask         Teams         Turns minutes    M
+                  questions inside a live   interactive   into live        
+                  meeting ("which slide got meeting       intelligence     
+                  the most pushback?")      agents                         
+
+  AI              Video and audio recap of  Teams video   Replaces         M
+                  a meeting with chapters   recap, Zoom   watching         
+                  and highlights                          hour-long        
+                                                          recordings       
+
+  AI              Reusable AI skills and    Slackbot AI   Users extend the L
+                  custom agents built by    skills, Zoom  AI themselves    
+                  users                     custom agents                  
+
+  AI              Note-taking for in-person Google Meet   Hybrid parity    S
+                  meetings from a phone     "Take notes                    
+                                            for me"                        
+
+  Automation      No-code workflows from    Teams         Makes the app a  L
+                  plain language            Workflows,    system of action 
+                  (approvals, forms,        Slack                          
+                  alerts)                   Workflow                       
+                                            Builder,                       
+                                            Workspace                      
+                                            Studio                         
+
+  Automation      Agent and bot messages    Teams         Agents can help  S
+                  visible only to one user  targeted      without spamming 
+                  in a shared chat          messages for  the room         
+                                            agents                         
+
+  Collaboration   Canvases or Loop          Slack Canvas, Decisions stay   L
+                  components: live          Microsoft     with the         
+                  documents inside chats    Loop          conversation     
+                  and meetings                                             
+
+  Collaboration   Shared files tab per      Teams Shared  Basic            M
+                  channel, with versions    tab           expectation for  
+                  and previews                            enterprise       
+
+  Collaboration   Drafts, mentions and      Teams         Daily efficiency S
+                  followed-threads quick                                   
+                  views                                                    
+
+  External        Shared channels across    Slack         Partners and     L
+                  organisations, with       Connect,      vendors; key for 
+                  policy controls           Teams shared  an operator      
+                                            channels                       
+
+  Meetings        Webinars and town halls:  Teams events, Large-audience   L
+                  registration, Q&A, 10k+   Zoom Events,  use case         
+                  viewers, recording        Webex                          
+
+  Meetings        Breakout rooms            Zoom, Teams,  Training and     M
+                                            Meet          workshops        
+
+  Meetings        Live translated captions  Teams, Zoom,  Arabic and       M
+                  and interpretation        Meet          English          
+                  channels                                audiences        
+
+  Meetings        Noise suppression,        All           Expected         M
+                  background blur,                        baseline         
+                  low-light enhancement                                    
+
+  Meetings        Deepfake and              Zoom          Fraud            M
+                  impersonation risk                      protection; fits 
+                  detection in calls                      the security     
+                                                          story            
+
+  Phone           AI call handling: caller  Webex Calling Front desk and   M
+                  intent, auto-answer, call               support lines    
+                  summaries                                                
+
+  Rooms           Meeting-room devices,     Teams Rooms,  Office           L
+                  room booking and          Webex         deployment       
+                  occupancy analytics                                      
+
+  Frontline       Shifts, tasks and         Teams         Field engineers  M
+                  walkie-talkie for field   Frontline     and NOC staff    
+                  staff                                                    
+
+  Admin           Data-loss prevention,     Teams, Google Regulated        M
+                  sensitivity labels        Workspace     customers        
+                  inherited by recordings                                  
+  ---------------------------------------------------------------------------------
+
+Effort: S under 2 weeks, M 2 to 6 weeks, L more than 6 weeks, for one or
+two developers.
+
+Creative features unique to Amer Teams
+
+Fifteen ideas no major competitor ships today. Each one uses something
+Amer Teams already has: end-to-end encryption, post-quantum keys, Agent
+Ops, real telemetry, or a telecom-grade network.
+
+  --------------------------------------------------------------------------
+  #     Feature         What it does                          Builds on
+  ----- --------------- ------------------------------------- --------------
+  1     Personal agent  Every user gets their own small team  Agent Ops
+        team            of agents (researcher, writer,        
+                        scheduler) and watches them work live 
+                        in Agent Ops, like the plugins-graph  
+                        video                                 
+
+  2     Agent glass box Before an agent acts on your behalf   Agent Ops
+                        (sends, books, deletes), a card shows events, audit
+                        the plan, the data it will touch and  log
+                        its cost; one tap to approve          
+
+  3     Encrypted AI    Summaries and translation run on the  E2EE,
+                        user's own device, or in a            on-device
+                        confidential-computing enclave, so    captions
+                        the server never sees plain text      
+
+  4     Decision ledger Decisions made in chats and meetings  Hash-chained
+                        are detected, confirmed by the people audit log
+                        involved, and stored in a             
+                        tamper-evident log with owner and due 
+                        date                                  
+
+  5     Meeting digital After a meeting, an interactive       Minutes agent,
+        twin            replay: who spoke, the topic map,     call trace
+                        decisions, and "ask the meeting"      
+                        questions                             
+
+  6     Pre-mortem      Before a big decision, a red-team     Co-pilot
+        agent           agent argues the opposite case in the 
+                        thread, citing data                   
+
+  7     Network-aware   Calls switch codec, resolution and    Call trace,
+        calls           route ahead of time by forecasting    Ops telemetry
+                        the link quality from live telemetry, 
+                        and explain why in plain words        
+
+  8     Quantum-safe    A visible padlock on every chat and   Post-quantum
+        badge           call showing its key type (ML-KEM-768 service
+                        hybrid), the safety code and when the 
+                        keys last rotated                     
+
+  9     Arabic-first    Gulf-dialect speech recognition,      Scheduler
+        co-pilot        right-to-left canvases, Hijri         agent
+                        calendar, prayer-time-aware           
+                        scheduling and Ramadan working hours  
+
+  10    Focus guardian  Learns each person's deep-work hours  Catch-up
+                        and holds non-urgent notifications,   digest
+                        then delivers one digest              
+
+  11    Wellbeing       Anonymous, aggregated team load:      Ops metrics
+        signals for     meeting hours, after-hours messages,  
+        managers        response pressure. No individual      
+                        tracking                              
+
+  12    Live expertise  "Who knows about OTN protection?",    Directory,
+        map             answered from the content of          search
+                        conversations the asker is allowed to 
+                        see                                   
+
+  13    Ambient         Always-open, low-bandwidth rooms per  LiveKit
+        presence rooms  team where people can drop in, like   
+                        an open office, with spatial audio    
+
+  14    Agent           Teams publish their own agents (an    Agent
+        marketplace for RFP writer, a capacity planner);      registry,
+        the             others install them, with Guardian    Guardian
+        organisation    policy and Agent Ops monitoring built 
+                        in                                    
+
+  15    Operator mode   A NOC war-room template: alarms flow  Ops alerts,
+        for telecoms    into a channel, an incident agent     Agent Ops
+                        opens a bridge, pulls topology and    
+                        drafts the post-incident report       
+  --------------------------------------------------------------------------
+
+The strongest differentiators are 1, 2, 3 and 4. Together they turn "we
+have AI too" into "our AI is private, visible and accountable", a claim
+Teams, Slack and Zoom cannot easily match.
+
+More practical features
+
+Twenty-five everyday features that users expect and that are quick to
+deliver. Most are S or M effort and do not need new infrastructure.
+
+  ---------------------------------------------------------------------------------
+  Area            Feature                            What it gives users   Effort
+  --------------- ---------------------------------- --------------------- --------
+  Chat            Scheduled send and "remind me      Send at the right     S
+                  about this message"                time; nothing         
+                                                     forgotten             
+
+  Chat            Threads that can be followed,      Long discussions stay M
+                  muted or popped out into their own readable              
+                  window                                                   
+
+  Chat            Rich text, code blocks, tables,    Technical teams can   S
+                  @channel and @role mentions        share configs and     
+                                                     logs cleanly          
+
+  Chat            Message translation on tap         Mixed-language Gulf   S
+                  (Arabic, English, Hindi, Urdu,     workforce             
+                  Tagalog)                                                 
+
+  Chat            Bookmarks and folders for saved    Personal knowledge    S
+                  messages, links and files          base                  
+
+  Chat            Announcements with a banner, read  HR and safety notices S
+                  tracking and acknowledgement       that must be          
+                                                     confirmed             
+
+  Chat            Message retention and auto-delete  Privacy and           S
+                  timers per chat                    compliance            
+
+  Chat            Slash commands (/poll, /meet,      Speed for power users S
+                  /remind, /ask amer)                                      
+
+  Meetings        Meeting templates with an agenda,  Shorter, structured   M
+                  a timer per item and a parking lot meetings              
+
+  Meetings        Join from a browser without        Customers and vendors M
+                  installing the app, for guests     join in one click     
+
+  Meetings        Dial-in by phone through the SIP   Join from a car or    M
+                  trunk                              with weak data        
+
+  Meetings        Recording with consent prompts,    Compliance-friendly   M
+                  transcript search and auto-expiry  recordings            
+
+  Meetings        Whiteboard templates               Faster workshops      S
+                  (retrospective, SWOT, network                            
+                  sketch)                                                  
+
+  Meetings        Follow-up email or chat sent       Nothing falls through S
+                  automatically with minutes and     after the call        
+                  action items                                             
+
+  Calendar        Find-a-time across attendees, time Ends scheduling       M
+                  zones and working hours            back-and-forth        
+
+  Calendar        Out-of-office and status synced    Clear availability    S
+                  with the calendar, with a delegate                       
+
+  Tasks           Turn any message into a task with  Lightweight project   M
+                  an owner and due date; personal    tracking without      
+                  and team task boards               another tool          
+
+  Files           Preview Office and PDF files in    No downloads for      M
+                  the app, with comments             quick reviews         
+
+  Search          One search across messages, files, Find anything in      M
+                  meetings, transcripts and people,  seconds               
+                  with filters                                             
+
+  Notifications   Per-chat notification settings,    Less noise            S
+                  quiet hours, and priority senders                        
+
+  Accessibility   Screen-reader support, high        Inclusive and         M
+                  contrast, adjustable text size,    required by many      
+                  keyboard shortcuts                 tenders               
+
+  Devices         Hand off a call between phone and  Seamless mobility     M
+                  desktop; multiple devices signed                         
+                  in                                                       
+
+  Integrations    Connectors for Outlook and Google  Fits existing tools   L
+                  calendars, SharePoint, Jira,                             
+                  ServiceNow, GitHub                                       
+
+  Admin           Usage analytics: active users,     Proves value to       M
+                  call quality by site, adoption by  management            
+                  feature                                                  
+
+  Admin           Guest accounts with expiry, and    External work and UAE M
+                  data residency per tenant (UAE     regulatory fit        
+                  region)                                                  
+  ---------------------------------------------------------------------------------
+
+Roadmap
+
+All 60 features ship in a single phase, Phase 3, over about 6 months.
+That fits only if the work runs in parallel: six workstreams, each with
+2 to 3 developers (about 15 people in total), shipping every 2 weeks
+behind feature flags.
+
+  -----------------------------------------------------------------------
+  Workstream               Features                                Team
+  ------------------------ --------------------------------------- ------
+  AI and agents            Catch-up digest, ask-the-meeting agent, 3
+                           video recap, AI skills and custom       
+                           agents, in-person notes, personal agent 
+                           teams, agent glass box, pre-mortem      
+                           agent, agent marketplace, decision      
+                           ledger, meeting digital twin, expertise 
+                           map                                     
+
+  Encrypted AI and         Encrypted AI (on device and in          2
+  security                 enclaves), quantum-safe badge, deepfake 
+                           detection, data-loss prevention and     
+                           labels, retention timers, guest         
+                           accounts, UAE data residency            
+
+  Chat, files and search   Every chat feature, canvases, shared    3
+                           files tab, file previews, quick views,  
+                           bookmarks, announcements, slash         
+                           commands, translation, unified search,  
+                           tasks                                   
+
+  Meetings and calendar    Webinars and town halls, breakout       3
+                           rooms, live translated captions, noise  
+                           suppression and blur, templates,        
+                           browser join, phone dial-in,            
+                           recordings, whiteboard templates,       
+                           follow-ups, find-a-time, network-aware  
+                           calls, presence rooms                   
+
+  Workflows and            Plain-language workflows, private agent 2
+  integrations             messages, calendar and tool connectors, 
+                           operator mode for telecoms, AI call     
+                           handling                                
+
+  Platform, admin and UX   Shared channels across organisations,   2
+                           Arabic-first experience, accessibility, 
+                           multi-device handoff, focus guardian,   
+                           wellbeing signals, usage analytics,     
+                           frontline shifts, room booking          
+  -----------------------------------------------------------------------
+
+Three rules keep a single phase safe:
+
+1.  Foundations first, in weeks 1 to 4: the agent event bus, the private
+    agent messages, the permission model for cross-organisation channels
+    and the enclave research spike. Every workstream builds on these.
+
+2.  Feature flags per tenant: every feature merges to main continuously
+    but switches on only after its tests pass, so one late feature never
+    blocks the release.
+
+3.  One gate at month 6: all 60 features pass automated tests on the
+    live test servers, and a pilot group of 50 users runs on them for 2
+    weeks with no severity-1 issues.
+
+The main risk is team size. With today's team of one or two developers
+plus agents, the same scope takes 15 to 18 months. The Agent Ops team
+can carry part of the coding and testing load, but it should be measured
+on the first features before the plan counts on it.
+
+Feature logic
+
+How each Phase 3 feature works: what triggers it, the steps the system
+runs, the data and API it adds to the existing orchestrator and Flutter
+app, and the rules that guard it. API paths sit under the orchestrator's
+/v1 prefix; every action by an agent is written to the hash-chained
+audit log and streamed to Agent Ops.
+
+AI and agents
+
+Catch-up digest
+
+-   Trigger: user opens the app after 4+ hours away, or taps "Catch me
+    up".
+
+-   Logic: 1) client collects unread messages per room since
+    last_read; 2) decrypts them on device; 3) ranks rooms by mentions,
+    direct messages, then priority senders; 4) sends the top 30 threads
+    to the summariser (on-device model if available, else the enclave,
+    never plain server); 5) returns one card per room: 2-line summary,
+    decisions, items needing reply, with deep links.
+
+-   Data/API: POST /ai/digest {rooms[], window}; cache the digest per
+    user for 30 min.
+
+-   Guards: rooms labelled Confidential are listed by name only; mute
+    and quiet-hours settings respected.
+
+Ask-the-meeting agent
+
+-   Trigger: /ask in the meeting chat, or the Amer button in a call.
+
+-   Logic: 1) live captions (already on device) stream to an encrypted
+    rolling transcript buffer; 2) the question plus the last 20 minutes
+    of transcript and shared slide text go to the co-pilot; 3) the
+    answer posts as a private agent message to the asker only, with
+    "share to everyone".
+
+-   Data/API: POST /meetings/{call_id}/ask; transcript buffer held in
+    memory, deleted at call end unless minutes are on.
+
+-   Guards: works only if the host enabled AI for the meeting; every
+    participant sees an "AI listening" badge.
+
+Video recap
+
+-   Trigger: recorded meeting ends.
+
+-   Logic: 1) transcript is split into topics by the minutes agent; 2)
+    each topic gets a title, start/end time and 1-line summary; 3) the 3
+    to 5 key moments are cut as clips; 4) recap card posts to the
+    meeting chat.
+
+-   Data/API: recap_chapters(call_id, start_s, end_s, title, summary);
+    GET /meetings/{id}/recap.
+
+-   Guards: inherits the recording's retention and sensitivity label.
+
+AI skills and custom agents
+
+-   Trigger: user saves a prompt as a skill, or builds an agent in the
+    Agent Builder.
+
+-   Logic: skill = name, instructions, allowed tools, input fields;
+    agent = skill set + model + schedule. On run, Guardian checks the
+    caller's rights, the agent runs through the Agent Ops runner, and
+    every step streams to Agent Ops.
+
+-   Data/API: skills, custom_agents tables; POST /agents/custom, POST
+    /agents/{id}/run.
+
+-   Guards: tools limited to an allow-list per role; admin approval
+    before an agent is shared org-wide.
+
+In-person meeting notes
+
+-   Trigger: "Take notes" on a phone in a physical room.
+
+-   Logic: on-device speech-to-text, speaker separation, then the
+    minutes agent produces minutes and action items into the linked
+    calendar event's chat.
+
+-   Guards: a visible banner and a spoken consent prompt; audio never
+    leaves the phone.
+
+Personal agent team
+
+-   Trigger: user assigns a goal ("prepare the vendor comparison for
+    Sunday").
+
+-   Logic: creates an Agent Ops project scoped to the user's own data;
+    orchestrator plans, delegates to researcher, writer and scheduler;
+    progress is shown live; deliverables land in the user's Saved area.
+
+-   Data/API: reuse /agentops/projects with owner and scope=personal;
+    per-user monthly token budget.
+
+-   Guards: agent reads only rooms the user can read; any outbound
+    action goes through the glass box.
+
+Agent glass box
+
+-   Trigger: any agent action that sends, books, deletes, shares or
+    spends.
+
+-   Logic: 1) agent's PreToolUse hook pauses the action; 2) a card shows
+    plan, data touched, recipients and cost estimate; 3) user approves,
+    edits or rejects; 4) decision is audited and the agent resumes or
+    stops.
+
+-   Data/API: agent_approvals(id, project_id, action, payload_hash,
+    status, decided_by); POST /agentops/approvals/{id}.
+
+-   Guards: timeout after 24 h counts as rejected; read-only actions
+    skip the card.
+
+Pre-mortem agent
+
+-   Trigger: a message tagged #decision, or /premortem.
+
+-   Logic: agent gathers the thread and linked files, writes the
+    strongest case against the proposal, the top 3 risks with likelihood
+    and impact, and what would change its mind. Posts as a reply.
+
+-   Guards: labelled clearly as a devil's-advocate view; one run per
+    decision unless asked again.
+
+Organisation agent marketplace
+
+-   Trigger: a team publishes a custom agent.
+
+-   Logic: submission → automated tests (sample prompts, tool policy
+    check) → admin approval → listed with owner, version, rating and
+    live usage from Agent Ops. Install = grant the agent to a team or
+    user.
+
+-   Data/API: agent_listings, agent_installs; GET /marketplace, POST
+    /marketplace/{id}/install.
+
+-   Guards: each version is pinned; an update needs re-approval; usage
+    and errors visible to the owner.
+
+Decision ledger
+
+-   Trigger: the minutes agent or a chat detector spots decision
+    language, or a user marks a message as a decision.
+
+-   Logic: 1) proposes {decision, owner, due date, source link}; 2)
+    participants confirm with one tap; 3) confirmed entry is
+    hash-chained like the audit log; 4) reminders before the due
+    date; 5) changes create a new version, never overwrite.
+
+-   Data/API: decisions(id, room_hash, text, owner, due, status,
+    prev_hash, hash); GET /decisions?owner=.
+
+-   Guards: only confirmed decisions enter the ledger; text stays
+    encrypted, the server keeps only the hash and metadata.
+
+Meeting digital twin
+
+-   Trigger: "Open replay" on any recorded meeting.
+
+-   Logic: combines transcript, speaker timeline, chapters, decisions
+    and call-quality trace into one interactive view; "ask the meeting"
+    uses the full transcript.
+
+-   Guards: same access as the recording.
+
+Live expertise map
+
+-   Trigger: search "who knows about X".
+
+-   Logic: each client builds topic tags from its own decrypted messages
+    and publishes only the tags (not content) to the directory, opt-in;
+    the search ranks people by tag weight and recency.
+
+-   Data/API: expertise_tags(user, tag, weight, updated); GET
+    /people/experts?q=.
+
+-   Guards: opt-in per user; tags can be reviewed and removed; nothing
+    from private chats unless the user allows.
+
+Encrypted AI and security
+
+Encrypted AI (on device and in enclaves)
+
+-   Trigger: any AI request on encrypted content.
+
+-   Logic: 1) router checks device capability; small tasks (translation,
+    short summaries) run on an on-device model; 2) larger tasks go to an
+    inference service inside a confidential-computing enclave; 3) the
+    client verifies the enclave's attestation report before sending; 4)
+    content is encrypted to the enclave's key, processed, answer
+    returned encrypted, nothing stored.
+
+-   Data/API: GET /ai/enclave/attestation; POST /ai/enclave/infer
+    (ciphertext only).
+
+-   Guards: if attestation fails, the request is refused, never silently
+    sent in plain text; a lock icon shows where the AI ran.
+
+Quantum-safe badge
+
+-   Trigger: opening any chat or call.
+
+-   Logic: shows key type (Megolm for chat; ML-KEM-768 + X25519 hybrid
+    for calls), last key rotation time and the safety code. Tap for
+    details. Turns amber if any participant's device is unverified, red
+    if a downgrade is detected.
+
+-   Data/API: read from pq_service and the call key events already in
+    the app.
+
+-   Guards: a downgrade blocks the call until the user accepts the risk.
+
+Deepfake and impersonation detection
+
+-   Trigger: a participant joins a call or a voice message arrives.
+
+-   Logic: 1) the receiving device runs a liveness and synthetic-voice
+    classifier on the decrypted stream; 2) it checks the speaker against
+    the verified device keys of the claimed user; 3) a risk score above
+    the threshold shows a warning to that viewer only.
+
+-   Guards: detection runs on device to keep E2EE; warnings say
+    "possible", never accuse; false-positive reports feed tuning.
+
+Data-loss prevention and sensitivity labels
+
+-   Trigger: sending a message or file, or starting a recording.
+
+-   Logic: 1) client classifies content against tenant rules (card
+    numbers, national IDs, keywords, file labels); 2) actions: warn,
+    require a reason, or block; 3) labels propagate to recordings,
+    minutes, transcripts and AI outputs; 4) Guardian already blocks AI
+    on Confidential labels.
+
+-   Data/API: dlp_rules(tenant, pattern, action), pushed to clients;
+    POST /dlp/events (metadata only).
+
+-   Guards: scanning happens on the device, so the server still never
+    sees content.
+
+Retention and auto-delete timers
+
+-   Trigger: owner sets a timer on a chat (1 day to 7 years) or the
+    tenant sets a policy.
+
+-   Logic: timer is stored in room state; each client deletes expired
+    messages locally; the server redacts expired events and deletes
+    media; tenant policy wins over a shorter user timer only when
+    compliance is on.
+
+-   Guards: a banner shows the active timer; legal hold pauses deletion.
+
+Guest accounts
+
+-   Trigger: an admin or allowed member invites an external email.
+
+-   Logic: creates a Matrix account flagged guest with an expiry
+    (default 30 days); guests see only rooms they were invited to; no
+    directory search; expiry deactivates and removes them from rooms.
+
+-   Data/API: POST /admin/guests {email, rooms[], expires}; nightly
+    expiry job.
+
+-   Guards: guests are marked in every member list; AI agents do not
+    read guest-only rooms unless the host allows.
+
+UAE data residency
+
+-   Trigger: tenant setup.
+
+-   Logic: each tenant has a home region; its Synapse database, media
+    store, recordings and backups live in that region; the orchestrator
+    routes requests by tenant; cross-region calls relay media only,
+    never store it.
+
+-   Data/API: tenants.region; per-region deployment of the compose stack
+    or k8s namespace.
+
+-   Guards: region cannot change without an export and import run by an
+    admin, logged in the audit chain.
+
+Chat, files and search
+
+Scheduled send and message reminders
+
+-   Logic: scheduled send: the client encrypts the message now and
+    stores it locally with a send time; a background task sends it at
+    that time (the server never holds plain text). If the device is
+    offline at send time, it sends on reconnect and marks it "sent
+    late". Reminders: a local notification at the chosen time, synced
+    across the user's devices through encrypted account data.
+
+-   Guards: scheduled messages are listed and editable until sent.
+
+Follow, mute and pop-out threads
+
+-   Logic: threads use Matrix m.thread relations; follow state is stored
+    per user in account data; followed threads with new replies appear
+    in the Followed quick view; pop-out opens the thread in its own
+    desktop window.
+
+Rich text, code blocks, tables, role mentions
+
+-   Logic: composer outputs Markdown, rendered as sanitised HTML in
+    formatted_body; code blocks get syntax highlighting and a copy
+    button; @role resolves to members of a role defined in the team,
+    @channel to all members, limited to admins in rooms over 50 people.
+
+Translate on tap
+
+-   Logic: long-press → Translate; detect language on device; translate
+    on device or in the enclave; cache per message; option to
+    auto-translate a whole room into the user's language.
+
+-   Guards: the original is always one tap away; labelled rooms
+    translate on device only.
+
+Bookmarks and folders
+
+-   Logic: save a message, link or file into personal folders stored as
+    encrypted account data; the Saved screen lists them by folder, with
+    search.
+
+Announcements with acknowledgement
+
+-   Logic: an announcement is a message with a banner style and an "I
+    acknowledge" button; each tap sends a read-receipt-like event; the
+    sender sees a live acknowledged/pending list and can remind pending
+    members in one tap.
+
+-   Data/API: event type com.amerteams.announcement, ack type
+    com.amerteams.ack.
+
+Slash commands
+
+-   Logic: composer detects /; a registry maps commands to handlers:
+    /poll, /meet, /remind, /ask amer, /premortem, plus commands
+    registered by marketplace agents. Unknown commands show suggestions.
+
+Canvases
+
+-   Logic: a canvas is a collaborative document attached to a room;
+    edits are CRDT operations (Yjs) sent as encrypted room events, so
+    all members converge without a server merge; blocks support text,
+    checklists, tables and embedded messages; version history from the
+    event log.
+
+-   Guards: same membership and encryption as the room.
+
+Shared files tab
+
+-   Logic: indexes every encrypted file event in a channel (name, size,
+    sender, date) on the client; groups versions by file name; preview
+    and download decrypt locally.
+
+Drafts, mentions and followed quick views
+
+-   Logic: filters over local state: unsent composer text per room
+    (Drafts), events that mention the user (Mentions), followed threads
+    with unread replies (Followed). Shown as chips above the chat list.
+
+File previews with comments
+
+-   Logic: PDFs and images render natively; Office files render in an
+    on-device viewer, or are converted in the enclave; comments are
+    thread replies anchored to page and position.
+
+Unified search
+
+-   Logic: messages and transcripts are searched in a local encrypted
+    index on each device (SQLite FTS); files by name and metadata;
+    people via the directory; results merged and ranked by recency and
+    relevance; filters for person, room, date and type.
+
+-   Guards: the server never builds a content index.
+
+Message-to-task and task boards
+
+-   Logic: long-press → Create task → owner, due date, room link; tasks
+    are encrypted room events, so a team board is a view over a room's
+    tasks; a personal board merges the user's tasks across rooms;
+    reminders before the due date; done tasks post a quiet update.
+
+Meetings and calendar
+
+Webinars and town halls
+
+-   Logic: 1) organiser creates an event with a registration page; 2)
+    registrants get a personal join link (token tied to email); 3)
+    presenters publish media on LiveKit, attendees join as
+    subscribe-only (already supported by publish_allowed); 4) above
+    1,000 viewers, the SFU output is pushed to an HLS/LL-HLS stream for
+    scale; 5) moderated Q&A with upvotes; 6) recording and attendance
+    report after the event.
+
+-   Data/API: events, registrations, qa_items; POST /events, POST
+    /events/{id}/register.
+
+-   Guards: large broadcasts are E2EE between presenters and the edge;
+    the event page states the encryption level honestly.
+
+Breakout rooms
+
+-   Logic: host splits participants manually or randomly into N child
+    LiveKit rooms, each with its own call key derived per room; timer
+    and "broadcast to all rooms"; on close, everyone returns to the main
+    room.
+
+-   Data/API: POST /meetings/{call_id}/breakouts {rooms, assignment,
+    minutes}.
+
+Live translated captions
+
+-   Logic: each listener's device transcribes the speaker's decrypted
+    audio, then translates captions into the listener's chosen language
+    on device; optional human interpreter channel published as a
+    separate audio track per language.
+
+-   Guards: speech never leaves devices for captions.
+
+Noise suppression, blur, low-light
+
+-   Logic: processed on the sender's device before encryption:
+    RNNoise-class noise suppression, segmentation model for blur or
+    background image, brightness correction. Toggles in the call screen;
+    auto-enabled when poor conditions are detected.
+
+Meeting templates with agenda and timer
+
+-   Logic: template = agenda items with minutes per item; the timer
+    moves through items and warns at 80%; topics raised off agenda go to
+    a parking lot; minutes agent uses the agenda as its outline.
+
+Browser join for guests
+
+-   Logic: link opens a web client (Flutter web) that joins as a
+    temporary guest identity with a name; waiting room by default;
+    LiveKit E2EE via insertable streams in the browser.
+
+-   Guards: browsers without insertable-stream support are refused
+    rather than joined without encryption.
+
+Phone dial-in
+
+-   Logic: each meeting gets a dial-in number and PIN; the SIP trunk
+    (existing sip.py) bridges the caller into the LiveKit room as an
+    audio participant shown as "Phone ••• 1234".
+
+-   Guards: a banner tells everyone a phone participant is in the call,
+    because the phone leg is not end-to-end encrypted.
+
+Recordings with consent and expiry
+
+-   Logic: start recording → every participant sees a consent prompt;
+    those who decline are not recorded (their tracks are excluded); the
+    recording is encrypted with a room key and stored; transcript is
+    indexed on members' devices; deleted at the tenant's retention date.
+
+Whiteboard templates
+
+-   Logic: templates are saved whiteboard states (retrospective, SWOT,
+    network sketch with optical and IP shapes); open one into the
+    existing whiteboard screen.
+
+Automatic follow-up
+
+-   Logic: at call end, the minutes agent posts minutes, decisions (to
+    the decision ledger) and action items (to tasks) into the meeting
+    chat; optional email to external invitees.
+
+Find-a-time
+
+-   Logic: reads free/busy (not details) from each invitee's calendar
+    and connected Outlook or Google calendars; applies working hours,
+    time zones, prayer times and Ramadan hours where set; proposes the 3
+    best slots; the scheduler agent can do it from plain language.
+
+-   Data/API: POST /calendar/find-time {invitees, duration, window}.
+
+Network-aware calls
+
+-   Logic: 1) every 2 s the client reports RTT, loss and jitter (call
+    trace already collects these); 2) a small forecaster predicts the
+    next 10 s; 3) if quality will drop, the client lowers resolution,
+    switches codec or moves to a nearer media node before the user
+    notices; 4) a one-line note explains the change.
+
+Ambient presence rooms
+
+-   Logic: a persistent LiveKit room per team, audio-only by default, at
+    very low bitrate; people drop in or out; spatial audio places voices
+    by seat; auto-mute after 2 minutes of silence.
+
+-   Guards: presence in the room is visible to the team; no recording
+    possible.
+
+Out-of-office and status from calendar
+
+-   Logic: calendar events of type OOO set the status, an automatic
+    reply and a delegate; status returns automatically when the event
+    ends.
+
+Workflows and integrations
+
+Plain-language workflows
+
+-   Trigger: user describes a workflow ("when a new vendor quote is
+    posted in #rfp, ask finance to approve and log it").
+
+-   Logic: 1) the workflow agent turns the text into a definition:
+    trigger → conditions → steps (post message, form, approval, call
+    webhook, run agent); 2) the user reviews it as a visual flow and
+    edits; 3) on save, it is versioned and enabled; 4) a runner executes
+    steps, retrying failed ones 3 times; 5) every run streams to Agent
+    Ops and the audit log.
+
+-   Data/API: workflows(id, owner, definition_json, version, enabled),
+    workflow_runs; POST /workflows, POST /workflows/{id}/run.
+
+-   Guards: workflows act with the creator's rights, never more;
+    external webhooks need admin approval; runs that touch encrypted
+    content execute on a member's device or in the enclave.
+
+Private agent messages
+
+-   Logic: a bot or agent sends an event with visible_to: [user] into a
+    room; it is encrypted only to that user's devices, so others never
+    receive it; shown with an "Only you can see this" label; expires
+    after 24 h.
+
+-   Data/API: event type com.amerteams.ephemeral.
+
+Calendar and tool connectors
+
+-   Logic: OAuth per user for Outlook and Google calendars (free/busy
+    and events), and per tenant for SharePoint, Jira, ServiceNow and
+    GitHub; each connector exposes actions to workflows and agents
+    through the MCP protocol; tokens are stored encrypted in a vault,
+    scoped to the minimum permissions.
+
+-   Guards: admins choose which connectors are allowed; every call
+    through a connector is audited.
+
+Operator mode for telecoms
+
+-   Trigger: an alarm arrives from the NMS or Alertmanager webhook
+    (already wired).
+
+-   Logic: 1) alarms are correlated by site and time window; 2) a
+    critical correlated alarm opens an incident channel with the on-call
+    team and a call bridge; 3) the incident agent posts the impacted
+    topology, recent changes and likely root cause; 4) a timeline is
+    built automatically; 5) after closure, the agent drafts the
+    post-incident report for review.
+
+-   Data/API: incidents(id, severity, sites, opened, closed, room_id);
+    POST /ops/alert-webhook extended with correlation.
+
+-   Guards: the agent suggests actions on network elements; it never
+    executes them without a named engineer's approval in the glass box.
+
+AI call handling for phone lines
+
+-   Logic: an inbound call to a published number is answered by the
+    voice agent; it detects intent (support, sales, a person's name),
+    answers simple questions from approved knowledge, or transfers to
+    the right person or queue with a one-line summary; voicemail is
+    transcribed and summarised.
+
+-   Guards: callers are told they are speaking with an AI; they can say
+    "person" at any time to reach a human.
+
+Platform, admin and UX
+
+Shared channels across organisations
+
+-   Logic: two Amer Teams servers federate over Matrix; an admin on each
+    side approves a connection with the partner's server name; a shared
+    channel is a room both servers participate in; each side applies its
+    own policies (DLP, retention, guest rules) to its own users; members
+    from the other organisation show their company badge.
+
+-   Data/API: org_connections(partner_server, status, approved_by);
+    Synapse federation allow-list generated from it.
+
+-   Guards: federation is closed by default; either side can disconnect,
+    which removes its users from shared rooms.
+
+Arabic-first experience
+
+-   Logic: full right-to-left layout, Arabic fonts and number formats;
+    Gulf-dialect speech model for captions and voice commands; Hijri
+    dates shown beside Gregorian; prayer times (by city) and Ramadan
+    working hours feed scheduling and focus time; the co-pilot answers
+    in the language of the question.
+
+Accessibility
+
+-   Logic: semantic labels on every widget for screen readers; text
+    scaling to 200% without clipping; high-contrast theme; full keyboard
+    navigation and shortcuts; captions on by default for users who
+    choose it; tested against WCAG 2.2 AA in CI.
+
+Multi-device handoff
+
+-   Logic: each device registers with the call; "Move call to this
+    device" joins the new device to the same LiveKit room with the
+    current call key, then the old device leaves; chat drafts and read
+    state sync through account data.
+
+Focus guardian
+
+-   Logic: learns each user's deep-work hours from calendar and
+    activity, or the user sets them; during focus, notifications except
+    from priority senders and @urgent are held; at the end, one digest
+    is delivered; status shows "Focusing until 11:00".
+
+-   Guards: the user can always override; @urgent use is rate-limited
+    per sender.
+
+Wellbeing signals for managers
+
+-   Logic: each client computes its own weekly numbers (meeting hours,
+    after-hours messages, average response pressure) and reports only
+    aggregates; the server shows a team view only when the team has 5 or
+    more members, so no individual can be identified.
+
+-   Guards: no per-person data ever leaves the device; employees see
+    their own numbers privately.
+
+Usage analytics
+
+-   Logic: counts from metadata the server already has: active users,
+    messages and calls per day, call quality by site (from call trace),
+    feature adoption; shown in the admin screen and exported to Grafana.
+
+-   Guards: no message content; per-user detail only for admins and only
+    for licence management.
+
+Frontline shifts
+
+-   Logic: managers publish a shift schedule; staff swap or offer shifts
+    with approval; clock-in at a geofenced site; push-to-talk
+    walkie-talkie as a low-latency audio room per site.
+
+-   Data/API: shifts, shift_swaps; POST /shifts/publish.
+
+Room booking and occupancy
+
+-   Logic: meeting rooms are calendar resources; booking checks capacity
+    and equipment; an unused booking auto-releases 10 minutes after
+    start if no device checks in; occupancy reports by room size for
+    facilities.
+
+Notification controls
+
+-   Logic: per-chat settings (all, mentions, none), quiet hours,
+    priority senders and keyword alerts, stored in push rules so Sygnal
+    pushes respect them; content-free push payloads stay as today.
+
+Feature flags (applies to all features)
+
+-   Logic: every feature checks flags(tenant, feature, enabled,
+    rollout_pct) at runtime; flags are cached on the client for 5
+    minutes; admins turn features on per tenant from the admin screen.
+
+-   Data/API: GET /flags, POST /admin/flags.
+
+Detailed specs
+
+Implementation-level logic for the features that carry the most risk or
+are reused by others: state machines, step-by-step sequences, database
+schema, error handling, limits and acceptance tests. Simpler features in
+Feature logic follow the common rules below.
+
+Common rules
+
+  -----------------------------------------------------------------------
+  Rule                 Specification
+  -------------------- --------------------------------------------------
+  Request lifecycle    Every long action is a job: queued → running →
+                       succeeded / failed / cancelled. Job id returned at
+                       once (HTTP 202); progress streamed over the
+                       existing SSE channel.
+
+  Idempotency          Every POST that creates something accepts
+                       Idempotency-Key; a repeat within 24 h returns the
+                       first result.
+
+  Retries              Network and 5xx errors: 3 retries, exponential
+                       back-off 1 s, 4 s, 16 s with jitter. 4xx: never
+                       retried. LLM overload (429/529): retry up to 5
+                       times, then fail with a clear message.
+
+  Timeouts             API calls 10 s; AI calls 60 s (streamed); agent
+                       jobs bounded by turn and token budgets, not wall
+                       time.
+
+  Limits               Per user: 60 AI requests per hour, 3 concurrent
+                       agent jobs, monthly token budget set by the
+                       tenant. Per tenant: configurable caps; 80%
+                       warning, 100% hard stop.
+
+  Permissions          Checked on the server for every call: Matrix
+                       membership for room data, require_admin for admin,
+                       role allow-lists for agent tools. Clients never
+                       decide access.
+
+  Encryption           Content is decrypted only on members' devices or
+                       in an attested enclave. The server stores
+                       ciphertext, hashes and metadata.
+
+  Audit                Every create, change, delete, approval and agent
+                       action writes to the hash-chained audit_log with
+                       actor, action and object id.
+
+  Telemetry            Prometheus counters for requests, errors and
+                       latency per feature
+                       (amer_feature_requests_total{feature}); Agent Ops
+                       events for any agent step.
+
+  Feature flags        flags(tenant, feature, enabled, rollout_pct); off
+                       by default; checked on client and server.
+
+  Errors to users      Plain sentence of what failed and what to do;
+                       technical detail behind "Details"; never a stack
+                       trace.
+
+  Offline              Client queues writes locally (encrypted), sends in
+                       order on reconnect, shows "waiting to send".
+
+  Localisation         All strings in ARB files, Arabic and English from
+                       day one; layout mirrors for right-to-left.
+
+  Tests                Each feature ships with unit tests, an API test, a
+                       Flutter widget test and at least one end-to-end
+                       test in tests/; CI blocks merge on failure.
+  -----------------------------------------------------------------------
+
+Agent glass box and personal agent team
+
+State machine of an agent action
+
+proposed → awaiting_approval → approved → executing → done, with exits
+rejected, edited → awaiting_approval, expired (24 h), failed. Read-only
+actions go proposed → executing directly.
+
+Sequence
+
+1.  The agent calls a tool. The PreToolUse hook classifies it: read,
+    write-internal (own drafts), write-external (send, book, share,
+    delete, spend).
+
+2.  Read and write-internal run at once. Write-external creates an
+    agent_approvals row, emits approval.requested to Agent Ops and
+    pushes a notification to the owner.
+
+3.  The hook returns permissionDecision: "ask" and the SDK session waits
+    (the runner keeps the session; nothing is lost).
+
+4.  The user opens the card: plan (agent's own one-line reason), target
+    (people, rooms, systems), a diff or preview of what will be sent,
+    data touched, estimated tokens and money.
+
+5.  Approve → hook returns allow, the tool runs, the result is audited.
+    Edit → the edited payload replaces the original and its hash is
+    stored. Reject → the agent receives "rejected by user: <reason>" and
+    must re-plan.
+
+6.  The project's stream shows every step; the owner can pause or stop
+    the whole team at any time.
+
+Schema
+
+CREATE TABLE agent_approvals (
+id text PRIMARY KEY, project_id text NOT NULL, agent text NOT NULL,
+tool text NOT NULL, category text NOT NULL, -- write_external | spend |
+delete
+payload_hash text NOT NULL, preview jsonb NOT NULL,
+est_tokens int, est_cost_usd real,
+status text NOT NULL DEFAULT 'awaiting', --
+awaiting|approved|edited|rejected|expired
+decided_by text, decided_at timestamptz, reason text,
+created_at timestamptz NOT NULL DEFAULT now(), expires_at timestamptz
+NOT NULL);
+CREATE TABLE personal_budgets (user_id text PRIMARY KEY, month date,
+tokens_used bigint, tokens_cap bigint);
+
+API: GET /agentops/approvals?status=awaiting, POST
+/agentops/approvals/{id} {decision, edited_payload?, reason?}, POST
+/agentops/projects with scope: personal.
+
+Personal team rules
+
+-   Scope token: the runner starts with the user's Matrix token, so
+    every read is limited to rooms the user is in.
+
+-   Budget: the runner checks personal_budgets before each turn; at 100%
+    the project pauses with "budget reached".
+
+-   Deliverables go to the user's Saved area, never posted to rooms
+    without an approval.
+
+Errors
+
+  -----------------------------------------------------------------------
+  Case                          Behaviour
+  ----------------------------- -----------------------------------------
+  Owner offline                 Approval waits; reminder push at 1 h and
+                                12 h; expires at 24 h.
+
+  Payload changed after         Hash mismatch → refuse to execute, ask
+  approval                      again.
+
+  Server restart while waiting  Project marked interrupted; approval
+                                cancelled; owner can resume from the last
+                                checkpoint.
+
+  Tool fails after approval     Shown as failed in Agent Ops; agent may
+                                retry once with the same approved
+                                payload.
+  -----------------------------------------------------------------------
+
+Acceptance tests
+
+-   An agent tries to send a message: no message is delivered until
+    approval; rejecting it delivers nothing.
+
+-   Editing the text changes what is sent and the audit log stores the
+    edited hash.
+
+-   A personal agent cannot read a room the owner is not in (403 from
+    Synapse surfaces as a tool error).
+
+-   At 100% budget, no further model calls are made.
+
+Catch-up digest and ask-the-meeting
+
+Catch-up digest: sequence
+
+1.  Client computes the away window: now - max(last_active, 4 h ago);
+    manual tap uses "since last digest".
+
+2.  Collects unread events from the local store per room; skips muted
+    rooms and rooms in quiet mode.
+
+3.  Scores each room: score = 5·mentions + 4·direct +
+    3·priority_sender + 2·questions_to_me + 1·log(unread).
+
+4.  Takes the top 30 rooms, max 200 messages each (newest first), strips
+    media to captions.
+
+5.  Labels: Confidential rooms → title only; Restricted → on-device
+    model only.
+
+6.  Router (see Encrypted AI) chooses device or enclave; prompt asks for
+    JSON {room_id, summary (≤30 words), decisions[], asks_for_me[],
+    deadlines[]}.
+
+7.  Validates the JSON against a schema; on failure retries once, then
+    falls back to "N unread, M mentions".
+
+8.  Renders cards in score order; tapping a card jumps to the first
+    unread message. Marks rooms as "digested", not as read.
+
+Limits: one automatic digest per 4 h; enclave input capped at 60k
+tokens; digest cached locally for 30 min, never on the server.
+
+Acceptance tests: a mention ranks its room first; muted rooms never
+appear; a Confidential room shows no summary text; malformed model
+output falls back to counts.
+
+Ask-the-meeting: sequence
+
+1.  Host enables "AI in this meeting"; every participant gets the badge
+    and a one-time notice.
+
+2.  Each participant's device produces captions for the audio it hears;
+    the host's device keeps a rolling transcript (speaker, time, text)
+    for the last 60 minutes in memory.
+
+3.  A question via /ask or the Amer button goes to the host device's
+    agent bridge with transcript and shared-slide text (OCR on device).
+
+4.  Answer is returned as a private agent message to the asker, with
+    timestamps cited; "Share" posts it to the meeting chat.
+
+5.  At call end, the buffer is wiped unless minutes are on, in which
+    case it becomes the minutes input.
+
+Failure cases: host leaves → transcript role moves to the next
+participant with AI allowed; a question about a time before the buffer →
+"I only have the last 60 minutes".
+
+Acceptance tests: with AI disabled, /ask returns "AI is off for this
+meeting"; answers cite at least one timestamp; no transcript text
+reaches the server's database.
+
+Decision ledger and tasks
+
+Decision states: detected → proposed → confirmed → (in_progress) → done
+| superseded | cancelled. A detected decision that nobody confirms
+within 72 h is dropped.
+
+Detection logic
+
+1.  Sources: minutes agent output, chat messages matching decision
+    phrases ("we agreed", "decided", "go with", Arabic "تم الاتفاق",
+    "قررنا"), or a manual "Mark as decision".
+
+2.  The agent extracts {text, owner, due, options_rejected[]} and posts
+    a proposal card in the room.
+
+3.  Confirmation: the owner plus at least one other participant tap
+    Confirm (configurable quorum).
+
+4.  On confirm, the client sends an encrypted room event with the full
+    text; the server stores only metadata and a hash chain entry.
+
+5.  A change creates a new version linked to the previous one; the old
+    version is shown as superseded.
+
+CREATE TABLE decisions (
+id text PRIMARY KEY, room_hash text NOT NULL, event_id text NOT NULL,
+owner text NOT NULL, due date, status text NOT NULL,
+version int NOT NULL DEFAULT 1, supersedes text,
+confirmed_by text[] NOT NULL, prev_hash text NOT NULL, hash text NOT
+NULL,
+created_at timestamptz NOT NULL DEFAULT now());
+
+Tasks
+
+-   Event com.amerteams.task {title, owner, due, status, source_event};
+    updates are new events referencing the task id (latest wins by
+    origin time).
+
+-   States: open → in_progress → done, plus blocked with a reason.
+
+-   Reminders: local notifications 24 h and 1 h before due; overdue
+    tasks appear at the top of the personal board.
+
+-   A decision with an owner and due date creates a linked task
+    automatically.
+
+Acceptance tests: a decision needs the quorum before it appears in the
+ledger; editing creates version 2 and keeps version 1 visible; tampering
+with a stored row makes /audit/verify-style checks fail; tasks sync
+across two devices within 5 s.
+
+Plain-language workflows
+
+Definition format (stored as JSON, versioned)
+
+{"name": "RFP quote approval",
+"trigger": {"type": "message", "room": "#rfp", "match": {"has_file":
+true, "keywords": ["quote"]}},
+"steps": [
+{"id": "s1", "type": "ask_form", "to": "$trigger.sender", "fields":
+["vendor", "amount_aed"]},
+{"id": "s2", "type": "condition", "if": "$s1.amount_aed > 500000",
+"then": "s3", "else": "s4"},
+{"id": "s3", "type": "approval", "approvers": ["role:finance_manager"],
+"timeout_h": 48},
+{"id": "s4", "type": "post", "room": "#rfp-log", "text": "Quote from
+{{s1.vendor}} logged"}]}
+
+Trigger types: message, schedule (cron), webhook, form submitted, alarm,
+calendar event, manual. Step types: post, ask_form, approval, condition,
+wait, call_connector, run_agent, create_task, http (admin-approved hosts
+only).
+
+Build sequence
+
+1.  The user describes the workflow; the workflow agent returns a
+    definition plus a list of assumptions.
+
+2.  The definition is validated: known step types, reachable steps, no
+    cycles without a wait, every referenced room and role exists, the
+    creator has rights on every room.
+
+3.  The app shows it as a visual flow; the user edits and runs a dry-run
+    with sample data (no side effects).
+
+4.  Save creates version N; enable starts listening for the trigger.
+
+Run sequence
+
+1.  Trigger fires → a workflow_runs row with the trigger payload.
+
+2.  Steps execute in order; each step's result is stored and available
+    as $step.field.
+
+3.  Approval and form steps pause the run; timeouts follow the step's
+    on_timeout (default: fail).
+
+4.  Failures retry 3 times, then the run fails and the owner is notified
+    with the failing step.
+
+5.  Every step streams to Agent Ops and the audit log.
+
+CREATE TABLE workflows (id text PRIMARY KEY, owner text, tenant text,
+name text,
+version int, definition jsonb, enabled boolean, created_at timestamptz);
+CREATE TABLE workflow_runs (id text PRIMARY KEY, workflow_id text,
+version int,
+status text, trigger jsonb, step_results jsonb, started_at timestamptz,
+ended_at timestamptz);
+
+Where steps run: steps that read encrypted messages run on the owner's
+device (a workflow runner in the app, active when the device is online)
+or in the enclave; metadata-only steps run on the server.
+
+Limits: 50 steps per workflow, 1,000 runs per day per workflow, run time
+30 days maximum (for long approvals).
+
+Acceptance tests: a cycle without a wait is rejected at save; a dry-run
+sends nothing; a workflow cannot post into a room its owner has left; a
+changed definition does not affect runs already in progress.
+
+Encrypted AI router and enclave
+
+Routing decision (client side, per request)
+
+  -----------------------------------------------------------------------
+  Condition                         Route
+  --------------------------------- -------------------------------------
+  Room label Restricted             On device only; refuse if the device
+                                    cannot run the task
+
+  Task is translate, short summary  On device if a local model is
+  (<4k tokens), classify            installed and the battery is above
+                                    20%
+
+  Larger task, label Confidential   Enclave, after attestation
+  or below                          
+
+  Content has no encryption (public Orchestrator, normal Claude API path
+  channel, admin metadata)          
+
+  Enclave unavailable               Ask the user: wait, or run a shorter
+                                    on-device version; never fall back to
+                                    plain server
+  -----------------------------------------------------------------------
+
+Enclave sequence
+
+1.  Client fetches GET /ai/enclave/attestation: report signed by the
+    hardware vendor, measurement of the enclave image, its public key.
+
+2.  Client checks the signature chain, that the measurement matches the
+    published build hash (pinned in the app), and the report is under 24
+    h old.
+
+3.  Client creates a one-time key, encrypts the request with the enclave
+    key (HPKE), sends POST /ai/enclave/infer.
+
+4.  Inside the enclave, the request is decrypted, sent to the model over
+    an attested TLS link, the answer is encrypted to the client's
+    one-time key.
+
+5.  The enclave keeps nothing: no logs of content, only token counts and
+    timing for billing.
+
+Deployment options: confidential VMs (AMD SEV-SNP or Intel TDX) in a UAE
+cloud region running a pinned inference proxy; GPU confidential
+computing for self-hosted models when available.
+
+Acceptance tests: a tampered attestation is refused; Restricted content
+never leaves the device (verified by network capture in CI); enclave
+logs contain no message text; when the enclave is down, no plain-text
+request is ever made.
+
+Canvases, shared channels, webinars, network-aware calls, operator mode
+
+Canvases
+
+-   Model: one Yjs document per canvas; each update is a binary delta
+    wrapped in an encrypted event com.amerteams.canvas.update
+    {canvas_id, delta}. Every 200 updates, a member posts a snapshot
+    event so new joiners load fast.
+
+-   Merge: CRDT guarantees all members converge regardless of order; no
+    server merge.
+
+-   Presence: cursors and selections are sent as ephemeral to-device
+    messages, never stored.
+
+-   Limits: 5 MB per canvas snapshot; images stored as encrypted media
+    and referenced.
+
+-   Tests: two offline edits to the same paragraph converge on
+    reconnect; a removed member cannot decrypt new updates.
+
+Shared channels across organisations
+
+-   Connection states: requested → approved_by_us → approved_by_both →
+    active → suspended | disconnected.
+
+-   Logic: approval on both sides adds each server to the other's
+    Synapse federation allow-list; room creation sets m.federate: true
+    only for rooms marked shared; each server's policy hook checks
+    outgoing events against its own DLP rules.
+
+-   Disconnect: removes the partner from the allow-list; rooms remain
+    readable to local members with history up to the disconnect.
+
+-   Tests: a non-approved server cannot join; DLP on side A blocks a
+    card number before it leaves A.
+
+Webinars and town halls
+
+-   States: draft → scheduled → live → ended → archived.
+
+-   Scale path: up to 300 viewers through LiveKit directly; above that,
+    an egress worker composites the presenters and publishes LL-HLS
+    through a CDN with 3 to 5 s latency.
+
+-   Q&A: questions are events in a moderated side room; upvotes as
+    reactions; moderators promote to "on screen".
+
+-   Registration: registrations(event_id, email, token, attended,
+    joined_at, left_at); tokens single-use per device.
+
+-   Tests: an attendee token cannot publish media; attendance report
+    counts match LiveKit participant logs.
+
+Network-aware calls
+
+-   Inputs every 2 s: RTT, packet loss, jitter, available bitrate,
+    network type (Wi-Fi, 4G, 5G).
+
+-   Forecast: exponentially weighted moving average plus trend over the
+    last 10 samples; predicted loss above 3% or RTT above 300 ms counts
+    as "degrading".
+
+-   Actions in order: lower video layer → switch to audio-priority mode
+    → move to the nearest media node (if multiple LiveKit regions) →
+    suggest audio-only. Each action holds at least 10 s to avoid
+    flapping.
+
+-   Tests: a simulated 5% loss triggers a step-down within 4 s; quality
+    recovers by step-up after 20 s of good samples.
+
+Operator mode for telecoms
+
+-   Correlation: alarms grouped when they share a site or a link within
+    a 5-minute window; severity = highest in the group; one incident per
+    group.
+
+-   Incident states: open → acknowledged → mitigating → resolved →
+    reviewed.
+
+-   Automation: open → create channel, invite on-call (from rota), start
+    bridge, post topology snippet and last 24 h of changes; resolved →
+    agent drafts the report (timeline, impact, root cause, actions) for
+    the incident owner to approve.
+
+-   Guards: network element actions are suggestions only; execution
+    needs a named engineer's approval in the glass box.
+
+-   Tests: 20 alarms from one site within 5 minutes create one incident;
+    the report draft contains every timeline entry.
+
+3D UI
+
+A modern 3D interface for Amer Teams that stays fast on mid-range
+phones, readable in Arabic and English, and accessible.
+
+Design principles
+
+1.  Depth shows meaning, not decoration. Layers in Z express hierarchy:
+    active call above chat, chat above the list, the Amer avatar above
+    everything when it speaks.
+
+2.  3D where it explains, flat where people read. Message text, forms
+    and tables stay flat and sharp; 3D is used for spaces, people,
+    agents, networks and transitions.
+
+3.  Calm by default. Motion only on state change; idle scenes are still.
+    A "Reduce motion" setting flattens everything.
+
+4.  Fast on a mid-range phone. 60 fps target, 3D scenes capped at 4 ms
+    GPU per frame; anything slower falls back to 2.5D.
+
+5.  Right-to-left aware. Scenes mirror for Arabic: the camera, light
+    direction and list flow all follow reading direction.
+
+Visual language
+
+  -----------------------------------------------------------------------
+  Element          Specification
+  ---------------- ------------------------------------------------------
+  Material         Frosted glass panels (background blur 24, 70% opacity)
+                   over a soft depth field; subtle inner light on the top
+                   edge
+
+  Lighting         One key light from the reading-start side (top-left in
+                   English, top-right in Arabic) and an ambient fill;
+                   soft contact shadows under floating panels
+
+  Depth levels     0 background, 1 lists, 2 content, 3 overlays and
+                   calls, 4 Amer avatar and system alerts; each level
+                   adds 8 dp elevation and 2% scale
+
+  Colour           Brand accent for live state and actions; neutral greys
+                   for everything else; red reserved for alerts and
+                   encryption warnings
+
+  Typography       Readex Pro or IBM Plex Sans Arabic for Arabic, Manrope
+                   for English; never placed on a curved or tilted
+                   surface when it must be read
+
+  Corners          20 dp radius on panels, 12 dp on cards, full round on
+                   avatars and presence orbs
+
+  Iconography      Soft 3D icons (rendered once to images) for
+                   navigation; flat line icons inside content
+  -----------------------------------------------------------------------
+
+Technology
+
+  -----------------------------------------------------------------------
+  Layer            Choice                              Use
+  ---------------- ----------------------------------- ------------------
+  2.5D effects     Flutter Transform with perspective  Tilting cards,
+                   matrices, BackdropFilter, custom    glass panels,
+                   shaders (FragmentProgram)           depth transitions,
+                                                       parallax
+
+  Real 3D scenes   Flutter GPU / Impeller with         Agent Ops 3D
+                   flutter_scene (glTF models),        graph, meeting
+                   falling back to three_dart on       space, Amer
+                   platforms without it                avatar, network
+                                                       views
+
+  Avatar           glTF avatar with blend shapes,      Amer co-pilot that
+                   driven by viseme data from          speaks and reacts
+                   text-to-speech; Rive for the 2D     
+                   fallback                            
+
+  Assets           glTF 2.0 + Draco compression, KTX2  Small downloads,
+                   textures; level-of-detail models at fast load
+                   3 sizes                             
+
+  Physics and      Simple force layout written in Dart Graphs that settle
+  layout           (as in Agent Ops today) on an       smoothly without
+                   isolate                             blocking the UI
+  -----------------------------------------------------------------------
+
+Performance budgets
+
+  -----------------------------------------------------------------------
+  Metric               Budget
+  -------------------- --------------------------------------------------
+  Frame time           16.6 ms total, 3D scene ≤ 4 ms GPU on a mid-range
+                       Android (Snapdragon 7-series class)
+
+  Scene load           ≤ 300 ms for a cached scene, ≤ 1.5 s first load
+
+  Assets per scene     ≤ 3 MB compressed, ≤ 50k triangles
+
+  Battery in calls     3D meeting space adds ≤ 10% power versus the flat
+                       grid; switches to flat automatically under 20%
+                       battery
+  -----------------------------------------------------------------------
+
+Fallbacks: each 3D view has a 2.5D version and a flat version. The app
+chooses automatically from GPU tier, battery saver and "Reduce motion";
+users can choose in settings. Web and low-end devices start at 2.5D.
+
+Screen-by-screen concepts
+
+  ---------------------------------------------------------------------------
+  Screen        3D concept                         Interaction     Flat
+                                                                   fallback
+  ------------- ---------------------------------- --------------- ----------
+  Home /        A shallow "desk" of stacked glass  Swipe a card    Vertical
+  Activity      cards: catch-up digest on top,     away to mark    card list
+                then mentions, tasks due, next     done;           
+                meeting. Cards tilt 3–5° toward    long-press      
+                the device as you scroll           lifts it to     
+                (gyroscope parallax).              show details    
+
+  Chat list     Rooms as rows on a gently curved   Pull down to    Standard
+                shelf; unread rooms glow at the    open the digest list
+                edge; pinned rooms float one level as a panel that 
+                higher                             slides out from 
+                                                   depth           
+
+  Chat          Flat, sharp messages for reading.  Threads open as Standard
+                Depth only for context: replying   a panel sliding chat
+                lifts the quoted message;          in from the     
+                reactions burst as small 3D emoji; side at depth   
+                the quantum-safe badge is a small  level 3         
+                rotating lock that settles when                    
+                verified                                           
+
+  Calls         Participants on floating tiles     Drag a tile to  Grid view
+                arranged in a semicircle; the      pin; pinch to   
+                active speaker moves slightly      switch between  
+                forward and lights up; spatial     semicircle and  
+                audio matches tile position        grid            
+
+  Meetings      Optional virtual room: a round     Tap a seat to   Grid with
+  (immersive)   table with avatar or video panels  move; walk      side
+                in seats, a shared screen on the   through a door  panels
+                wall, a whiteboard as a 3D board;  to join a       
+                breakout rooms as doors            breakout        
+
+  Ambient       A floor plan of team "tables";     Drag yourself   List of
+  presence      people appear as glowing orbs with to a table to   who is in
+  rooms         initials; voices come from their   join that       the room
+                position                           conversation    
+
+  Agent Ops     The live agent graph in real 3D:   Orbit, zoom,    The
+                Amer at the centre, agents as orbs tap an agent to current 2D
+                on an orbit, handoffs as light     open its log;   graph
+                pulses travelling along arcs,      timeline        
+                files as small cubes collecting    scrubber to     
+                around each agent, failures as red replay a        
+                flashes                            project         
+
+  Amer avatar   A 3D head-and-shoulders avatar in  Tap to talk;    Animated
+                the corner that speaks answers     drag to dock;   2D orb
+                with lip-sync, nods while          can be switched (Rive)
+                listening, and shows thinking with to a simple orb 
+                a subtle light ring                                
+
+  Decision      A vertical timeline as a stack of  Tap a tile to   Timeline
+  ledger        glass tiles; superseded decisions  see its         list
+                sink back and fade                 versions as a   
+                                                   fan             
+
+  Operator mode A 3D map of the affected network   Tap a site to   Site list
+                sites and links; the faulty link   see alarms;     with
+                pulses red; the incident timeline  rotate to see   severity
+                runs along the bottom              layers          colours
+                                                   (optical, IP)   
+
+  Health and    Services as pillars whose height   Tap a pillar    Current
+  Ops           is latency and colour is status;   for the probe   Health
+                history shown as a ribbon behind   history         screen
+                them                                               
+  ---------------------------------------------------------------------------
+
+Motion, interaction, accessibility and build plan
+
+Motion
+
+  --------------------------------------------------------------------------
+  Motion                  Duration     Curve
+  ----------------------- ------------ -------------------------------------
+  Panel enters from depth 280 ms       easeOutCubic, scale 0.96 → 1, blur 8
+                                       → 0
+
+  Card tilt on scroll     continuous   spring (stiffness 300, damping 30),
+                                       max 5°
+
+  Handoff pulse along an  600 ms       easeInOut
+  arc                                  
+
+  Avatar idle             4 s loop     subtle breathing; stops with Reduce
+                                       motion
+
+  Alert                   180 ms       quick lift plus one red glow; no
+                                       shaking
+  --------------------------------------------------------------------------
+
+Interaction rules
+
+-   Every 3D element has a 2D tap target of at least 48 dp.
+
+-   Gestures are optional shortcuts; every action is also reachable
+    through a visible button.
+
+-   Camera moves are always user-initiated, except for a gentle
+    re-centre after 5 seconds of inactivity.
+
+-   Haptics: light tick on lift, medium on confirm, none during calls.
+
+Accessibility
+
+-   Reduce motion and the system "remove animations" setting switch all
+    views to flat.
+
+-   Screen readers get a semantic tree for 3D scenes (each agent,
+    participant or site is a labelled node with its state).
+
+-   Contrast ratio of at least 4.5:1 for text on glass, enforced by a
+    darker scrim behind text.
+
+-   No information is carried by depth or colour alone; every state has
+    a text label.
+
+Build plan inside the single phase
+
+1.  Weeks 1–3: design tokens (depth levels, glass, light, motion) in
+    theme.dart; a Depth widget and GlassPanel component; GPU-tier
+    detection and the fallback switch.
+
+2.  Weeks 3–8: 2.5D pass on every screen (home, chat list, chat, calls,
+    settings).
+
+3.  Weeks 6–14: real 3D scenes: Agent Ops graph, calls semicircle, Amer
+    avatar with lip-sync.
+
+4.  Weeks 12–20: immersive meetings, presence rooms, operator mode map,
+    health pillars.
+
+5.  Weeks 18–24: performance tuning on low-end Android, Arabic mirroring
+    review, accessibility audit, golden-image tests for every view in
+    all three modes (3D, 2.5D, flat).
+
+Acceptance tests: 60 fps on the reference mid-range phone in every 3D
+view; every screen passes the screen-reader audit; switching Reduce
+motion on changes every view to flat within one frame; Arabic layouts
+mirror correctly in golden tests.
+
+Sources
+
+-   TechRepublic: Microsoft Teams 2026 AI upgrades
+
+-   Microsoft Teams blog, April 2026
+
+-   Microsoft Teams blog, March 2026
+
+-   Pulse 2.0: Slackbot 30+ features
+
+-   Zoom: AI innovations for Zoom Workplace
+
+-   IT Brief: Zoom agentic AI
+
+-   Webex: What's new
+
+-   UC Today: Webex Calling AI features
+
+-   9to5Google: Google Cloud Next 26
+
+Note: the feature lists come from search results and news coverage. The
+individual pages were not opened in full, so check specific claims
+before quoting them externally.

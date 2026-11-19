@@ -22,6 +22,15 @@ def _handle_olm_event(self, sender, sender_key, payload):
     return _orig_handle(self, sender, sender_key, payload)
 Olm._handle_olm_event = _handle_olm_event
 
+# matrix-nio 0.26 compares the SAS commitment as a hex SHA-256, but the spec (and matrix-dart-sdk) use unpadded
+# base64, so nio wrongly reports a commitment mismatch against every spec-compliant client. Check it per spec.
+import base64, hashlib
+from nio.api import Api
+def _check_commitment(self, key):
+    d = hashlib.sha256(key.encode() + Api.to_canonical_json(self.start_verification().content).encode()).digest()
+    return self.commitment in (base64.b64encode(d).decode().rstrip("="), d.hex())
+Sas._check_commitment = _check_commitment
+
 HS = os.getenv("HS", "http://localhost"); SERVER = os.getenv("SERVER_NAME", "amer.test")
 ME = f"@moh:{SERVER}"; OUT = os.getenv("OUT", "moh2.json")
 state = {"stage": "start", "emoji": [], "verified": False}
@@ -41,6 +50,7 @@ async def main():
         sas = c.key_verifications[ev.transaction_id]; await c.to_device(sas.share_key()); save(stage="key-shared")
     async def on_key(ev):
         sas = c.key_verifications[ev.transaction_id]
+        if sas.canceled: save(stage="error", error=f"nio cancelled: {sas.cancel_code} {sas.cancel_reason}"); return
         save(stage="emoji", emoji=[e[1] for e in sas.get_emoji()])          # names, e.g. "Dog", "Pizza"
         await asyncio.sleep(15)                                              # let the app show and the test compare them
         await c.confirm_short_auth_string(ev.transaction_id); save(stage="confirmed")
@@ -77,6 +87,7 @@ async def main():
     for n in range(90):                                                      # up to ~3 minutes; re-request until the app answers
         if n % 10 == 9 and state["stage"] == "requested": await request()
         await c.sync(timeout=2000)
+        if c.outgoing_to_device_messages: await c.send_to_device_messages()   # e.g. nio's own cancels reach the app
         if state["stage"] in ("done", "cancelled", "error"): break
     await c.close()
 

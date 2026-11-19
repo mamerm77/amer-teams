@@ -6,6 +6,8 @@ from prometheus_client import Counter, Histogram, generate_latest
 import asyncio
 from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace, compliance
 from .admin import require_admin
+from .agentops.router import router as agentops_router
+from .agentops import store as agentops_store
 
 app = FastAPI(title="Amer Teams Orchestrator", version="0.5.0")
 
@@ -14,6 +16,7 @@ app.include_router(sip.router)
 app.include_router(meetings.router)
 app.include_router(calltrace.router)
 app.include_router(compliance.router)
+app.include_router(agentops_router)
 
 @app.on_event("startup")
 async def _start():
@@ -22,6 +25,8 @@ async def _start():
         if aid in agents.AGENTS: agents.AGENTS[aid].enabled = en
     asyncio.create_task(ops.loop())
     asyncio.create_task(calltrace.retention_loop())
+    s = agentops_store.store()
+    if hasattr(s, "mark_interrupted"): await s.mark_interrupted()
 REQ = Counter("amer_agent_requests_total", "Agent requests", ["agent"])
 LAT = Histogram("amer_agent_latency_seconds", "Agent latency", ["agent"])
 ERR = Counter("amer_agent_errors_total", "Agent requests that failed", ["agent"])

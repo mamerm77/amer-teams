@@ -95,4 +95,40 @@ class ApiService {
   }
   /// The Amer assistant account on this server (a chat participant).
   Future<Map<String, dynamic>> assistant() async => jsonDecode((await http.get(_u('/v1/ai/assistant'), headers: _h)).body);
+
+  // ---------- Agent Ops (AI agent teams delivering projects) ----------
+  Future<List<dynamic>> agentopsProjects() => _get('/v1/agentops/projects');
+  Future<List<dynamic>> agentopsTeam() => _get('/v1/agentops/team');
+  Future<List<dynamic>> agentopsEvents({int after = 0, String? projectId}) async {
+    final r = await http.get(_u('/v1/agentops/events').replace(queryParameters: {'after': '$after', if (projectId != null) 'project_id': projectId}), headers: _h);
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j as List;
+  }
+  Future<Map<String, dynamic>> agentopsStart(String prompt, {String? name}) => _post('/v1/agentops/projects', {'prompt': prompt, if (name != null) 'name': name});
+  Future<void> agentopsStop(String projectId) => _post('/v1/agentops/projects/${Uri.encodeComponent(projectId)}/stop', {});
+  Future<Map<String, dynamic>> agentopsReplay({double speed = 3}) => _post('/v1/agentops/replay', {'speed': speed});
+
+  /// Live Server-Sent Events from /v1/agentops/stream. Ends when the connection drops;
+  /// the caller reconnects with the last seq it saw, so no event is lost or repeated.
+  Stream<Map<String, dynamic>> agentopsStream({int after = 0}) async* {
+    final client = http.Client();
+    try {
+      final req = http.Request('GET', _u('/v1/agentops/stream').replace(queryParameters: {'after': '$after'}))
+        ..headers.addAll({'Authorization': 'Bearer ${m.accessToken}', 'Accept': 'text/event-stream'});
+      final res = await client.send(req);
+      if (res.statusCode != 200) throw Exception('Agent Ops stream refused (${res.statusCode})');
+      final data = StringBuffer();
+      await for (final line in res.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (line.startsWith('data:')) {
+          data.write(line.substring(5).trimLeft());
+        } else if (line.isEmpty && data.isNotEmpty) {
+          yield jsonDecode(data.toString()) as Map<String, dynamic>;
+          data.clear();
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
 }
