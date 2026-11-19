@@ -59,6 +59,25 @@ class SearchIndex {
     return [for (final r in rows) DateTime.fromMillisecondsSinceEpoch(int.parse('${r['ts']}'))];
   }
 
+  /// Words I use most in what I wrote (last 90 days), for expertise suggestions on this device (docs/EXPERTISE.md).
+  Future<List<String>> myTopTerms(String me, {int n = 15}) async {
+    final db = _db; if (db == null) return [];
+    final rows = await db.query('msgs', columns: ['body'], where: 'sender = ? AND kind = ? AND CAST(ts AS INTEGER) >= ?', whereArgs: [me, 'text', DateTime.now().subtract(const Duration(days: 90)).millisecondsSinceEpoch], limit: 3000);
+    final count = <String, int>{};
+    for (final r in rows) {
+      for (final w in '${r['body']}'.toLowerCase().split(RegExp(r'[^\p{L}\p{N}+#/-]+', unicode: true))) {
+        if (w.length < 4 || _stop.contains(w) || RegExp(r'^\d+$').hasMatch(w)) continue;
+        count[w] = (count[w] ?? 0) + 1;
+      }
+    }
+    final top = count.entries.where((e) => e.value >= 3).toList()..sort((a, b) => b.value.compareTo(a.value));
+    return top.take(n).map((e) => e.key).toList();
+  }
+  static const _stop = {'that', 'this', 'with', 'have', 'will', 'from', 'they', 'what', 'when', 'your', 'there', 'about', 'would', 'could', 'should', 'thanks', 'thank',
+    'please', 'just', 'like', 'also', 'been', 'were', 'their', 'them', 'then', 'than', 'which', 'into', 'some', 'more', 'only', 'very', 'here', 'okay', 'sure', 'today',
+    'tomorrow', 'meeting', 'call', 'need', 'know', 'think', 'good', 'great', 'send', 'sent', 'done', 'let\'s', 'yes', 'noted', 'regards', 'hello', 'dear',
+    'هذا', 'هذه', 'على', 'إلى', 'التي', 'الذي', 'شكرا', 'شكراً', 'ممكن', 'لكن', 'بعد', 'قبل', 'كان', 'يكون', 'اليوم'};
+
   /// Full-text search with optional filters. Words are matched as prefixes ("vend" finds "vendor").
   Future<List<Map<String, Object?>>> search(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
     final db = _db; if (db == null) return [];

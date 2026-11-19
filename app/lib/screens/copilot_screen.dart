@@ -1,3 +1,4 @@
+import 'expertise_screen.dart';
 import 'skills_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -36,6 +37,7 @@ class _S extends State<CopilotScreen> {
     ListenableBuilder(listenable: Flags.instance, builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
       if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
       TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: const Text('Skills and marketplace'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
+      TextButton.icon(icon: const Icon(Icons.person_search), label: const Text('Who knows about…'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const ExpertiseScreen()))),
       if (Flags.instance.on('workflows')) TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: const Text('Workflows'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
     ])),
       Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with Amer')))]),

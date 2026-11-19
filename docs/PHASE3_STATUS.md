@@ -58,7 +58,7 @@ Each built feature has a doc listing its open gaps.
 | 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
 | 10 | Focus guardian | Built: server holds pushes (priority senders only), status, DM auto-reply, busy in find-a-time, summary of what waited (FOCUS.md) |
 | 11 | Wellbeing signals | Built: private, on-device weekly signals and nudges; no team view by design (WELLBEING.md) |
-| 12 | Live expertise map | Not started |
+| 12 | Live expertise map | Built: opt-in self-published topics, on-device suggestions from your own messages, ranked search; tested 3/3 (EXPERTISE.md) |
 | 13 | Ambient presence rooms | Built: always-open team room, who's-here bar from the media server, drop in muted; tested 4/4 (AMBIENT.md) |
 | 14 | Agent marketplace | Built: submit, administrator review with notes, tenant marketplace, install counts, re-review on edit (SKILLS.md) |
 | 15 | Operator mode for telecoms | Built: on-call rotas, incident numbers, encrypted war rooms, paging through quiet hours, forward-only states, MTTA/MTTR, Alertmanager opens and resolves incidents; AI post-incident review; tested 12/12 (OPERATOR_MODE.md) |
