@@ -38,7 +38,7 @@ class Depth extends ChangeNotifier {
 
   ThemeData theme(ThemeData base, BuildContext? c, DepthMode m) {
     if (m == DepthMode.flat) return base.copyWith(cardTheme: base.cardTheme.copyWith(elevation: 0, shape: RoundedRectangleBorder(side: BorderSide(color: base.colorScheme.outlineVariant), borderRadius: BorderRadius.circular(12))),
-      pageTransitionsTheme: const PageTransitionsTheme(builders: {for (final p in TargetPlatform.values) p: FadeForwardsPageTransitionsBuilder()}));
+      pageTransitionsTheme: PageTransitionsTheme(builders: {for (final p in TargetPlatform.values) p: const FadeForwardsPageTransitionsBuilder()}));
     if (m == DepthMode.d25) return base.copyWith(cardTheme: base.cardTheme.copyWith(elevation: 3, shadowColor: Colors.black54, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))));
     return base.copyWith(cardTheme: base.cardTheme.copyWith(elevation: 6, shadowColor: Colors.black87, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
       pageTransitionsTheme: PageTransitionsTheme(builders: {for (final p in TargetPlatform.values) p: const _DepthPageTransition()}));

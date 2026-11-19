@@ -138,7 +138,7 @@ Future<void> confirmSignOut(BuildContext c) async {
     content: Text(backedUp
         ? 'Your encrypted chat history is backed up. On your next sign-in, use your recovery key in Security to read old messages.'
         : 'You have not set up encrypted backup. If you sign out, old encrypted messages cannot be read on this or any new device. Set up backup in Security first.'),
-    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))),
-      FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Sign out')))]));
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(d, 'Cancel'))),
+      FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(d, 'Sign out')))]));
   if (ok == true) await m.logout();
 }

@@ -62,7 +62,7 @@ Future<void> newSharedChannel(BuildContext c) async {
       items: [for (final p in partners) DropdownMenuItem(value: '${p['server']}', child: Text('${p['server']}${(p['note'] ?? '') != '' ? ' (${p['note']})' : ''}'))], onChanged: (v) => set(() => server = v!)),
     TextField(controller: people, decoration: InputDecoration(labelText: 'Invite (comma separated)', hintText: '@name:$server')),
     const Padding(padding: EdgeInsets.only(top: 8), child: Text('End-to-end encrypted. Card numbers, IBANs and Emirates IDs are stopped on your device before they are sent.', style: TextStyle(fontSize: 12))),
-  ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Create')))])));
+  ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(d, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(d, 'Create')))])));
   if (ok != true || name.text.trim().isEmpty) return;
   final inv = people.text.split(',').map((x) => x.trim()).where((x) => x.startsWith('@')).toList();
   try {
