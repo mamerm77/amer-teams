@@ -37,7 +37,7 @@ Each built feature has a doc listing its open gaps.
 | Webinars and town halls | Existing webinar mode (attendees cannot publish); registration, Q&A and HLS not started |
 | Breakout rooms | Existing |
 | Live translated captions | Partial: on-device captions exist; translation not started |
-| Noise suppression, blur, low light | Not started |
+| Noise suppression, blur, low light | Partial: WebRTC noise suppression, echo cancellation, gain control on every call; blur and low light need a native video plugin (segmentation on each platform) |
 | Deepfake detection | Not started |
 | AI call handling for phone lines | Not started |
 | Room devices and booking | Not started |
@@ -55,7 +55,7 @@ Each built feature has a doc listing its open gaps.
 | 6 | Pre-mortem agent | Not started |
 | 7 | Network-aware calls | Not started (call trace collects the inputs) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
-| 9 | Arabic-first co-pilot | Partial: prayer times, Ramadan hours and Arabic decision phrases; RTL and Hijri calendar UI not started |
+| 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
 | 10 | Focus guardian | Not started |
 | 11 | Wellbeing signals | Not started |
 | 12 | Live expertise map | Not started |
@@ -84,7 +84,7 @@ Each built feature has a doc listing its open gaps.
 | Out-of-office from calendar | Partial: set by hand (status, automatic reply, delegate); calendar-event trigger waits for connectors |
 | Message-to-task and task boards | Built (DECISIONS.md) |
 | File previews with comments | Partial: images preview; PDF and Office not started |
-| Unified search | Partial: in-chat search exists; cross-chat index not started |
+| Unified search | Built: on-device FTS index, filters, people (SEARCH.md); transcripts not indexed |
 | Notification settings and quiet hours | Built: server push filter, per-chat levels, priority senders (NOTIFICATIONS.md) |
 | Accessibility | Not started (beyond tooltips and labels) |
 | Multi-device handoff | Not started |
@@ -97,4 +97,4 @@ Each built feature has a doc listing its open gaps.
 |---|---|
 | Modern 3D UI with 2.5D and flat fallbacks | Not started |
 | Feature flags per tenant | Built: per tenant, stable rollout %, server-gated, admin screen (FEATURE_FLAGS.md) |
-| Arabic and English strings (ARB), RTL | Not started |
+| Arabic and English strings (ARB), RTL | Partial: locale switch, RTL, Flutter widgets localised, key strings translated |
