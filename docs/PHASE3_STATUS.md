@@ -40,7 +40,7 @@ Each built feature has a doc listing its open gaps.
 | Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
 | Deepfake detection | Not started |
 | AI call handling for phone lines | Not started |
-| Room devices and booking | Not started |
+| Room devices and booking | Built: booking with no double booking (database constraint), private titles, check-in and no-show release, paired room display; tested 12/12 (ROOMS.md) |
 | Frontline shifts and walkie-talkie | Not started |
 | DLP and inherited sensitivity labels | Partial: chat labels block AI (Guardian); DLP not started |
 

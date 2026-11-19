@@ -13,6 +13,7 @@ class ApiService {
   Uri url(String p) => _u(p);
   Map<String, String> get headers => _h;
   String? get me => m.client.userID;
+  Future<void> deletePath(String p) async { final r = await http.delete(_u(p), headers: _h); if (r.statusCode >= 300) throw Exception('Request failed (${r.statusCode})'); }
   Future<Map<String, dynamic>> putMap(String p, Map body) async {
     final r = await http.put(_u(p), headers: _h, body: jsonEncode(body));
     final j = jsonDecode(utf8.decode(r.bodyBytes));
