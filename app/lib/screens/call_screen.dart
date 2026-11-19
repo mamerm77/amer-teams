@@ -35,6 +35,12 @@ class _S extends State<CallScreen> {
   _Panel panel = _Panel.none;
   final hands = <String>{}; final floating = <(String, String, DateTime)>[];
   final stt = SpeechToText(); final transcript = StringBuffer(); String liveCaption = '';
+  /// The meeting's transcript, held only in memory on this device: own final captions plus lines other
+  /// participants shared over the encrypted data channel. Gone when the meeting screen closes.
+  final lines = <Map<String, Object?>>[];
+  static const _aiState = 'com.amerteams.meeting.ai';
+  bool get aiOn { final s = room.getState(_aiState)?.content; return s?['enabled'] == true && s?['call_id'] == callId; }
+  bool asking = false;
   Timer? tick; EventsListener<RoomEvent>? ev;
   final chatInput = TextEditingController();
   Future<mx.Timeline>? _chatTl;   // loaded once, updates itself
@@ -101,6 +107,7 @@ class _S extends State<CallScreen> {
     _snack('Breakout rooms opened');
   }
   void _onRoomEvent(mx.Event e) async {
+    if (e.roomId == widget.roomId && e.type == _aiState) { if (mounted) setState(() {}); return; }
     if (e.roomId != widget.roomId || e.type != 'com.amerteams.breakout' || e.senderId == me) return;
     final mine = ((e.content['rooms'] as List?) ?? []).cast<Map>().where((r) => (r['members'] as List).contains(me)).firstOrNull;
     if (mine == null || !mounted) return;
@@ -232,6 +239,7 @@ class _S extends State<CallScreen> {
       setState(() {
         if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); }
         if (j['t'] == 'react') floating.add((who, j['e'] as String, DateTime.now()));
+        if (j['t'] == 'cap' && aiOn && j['x'] is String) lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch});
       });
     } catch (_) {}
   }
@@ -245,10 +253,56 @@ class _S extends State<CallScreen> {
 
   Future<void> _toggleCaptions() async {
     if (!captions && await stt.initialize()) {
-      stt.listen(onResult: (r) { setState(() => liveCaption = r.recognizedWords); if (r.finalResult) transcript.writeln('Me: ${r.recognizedWords}'); },
+      stt.listen(onResult: (r) {
+        setState(() => liveCaption = r.recognizedWords);
+        if (!r.finalResult || r.recognizedWords.trim().isEmpty) return;
+        transcript.writeln('Me: ${r.recognizedWords}');
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        lines.add({'speaker': room.client.userID == null ? 'Me' : (room.unsafeGetUserFromMemoryOrFallback(me).calcDisplayname()), 'text': r.recognizedWords, 'ts': ts});
+        if (aiOn && call != null) _send({'t': 'cap', 'x': r.recognizedWords, 'ts': ts}).catchError((_) {});   // shared only while Amer is on
+      },
                  listenOptions: SpeechListenOptions(partialResults: true, onDevice: true));
       setState(() => captions = true);
     } else { await stt.stop(); setState(() => captions = false); }
+  }
+
+  // ---------- Amer in the meeting (ask-the-meeting agent) ----------
+  Future<void> _toggleAi() async {
+    final on = !aiOn;
+    try {
+      await room.client.setRoomStateWithKey(room.id, _aiState, '', {'enabled': on, 'call_id': callId, 'by': me});
+      _snack(on ? 'Amer is on for this meeting. Everyone sees that AI is listening.' : 'Amer is off for this meeting');
+      setState(() {});
+    } catch (e) { _snack('Could not change Amer: $e'); }
+  }
+  Future<void> _askDialog([String? preset]) async {
+    if (!aiOn) { _snack(isHost ? 'Switch Amer on for this meeting first (More → Amer in this meeting)' : 'The host has not switched Amer on for this meeting'); return; }
+    final q = TextEditingController(text: preset);
+    final question = preset ?? await showDialog<String>(context: context, builder: (d) => AlertDialog(
+      title: const Text('Ask Amer about this meeting'),
+      content: TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'e.g. What did we decide about the budget?'), onSubmitted: (v) => Navigator.pop(d, v)),
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, q.text), child: const Text('Ask'))]));
+    if (question == null || question.trim().isEmpty || !mounted) return;
+    setState(() => asking = true);
+    String answer;
+    try {
+      final r = await context.read<ApiService>().askMeeting(callId, room.id, question.trim(), lines);
+      answer = r['answer'] as String? ?? '';
+    } catch (e) { answer = '$e'.replaceFirst('Exception: ', ''); }
+    if (!mounted) return;
+    setState(() => asking = false);
+    await showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [const Icon(Icons.auto_awesome), const SizedBox(width: 8), const Expanded(child: Text('Amer', style: TextStyle(fontWeight: FontWeight.w600))),
+        Text('Only you can see this', style: TextStyle(fontSize: 12, color: Theme.of(s).colorScheme.outline))]),
+      const SizedBox(height: 8), Text(question.trim(), style: const TextStyle(fontStyle: FontStyle.italic)),
+      const SizedBox(height: 8), Flexible(child: SingleChildScrollView(child: SelectableText(answer))),
+      const SizedBox(height: 12),
+      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+        TextButton(onPressed: () => Navigator.pop(s), child: const Text('Close')),
+        FilledButton.icon(icon: const Icon(Icons.share, size: 18), label: const Text('Share to everyone'), onPressed: () async {
+          Navigator.pop(s); await room.sendTextEvent('🤖 Amer, asked by ${room.unsafeGetUserFromMemoryOrFallback(me).calcDisplayname()}: ${question.trim()}\n\n$answer'); }),
+      ]),
+    ]))));
   }
 
   Future<void> _switchCamera() async {
@@ -262,8 +316,9 @@ class _S extends State<CallScreen> {
     }
     cm?.inCall = false;
     tick?.cancel(); await stt.stop(); await ev?.dispose(); await call?.leave();
-    if (amerNotes && transcript.isNotEmpty && mounted) {
-      final r = await context.read<ApiService>().ask('Write minutes', context: transcript.toString(), agent: 'minutes');
+    if (amerNotes && (transcript.isNotEmpty || lines.isNotEmpty) && mounted) {
+      final full = lines.isEmpty ? transcript.toString() : lines.map((l) => '${l['speaker']}: ${l['text']}').join('\n');
+      final r = await context.read<ApiService>().ask('Write minutes', context: full, agent: 'minutes');
       await room.sendTextEvent('📝 Minutes by Amer\n\n${r['answer']}');
     }
     if (mounted) Navigator.pop(context);
@@ -328,6 +383,7 @@ class _S extends State<CallScreen> {
               case 'breakout': _breakouts();
               case 'muteall': _host('mute_all');
               case 'lock': _toggleLock();
+              case 'amer': _toggleAi();
               case 'webinar': _setWebinar(!webinar);
               case 'end': _host('end');
             }
@@ -339,6 +395,7 @@ class _S extends State<CallScreen> {
             if (isHost) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'lock', child: ListTile(leading: Icon(locked ? Icons.lock_open : Icons.lock), title: Text(locked ? 'Unlock meeting' : 'Lock meeting'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'webinar', child: ListTile(leading: const Icon(Icons.campaign), title: Text(webinar ? 'Turn off webinar mode' : 'Webinar mode'))),
+            if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
         ]),
@@ -347,6 +404,13 @@ class _S extends State<CallScreen> {
         if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
           content: Text("You're the only one here.${mid != null ? ' Share meeting ID ${MeetingService.format(mid)} or invite people.' : ' Invite people to join.'}"),
           actions: [FilledButton.tonal(onPressed: _shareLink, child: const Text('Invite people'))]),
+        if (aiOn) MaterialBanner(leading: const Icon(Icons.hearing, color: Colors.deepPurple),
+          content: Text(captions ? 'AI listening · Amer is on for this meeting. Your speech is transcribed on this device and shared encrypted with the meeting.'
+                                 : 'AI listening · Amer is on for this meeting. Your speech is not shared until you turn on Captions.'),
+          actions: [
+            if (!captions) TextButton(onPressed: _toggleCaptions, child: const Text('Share my speech')),
+            if (isHost) TextButton(onPressed: _toggleAi, child: const Text('Turn off')),
+            FilledButton.tonal(onPressed: asking ? null : () => _askDialog(), child: Text(asking ? 'Asking…' : 'Ask Amer'))]),
         if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. The on-device transcript goes to the AI engine when you leave.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: const Text('Stop'))]),
         Expanded(child: wide || panel == _Panel.none
             ? Row(children: [Expanded(child: stage), if (panel != _Panel.none) SizedBox(width: 340, child: _panel(people, waiting))])
@@ -361,6 +425,7 @@ class _S extends State<CallScreen> {
           PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
             itemBuilder: (_) => [for (final e in ['👍', '👏', '❤️', '😂', '😮', '🎉']) PopupMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 22)))]),
           _btn(captions ? Icons.closed_caption : Icons.closed_caption_off, 'Captions', _toggleCaptions, off: captions),
+          if (aiOn) _btn(Icons.question_answer_outlined, 'Ask Amer', () => _askDialog()),
           _btn(Icons.auto_awesome, 'Amer minutes', () => setState(() => amerNotes = !amerNotes), off: amerNotes),
           FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(110, 48)), onPressed: _leave, icon: const Icon(Icons.call_end), label: const Text('Leave')),
         ]))),
@@ -448,5 +513,9 @@ class _S extends State<CallScreen> {
         IconButton(icon: const Icon(Icons.send), onPressed: _sendChat)]))),
     ]));
   }
-  Future<void> _sendChat() async { final t = chatInput.text.trim(); if (t.isEmpty) return; chatInput.clear(); await room.sendTextEvent(t); }
+  Future<void> _sendChat() async {
+    final t = chatInput.text.trim(); if (t.isEmpty) return; chatInput.clear();
+    if (t.toLowerCase().startsWith('/ask')) { final q = t.substring(4).trim(); return _askDialog(q.isEmpty ? null : q); }   // private: never posted
+    await room.sendTextEvent(t);
+  }
 }

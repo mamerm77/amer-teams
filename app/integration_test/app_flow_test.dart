@@ -212,6 +212,16 @@ void main() {
     await step('Meeting: raise hand', () async { await wait(6); /* let the "No camera" notice clear the control bar */ await tap(find.byTooltip('Raise hand'), 'Raise hand'); expectFound(await waitFor(find.byTooltip('Lower hand')), 'hand raised'); });
     await step('Meeting: participants panel', () async { await tap(find.byTooltip('Participants'), 'Participants'); expectFound(await waitFor(find.textContaining('Participants (')), 'participants list'); });
     await step('Meeting: chat panel', () async { await tap(find.byTooltip('Chat'), 'Chat'); expectFound(await waitFor(field('Message everyone (encrypted)')), 'meeting chat'); });
+    await step('Meeting: host switches Amer on, everyone sees AI listening', () async {
+      await tap(find.byTooltip('More'), 'More'); await tap(find.text('Amer in this meeting'), 'Amer in this meeting');
+      expectFound(await waitFor(find.textContaining('AI listening'), secs: 20), 'AI listening banner');
+    });
+    await step('Meeting: /ask answers privately', () async {
+      await t.enterText(field('Message everyone (encrypted)'), '/ask what did we decide?'); await t.testTextInput.receiveAction(TextInputAction.done); await wait(1);
+      expectFound(await waitFor(find.text('Only you can see this'), secs: 30), 'private answer sheet');
+      expectFound(find.text('Share to everyone'), 'share option');
+      await tap(find.text('Close'), 'Close');
+    });
     await step('Meeting: whiteboard', () async {
       await tap(find.byTooltip('More'), 'More');
       await tap(find.text('Whiteboard'), 'Whiteboard'); await wait(3);

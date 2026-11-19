@@ -34,6 +34,9 @@ class ApiService {
 
   Future<List<dynamic>> alerts() async => jsonDecode((await http.get(_u('/v1/ops/alerts'), headers: _h)).body);
 
+  /// Ask-the-meeting agent: question plus the last 20 minutes of the meeting's on-device transcript (docs/MEETING_AGENT.md).
+  Future<Map<String, dynamic>> askMeeting(String callId, String roomId, String question, List<Map<String, Object?>> transcript) =>
+      _post('/v1/meetings/${Uri.encodeComponent(callId)}/ask', {'room_id': roomId, 'question': question, 'transcript': transcript});
   /// Catch-up digest of unread chats (docs/CATCH_UP.md).
   Future<Map<String, dynamic>> digest(Map<String, Object?> body) => _post('/v1/ai/digest', body);
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});
