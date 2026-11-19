@@ -79,7 +79,11 @@ jobs:
       - name: Build installer
         shell: pwsh
         run: |
-          choco install nsis -y --no-progress
+          # NSIS: Chocolatey, retried; if its feed is down, winget (the community feed has had outages)
+          $mk = "${env:ProgramFiles(x86)}\NSIS\makensis.exe"
+          for ($i = 0; $i -lt 3 -and -not (Test-Path $mk); $i++) { choco install nsis -y --no-progress; if (-not (Test-Path $mk)) { Start-Sleep 20 } }
+          if (-not (Test-Path $mk)) { winget install --id NSIS.NSIS -e --silent --accept-package-agreements --accept-source-agreements --disable-interactivity }
+          if (-not (Test-Path $mk)) { throw "Could not install NSIS" }
           bash installer/stage_server.sh
           $v = (Select-String -Path app/pubspec.yaml -Pattern '^version: (\S+?)\+').Matches[0].Groups[1].Value
           & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /DVERSION=$v /DAPPDIR=..\app\build\windows\x64\runner\Release /DSERVERDIR=stage\server installer\amer-teams.nsi
