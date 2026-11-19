@@ -43,6 +43,8 @@ class SecureCall {
   String get safetyCode => _key == null ? '------'
       : sha256.convert([..._key!, ...utf8.encode(callId)]).toString().substring(0, 6).toUpperCase();
   bool get quantumSafe => _key != null;
+  /// For admitting browser guests (docs/GUESTS.md): the current call key exactly as handed to the frame encryptor.
+  String? get sharedKeyForGuests => _key == null ? null : base64.encode(_key!);
 
   static Future<SecureCall> start(ApiService api, mx.Room room, {bool video = true, String? callId}) async {
     if (!room.encrypted) throw StateError('Calls require an end-to-end encrypted room');

@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:amer_background/amer_background.dart';
 import '../services/recording.dart';
+import '../services/guest_keys.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -250,7 +252,7 @@ class _S extends State<CallScreen> {
       sec('Speaker', Icons.volume_up_outlined, 'audiooutput', lk.setAudioOutputDevice),
     ])));
   }
-  void _refresh() { _recTick(); if (mounted) setState(() {}); }
+  void _refresh() { _recTick(); _guestTick(); if (mounted) setState(() {}); }
 
   void _onCtl() {
     final c = ctl!;
@@ -297,6 +299,8 @@ class _S extends State<CallScreen> {
       final j = jsonDecode(utf8.decode(e.data)); final who = e.participant?.name ?? 'Someone';
       setState(() {
         if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); }
+        if (j['t'] == 'gk-hello' && (e.participant?.identity ?? '').startsWith('guest-') && j['pk'] is String) lobby[e.participant!.identity] = (j['pk'] as String, who);
+        if (j['t'] == 'qa') _onQa(j, who);
         if (j['t'] == 'rec') _onRec(j, e.participant?.identity ?? '', who);
         if (j['t'] == 'react') floating.add((who, j['e'] as String, DateTime.now()));
         if (j['t'] == 'cap' && aiOn && j['x'] is String) lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch});
@@ -412,6 +416,74 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- browser guests: lobby and key hand-over (docs/GUESTS.md) ----------
+  final lobby = <String, (String, String)>{};      // identity -> (X25519 public key, display name), waiting
+  final admitted = <String, (String, int)>{};     // identity -> (public key, key index last sent)
+  bool _askedWho = false;
+  void _guestTick() {
+    if (!isHost || call == null) return;
+    final here = call!.lk.remoteParticipants.keys.toSet();
+    lobby.removeWhere((k, _) => !here.contains(k)); admitted.removeWhere((k, _) => !here.contains(k));
+    if (!_askedWho && here.any((i) => i.startsWith('guest-'))) { _askedWho = true; _send({'t': 'gk-who'}); }
+    for (final e in admitted.entries.toList()) { if (e.value.$2 != call!.keyIndex) _sendKey(e.key, e.value.$1); }   // the key rotated
+  }
+  Future<void> _sendKey(String ident, String pk) async {
+    final k = call?.sharedKeyForGuests; if (k == null) return;
+    admitted[ident] = (pk, call!.keyIndex);
+    try { await _send(await GuestKeys.wrap(k, pk, call!.keyIndex, ident)); } catch (_) { admitted.remove(ident); }
+  }
+  Future<void> _admit(String ident) async { final g = lobby.remove(ident); if (g != null) { await _sendKey(ident, g.$1); setState(() {}); } }
+  Future<void> _guestLinkDialog({bool webinar = false}) async {
+    final api = context.read<ApiService>();
+    try {
+      final Uri link; String extra = '';
+      if (webinar) {
+        final r = await api.createWebinar(widget.roomId, callId, room.getLocalizedDisplayname());
+        link = api.publicUrl('/join?w=${r['slug']}'); extra = 'Registration page. Each person who registers gets a personal join link and joins as an attendee.';
+      } else {
+        final r = await api.guestLink(widget.roomId, callId);
+        link = api.publicUrl('/join#${r['code']}'); extra = 'Works in a browser for 24 hours. Guests wait in the lobby until a host lets them in.';
+      }
+      if (!mounted) return;
+      await showDialog(context: context, builder: (d) => AlertDialog(title: Text(webinar ? 'Webinar registration' : 'Guest link'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText('$link'), const SizedBox(height: 8), Text(extra)]),
+        actions: [TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: '$link')); Navigator.pop(d); _snack('Link copied'); }, child: const Text('Copy'))]));
+    } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
+  }
+
+  // ---------- Q&A (webinars and town halls) ----------
+  final qa = <String, Map<String, dynamic>>{}; final _qaTick = ValueNotifier(0);
+  void _onQa(Map j, String who) {
+    final id = j['id'] as String?; if (id == null) return;
+    if (j['op'] == 'ask' && j['q'] is String) qa[id] = {'id': id, 'q': (j['q'] as String).substring(0, min((j['q'] as String).length, 300)), 'name': j['name'] ?? who, 'votes': 0, 'answered': false};
+    if (j['op'] == 'vote') qa[id]?['votes'] = (qa[id]?['votes'] as int? ?? 0) + 1;
+    if (j['op'] == 'answered') qa[id]?['answered'] = true;
+    _qaTick.value++;
+  }
+  void _qaSheet() {
+    final input = TextEditingController(); final voted = <String>{};
+    showModalBottomSheet(context: context, isScrollControlled: true, builder: (c) => Padding(padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
+      child: SizedBox(height: 480, child: ValueListenableBuilder(valueListenable: _qaTick, builder: (c, _, __) {
+        final list = qa.values.toList()..sort((a, b) => a['answered'] != b['answered'] ? (a['answered'] ? 1 : -1) : (b['votes'] as int).compareTo(a['votes'] as int));
+        return Column(children: [
+          const ListTile(title: Text('Questions'), subtitle: Text('Most votes first. Hosts mark questions answered.')),
+          Expanded(child: list.isEmpty ? const Center(child: Text('No questions yet')) : ListView(children: [for (final q in list) ListTile(
+            leading: Text('${q['votes']}'), title: Text(q['q'], style: TextStyle(decoration: q['answered'] ? TextDecoration.lineThrough : null)), subtitle: Text(q['name']),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (!q['answered'] && !voted.contains(q['id'])) IconButton(tooltip: 'Vote', icon: const Icon(Icons.arrow_upward), onPressed: () { voted.add(q['id']); _onQa({'op': 'vote', 'id': q['id']}, ''); _send({'t': 'qa', 'op': 'vote', 'id': q['id']}); }),
+              if (isHost && !q['answered']) IconButton(tooltip: 'Mark answered', icon: const Icon(Icons.check), onPressed: () { _onQa({'op': 'answered', 'id': q['id']}, ''); _send({'t': 'qa', 'op': 'answered', 'id': q['id']}); }),
+            ]))])),
+          Padding(padding: const EdgeInsets.all(8), child: Row(children: [
+            Expanded(child: TextField(controller: input, maxLength: 300, decoration: const InputDecoration(hintText: 'Ask a question', isDense: true, counterText: ''))),
+            IconButton(tooltip: 'Ask', icon: const Icon(Icons.send), onPressed: () {
+              final t = input.text.trim(); if (t.isEmpty) return; input.clear();
+              final m = {'t': 'qa', 'op': 'ask', 'id': 'q-${DateTime.now().millisecondsSinceEpoch}-$me', 'q': t, 'name': room.unsafeGetUserFromMemoryOrFallback(me).calcDisplayname()};
+              _onQa(m, 'You'); _send(m); }),
+          ])),
+        ]);
+      }))));
+  }
 
   // ---------- recordings with consent (docs/RECORDINGS.md) ----------
   final rec = RecordingConsent(); final recorder = DeviceRecorder(); final _asked = <String>{};
@@ -558,6 +630,9 @@ class _S extends State<CallScreen> {
               case 'webinar': _setWebinar(!webinar);
               case 'rec': rec.recording ? _stopRec('stopped by host') : _askRecord();
               case 'withdraw': _withdraw();
+              case 'guest': _guestLinkDialog();
+              case 'webinarreg': _guestLinkDialog(webinar: true);
+              case 'qa': _qaSheet();
               case 'end': _host('end');
             }
           }, itemBuilder: (_) => [
@@ -572,10 +647,15 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'rec', child: ListTile(leading: Icon(rec.recording ? Icons.stop : Icons.fiber_manual_record, color: Colors.red), title: Text(rec.recording ? 'Stop recording' : 'Record (with consent)'))),
             if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
+            if (isHost && widget.meeting) const PopupMenuItem(value: 'guest', child: ListTile(leading: Icon(Icons.public), title: Text('Guest link (browser)'))),
+            if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
+            if (widget.meeting) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
         ]),
       body: Column(children: [
+        if (isHost) for (final g in lobby.entries) MaterialBanner(leading: const Icon(Icons.public), content: Text('${g.value.$2} is waiting in the lobby (browser guest)'),
+          actions: [TextButton(onPressed: () { lobby.remove(g.key); _host('remove', identity: g.key); setState(() {}); }, child: const Text('Remove')), FilledButton(onPressed: () => _admit(g.key), child: const Text('Let in'))]),
         if (attendee) MaterialBanner(content: const Text('You are an attendee in this webinar. Raise your hand to ask to speak.'), actions: [TextButton(onPressed: _toggleHand, child: Text(myHand ? 'Lower hand' : 'Raise hand'))]),
         if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
           content: Text("You're the only one here.${mid != null ? ' Share meeting ID ${MeetingService.format(mid)} or invite people.' : ' Invite people to join.'}"),

@@ -23,4 +23,5 @@ spec:
           - {path: /_matrix, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
           - {path: /_synapse/client, pathType: Prefix, backend: {service: {name: synapse-main, port: {number: 8008}}}}
           - {path: /api, pathType: Prefix, backend: {service: {name: orchestrator, port: {number: 8080}}}}
+          - {path: /join, pathType: Prefix, backend: {service: {name: orchestrator, port: {number: 8080}}}}
           - {path: /livekit, pathType: Prefix, backend: {service: {name: livekit, port: {number: 7880}}}}

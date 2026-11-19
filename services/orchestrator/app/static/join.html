@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Join an Amer Teams meeting</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--mute:#5b6170;--line:#dfe2e8;--accent:#b0102a}
+@media (prefers-color-scheme:dark){:root{--bg:#121417;--card:#1b1e23;--ink:#eceef2;--mute:#9aa1ae;--line:#2b2f36;--accent:#ff5a6e}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:440px;margin:40px auto}
+h1{font-size:20px;margin:0 0 6px}p{color:var(--mute);margin:6px 0 14px}input,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+button{padding:10px 16px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;cursor:pointer}button.sec{background:transparent;color:var(--ink);border:1px solid var(--line)}
+#call{display:none}#grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}video{width:100%;background:#000;border-radius:10px;aspect-ratio:16/9;object-fit:cover}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}.status{color:var(--mute)}#qa{margin-top:14px}#qa li{margin:6px 0}.lock{color:#1a8f3a}
+</style></head><body><main>
+<section class="card" id="reg" hidden><h1 id="wtitle">Webinar</h1><p id="wwhen"></p>
+  <label>Your name<input id="rname" maxlength="60"></label><br><br><label>Email<input id="remail" type="email"></label><br><br>
+  <button id="rgo">Register</button><p id="rmsg"></p></section>
+<section class="card" id="pre"><h1>Join the meeting</h1><p>You are joining as a guest from your browser. Audio and video are end-to-end encrypted.</p>
+  <label>Your name<input id="name" maxlength="60" autocomplete="name"></label><br><br><button id="go">Join</button><p id="msg"></p></section>
+<section id="call"><div class="bar"><span class="lock">🔒</span><span class="status" id="st">Connecting…</span>
+  <button class="sec" id="mic">Mute</button><button class="sec" id="cam">Stop video</button><button class="sec" id="leave">Leave</button></div>
+  <div id="grid"></div>
+  <div id="qa"><h1>Questions</h1><div class="bar"><input id="q" maxlength="300" placeholder="Ask a question"><button id="ask">Ask</button></div><ul id="ql"></ul></div>
+</section></main>
+<script src="/join/livekit-client.umd.js"></script><script src="/join/join.js"></script></body></html>

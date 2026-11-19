@@ -34,7 +34,7 @@ Each built feature has a doc listing its open gaps.
 | Shared files tab with versions | Existing files view; versions and grouping not started |
 | Drafts, mentions, followed quick views | Built |
 | Shared channels across organisations | Built (see top five) |
-| Webinars and town halls | Existing webinar mode (attendees cannot publish); registration, Q&A and HLS not started |
+| Webinars and town halls | Built: registration page with capacity, attendee-only join links, Q&A with votes; tested 12/12 on the real stack with a browser. HLS not built (WEBINARS.md) |
 | Breakout rooms | Existing |
 | Live translated captions | Partial: on-device captions exist; translation not started |
 | Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
@@ -75,9 +75,9 @@ Each built feature has a doc listing its open gaps.
 | Retention and auto-delete timers | Built (1 day to 7 years, server purge, banner); legal hold not started |
 | Slash commands | Built |
 | Meeting templates with agenda timer | Built: shared timer, 80% warning, parking lot (MEETING_AGENDA.md) |
-| Browser join for guests | Not started |
+| Browser join for guests | Built: /join page, lobby, call key wrapped to the guest's one-time key; a real Chromium decrypts real E2EE video locally (GUESTS.md) |
 | Phone dial-in | Not started (SIP dial-out exists) |
-| Recordings with consent | Not started |
+| Recordings with consent | Built, not tested on a device: everyone agrees first, recorded on the host's phone, shared encrypted, audit trail (RECORDINGS.md) |
 | Whiteboard templates | Built: retro, SWOT, optical/IP network sketch, text labels |
 | Automatic follow-up | Built: minutes follow the agenda; decisions become proposals, actions become tasks. Email to external invitees not built |
 | Find-a-time | Built (FIND_A_TIME.md), with prayer times and Ramadan hours |

@@ -139,6 +139,14 @@ class ApiService {
   Future<Map<String, dynamic>> recordingEvent(String roomId, String callId, String recId, String event) =>
       _post('/v1/meetings/recording', {'room_id': roomId, 'call_id': callId, 'recording_id': recId, 'event': event});
 
+  /// Guests and webinars (docs/GUESTS.md, docs/WEBINARS.md).
+  Uri publicUrl(String pathAndFragment) => Uri.parse('${m.homeserver!.origin}$pathAndFragment');
+  Future<Map<String, dynamic>> guestLink(String roomId, String callId, {bool attendee = false, int hours = 24}) =>
+      _post('/v1/guests/links', {'room_id': roomId, 'call_id': callId, 'attendee': attendee, 'hours': hours});
+  Future<Map<String, dynamic>> createWebinar(String roomId, String callId, String title, {DateTime? starts}) =>
+      _post('/v1/webinars', {'room_id': roomId, 'call_id': callId, 'title': title, if (starts != null) 'starts_at': starts.millisecondsSinceEpoch ~/ 1000});
+  Future<Map<String, dynamic>> webinarRegistrations(String slug) async => jsonDecode((await http.get(_u('/v1/webinars/${Uri.encodeComponent(slug)}/registrations'), headers: _h)).body);
+
   // ---------- Phone network ----------
   Future<Map<String, dynamic>> phonePolicy() async => jsonDecode((await http.get(_u('/v1/phone/policy'), headers: _h)).body);
   Future<Map<String, dynamic>> dial(String number) => _post('/v1/phone/dial', {'number': number});

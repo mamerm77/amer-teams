@@ -24,6 +24,10 @@
 	handle /grafana/* {
 		reverse_proxy grafana:3000
 	}
+	# Browser join for guests and webinar registration (docs/GUESTS.md)
+	handle /join* {
+		reverse_proxy orchestrator:8080
+	}
 	# AI engine + call token service
 	handle_path /api/* {
 		reverse_proxy orchestrator:8080
