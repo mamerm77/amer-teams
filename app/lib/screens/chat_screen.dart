@@ -1,3 +1,4 @@
+import '../services/group_mentions.dart';
 import 'dart:math' show min;
 import 'dart:async';
 import 'dart:typed_data';
@@ -211,6 +212,11 @@ class _S extends State<ChatScreen> {
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
     var text = t;
     _mentions.forEach((name, id) => text = text.replaceAll('@$name', mentionMarkdown(name, id)));   // @Name -> pill
+    final pl = room.getState(EventTypes.RoomPowerLevels)?.content;
+    final group = expandGroupMentions(text, me: me, myPower: room.getPowerLevelByUserId(me).level, notifyLevel: roomNotifyLevel(pl),
+        members: {for (final u in room.getParticipants()) u.id: (u.calcDisplayname(), room.getPowerLevelByUserId(u.id).level)}, pill: mentionMarkdown);
+    if (group.refused != null) { input.text = t; _snack(group.refused!); return; }   // text kept so it can be edited
+    text = group.text;                                                                 // @channel -> @room, @moderators -> pills
     _mentions.clear();
     try {
       if (editing != null) { await room.sendTextEvent(text, editEventId: editing!.eventId).timeout(const Duration(seconds: 20)); }
@@ -243,6 +249,15 @@ class _S extends State<ChatScreen> {
     if (m == null) return [];
     final q = m.group(1)!.toLowerCase();
     return room.getParticipants().where((u) => u.id != me && (u.calcDisplayname().toLowerCase().contains(q) || u.id.toLowerCase().contains(q))).take(6).toList();
+  }
+  List<GroupMention> _groupCandidates() {
+    final m = RegExp(r'@(\w*)$').firstMatch(input.text.substring(0, input.selection.baseOffset < 0 ? input.text.length : input.selection.baseOffset));
+    return m == null ? [] : groupCandidates(m.group(1)!);
+  }
+  void _insertGroup(GroupMention g) {
+    input.text = input.text.replaceFirst(RegExp(r'@\w*$'), '@${g.tag} ');
+    input.selection = TextSelection.collapsed(offset: input.text.length);
+    setState(() {});
   }
   void _insertMention(User u) {
     final name = u.calcDisplayname().replaceAll(' ', '_');
@@ -540,7 +555,9 @@ class _S extends State<ChatScreen> {
           Icon(editing != null ? Icons.edit : Icons.reply, size: 18), const SizedBox(width: 8),
           Expanded(child: Text(editing != null ? 'Editing message' : 'Replying to ${replyTo!.senderFromMemoryOrFallback.calcDisplayname()}: ${_text(replyTo!)}', maxLines: 1, overflow: TextOverflow.ellipsis)),
           IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() { replyTo = null; editing = null; input.clear(); }))])),
-        if (_mentionCandidates().isNotEmpty) Material(elevation: 2, child: Column(children: [for (final u in _mentionCandidates()) ListTile(dense: true,
+        if (_mentionCandidates().isNotEmpty || _groupCandidates().isNotEmpty) Material(elevation: 2, child: Column(children: [
+          for (final g in _groupCandidates()) ListTile(dense: true, leading: const CircleAvatar(radius: 14, child: Icon(Icons.groups, size: 16)),
+            title: Text('@${g.tag}'), subtitle: Text(g.label), onTap: () => _insertGroup(g)),for (final u in _mentionCandidates()) ListTile(dense: true,
           leading: CircleAvatar(radius: 14, child: Text(u.calcDisplayname().characters.first.toUpperCase())), title: Text(u.calcDisplayname()), subtitle: Text(u.id), onTap: () => _insertMention(u))])),
         if (_format) Row(children: [
           IconButton(tooltip: 'Bold', icon: const Icon(Icons.format_bold), onPressed: () => _wrap('**')),
