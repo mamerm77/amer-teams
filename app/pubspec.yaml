@@ -18,6 +18,9 @@ dependencies:
   provider: ^6.1.2
   speech_to_text: ^7.0.0          # on-device captions (text stays local)
   crypto: ^3.0.6
+  archive: ^4.0.0              # read Office files (zip) for on-device previews
+  xml: ^6.5.0
+  pdfrx: ^2.0.0                # PDF previews, rendered on this device (pdfium)
   cryptography: ^2.7.0          # X25519, HKDF, AES-GCM for the AI enclave proxy (docs/ENCRYPTED_AI.md)
   pqcrypto: ^0.4.4
   record: ^6.2.1                  # voice messages

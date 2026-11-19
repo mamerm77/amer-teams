@@ -83,7 +83,7 @@ Each built feature has a doc listing its open gaps.
 | Find-a-time | Built (FIND_A_TIME.md), with prayer times and Ramadan hours |
 | Out-of-office from calendar | Partial: set by hand (status, automatic reply, delegate); calendar-event trigger waits for connectors |
 | Message-to-task and task boards | Built (DECISIONS.md) |
-| File previews with comments | Partial: images preview; PDF and Office not started |
+| File previews with comments | Built: PDF (pdfium), Word, Excel, PowerPoint and text previewed on the device; threaded encrypted comments. Layout not reproduced (FILE_PREVIEWS.md) |
 | Unified search | Built: on-device FTS index, filters, people (SEARCH.md); transcripts not indexed |
 | Notification settings and quiet hours | Built: server push filter, per-chat levels, priority senders (NOTIFICATIONS.md) |
 | Accessibility | Not started (beyond tooltips and labels) |

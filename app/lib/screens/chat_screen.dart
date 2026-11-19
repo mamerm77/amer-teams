@@ -1,3 +1,5 @@
+import '../services/office_text.dart';
+import 'file_preview_screen.dart';
 import 'dart:math' show min;
 import 'dart:async';
 import 'dart:typed_data';
@@ -824,8 +826,10 @@ class _S extends State<ChatScreen> {
         const Icon(Icons.graphic_eq), const SizedBox(width: 8),
         Text(ms > 0 ? '${ms ~/ 60000}:${((ms ~/ 1000) % 60).toString().padLeft(2, '0')}' : 'Voice message')]);
     } else if (e.messageType == MessageTypes.File || e.messageType == MessageTypes.Video) {
-      body = InkWell(onTap: () => download(e), child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.insert_drive_file), const SizedBox(width: 8),
-        Flexible(child: Text(e.body)), const SizedBox(width: 8), const Icon(Icons.download, size: 18)]));
+      final canPreview = e.messageType == MessageTypes.File && OfficeText.canPreview(e.body);
+      body = InkWell(onTap: () => canPreview ? Navigator.push(c, MaterialPageRoute(builder: (_) => FilePreviewScreen(room: room, event: e, onDownload: () => download(e)))) : download(e),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(canPreview ? Icons.description : Icons.insert_drive_file), const SizedBox(width: 8),
+        Flexible(child: Text(e.body)), const SizedBox(width: 8), canPreview ? IconButton(tooltip: 'Download', visualDensity: VisualDensity.compact, icon: const Icon(Icons.download, size: 18), onPressed: () => download(e)) : const Icon(Icons.download, size: 18)]));
     } else {
       final mentioned = mentionsMe(e, me);
       body = Container(color: mentioned && !mine ? cs.tertiaryContainer : null, child: _rich(c, _text(e)));
