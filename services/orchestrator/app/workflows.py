@@ -17,7 +17,8 @@ from pydantic import BaseModel, Field
 from . import agents, auth, db
 from .admin import require_admin
 
-router = APIRouter()
+from . import flags
+router = APIRouter(dependencies=[Depends(flags.require("workflows"))])
 TRIGGERS = {"message", "schedule", "webhook", "form", "alarm", "calendar", "manual"}
 STEPS = {"post", "ask_form", "approval", "condition", "wait", "call_connector", "run_agent", "create_task", "http"}
 DEVICE_STEPS = {"post", "ask_form", "approval", "run_agent", "create_task"}

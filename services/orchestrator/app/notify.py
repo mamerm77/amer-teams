@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from . import auth, db
+from . import auth, db, flags
 
 router = APIRouter()
 SYGNAL = os.getenv("SYGNAL_URL", "http://sygnal:5000/_matrix/push/v1/notify")
@@ -70,10 +70,10 @@ async def _owner(pushkey: str) -> tuple[str, Settings] | None:
     return (r[0], Settings(**(r[1] if isinstance(r[1], dict) else json.loads(r[1])))) if r else None
 
 @router.get("/v1/notify/settings")
-async def get_settings(user=Depends(auth.matrix_user)): return (await _load(user["user_id"])).model_dump()
+async def get_settings(user=Depends(flags.require("quiet_hours"))): return (await _load(user["user_id"])).model_dump()
 
 @router.put("/v1/notify/settings")
-async def put_settings(req: Settings, user=Depends(auth.matrix_user)):
+async def put_settings(req: Settings, user=Depends(flags.require("quiet_hours"))):
     try: ZoneInfo(req.quiet.tz)
     except Exception: raise HTTPException(422, f"Unknown time zone {req.quiet.tz}")
     cur = await _load(user["user_id"])

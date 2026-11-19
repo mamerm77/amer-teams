@@ -22,6 +22,7 @@ import '../services/later.dart';
 import 'chat_screen.dart';
 import 'find_time_screen.dart';
 import '../services/ooo.dart';
+import '../services/feature_flags.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -35,6 +36,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client);
+    Flags.instance.load(ApiService(m));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
   }

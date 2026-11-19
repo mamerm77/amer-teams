@@ -4,7 +4,7 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from prometheus_client import Counter, Histogram, generate_latest
 import asyncio
-from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace, compliance, digest, meeting_ai, workflows, calendar_time, decisions, notify
+from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace, compliance, digest, meeting_ai, workflows, calendar_time, decisions, notify, flags
 from .admin import require_admin
 from .agentops.router import router as agentops_router
 from .agentops.personal import router as personal_router, store as approvals_store
@@ -23,6 +23,7 @@ app.include_router(workflows.router)
 app.include_router(calendar_time.router)
 app.include_router(decisions.router)
 app.include_router(notify.router)
+app.include_router(flags.router)
 app.include_router(agentops_router)
 app.include_router(personal_router)
 

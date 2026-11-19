@@ -18,7 +18,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from . import agents, auth, config, db
 
-router = APIRouter()
+from . import flags
+router = APIRouter(dependencies=[Depends(flags.require("meeting_agent"))])
 WINDOW_S, MAX_LINES = 20 * 60, 600
 STATE = "com.amerteams.meeting.ai"
 

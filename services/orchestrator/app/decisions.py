@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from . import auth, db
 from .admin import require_admin
 
-router = APIRouter()
+from . import flags
+router = APIRouter(dependencies=[Depends(flags.require("decisions"))])
 QUORUM_OTHERS = 1                       # the owner plus at least this many other members
 PROPOSAL_TTL_S = 72 * 3600
 STATUSES = {"confirmed", "in_progress", "done", "cancelled", "superseded"}

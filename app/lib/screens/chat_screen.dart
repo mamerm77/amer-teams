@@ -27,6 +27,7 @@ import 'find_time_screen.dart';
 import 'tasks_screen.dart';
 import 'security_badge.dart';
 import '../services/quick_views.dart';
+import '../services/feature_flags.dart';
 import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
@@ -455,7 +456,7 @@ class _S extends State<ChatScreen> {
             itemBuilder: (_) => const [PopupMenuItem(value: 'follow', child: Text('Follow this thread')), PopupMenuItem(value: 'mute', child: Text('Mute this thread')), PopupMenuItem(value: 'none', child: Text('Default'))]),
           IconButton(tooltip: 'Encryption details', icon: Icon(room.encrypted ? Icons.lock : Icons.lock_open, color: room.encrypted ? Colors.green : Theme.of(c).colorScheme.error), onPressed: () => showSecurityDetails(c, room)),
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
-          IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),
+          if (Flags.instance.on('canvases')) IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
           IconButton(tooltip: 'Video call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
           PopupMenuButton<String>(tooltip: 'Chat menu', onSelected: (v) {
@@ -464,12 +465,12 @@ class _S extends State<ChatScreen> {
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
             if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
-          }, itemBuilder: (_) => const [
-            PopupMenuItem(value: 'tasks', child: Text('Tasks')),
-            PopupMenuItem(value: 'time', child: Text('Find a time')),
-            PopupMenuItem(value: 'info', child: Text('Chat info')),
-            PopupMenuItem(value: 'files', child: Text('Files and media')),
-            PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
+          }, itemBuilder: (_) => [
+            if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),
+            if (Flags.instance.on('find_time')) const PopupMenuItem(value: 'time', child: Text('Find a time')),
+            const PopupMenuItem(value: 'info', child: Text('Chat info')),
+            const PopupMenuItem(value: 'files', child: Text('Files and media')),
+            const PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
         if (lifetime != null) Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), color: Theme.of(c).colorScheme.surfaceContainerHigh,

@@ -30,7 +30,8 @@ from .. import auth, config, db
 from . import store as S
 from .runner import ProjectRun
 
-router = APIRouter(prefix="/v1/agentops")
+from .. import flags
+router = APIRouter(prefix="/v1/agentops", dependencies=[Depends(flags.require("personal_agents"))])
 TTL_S = 24 * 3600
 MONTHLY_TOKENS = int(os.getenv("AGENTOPS_PERSONAL_TOKENS", "300000"))
 MAX_CONCURRENT = 3

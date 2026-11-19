@@ -6,6 +6,7 @@ import '../services/matrix_service.dart';
 import 'chat_screen.dart';
 import 'workflows_screen.dart';
 import 'personal_agents_screen.dart';
+import '../services/feature_flags.dart';
 
 /// Opens (or creates) the encrypted direct chat with the Amer assistant account.
 Future<void> openAmerChat(BuildContext c) async {
@@ -31,8 +32,10 @@ class _S extends State<CopilotScreen> {
     setState(() => busy = false);
   }
   @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Amer co-pilot'), actions: [
-    TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
-    TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: const Text('Workflows'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
+    ListenableBuilder(listenable: Flags.instance, builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
+      if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+      if (Flags.instance.on('workflows')) TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: const Text('Workflows'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
+    ])),
       Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with Amer')))]),
     body: Column(children: [
     const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Tip: chat with Amer like a colleague, or @mention Amer in any group chat after adding it to the group.')),

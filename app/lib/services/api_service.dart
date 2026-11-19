@@ -48,6 +48,14 @@ class ApiService {
   Future<Map<String, dynamic>> agentBudget() async => jsonDecode((await http.get(_u('/v1/agentops/budget'), headers: _h)).body);
   Future<List<dynamic>> deliverables(String id) => _get('/v1/agentops/personal/${Uri.encodeComponent(id)}/deliverables');
 
+  // ---------- Feature flags (docs/FEATURE_FLAGS.md) ----------
+  Future<Map<String, dynamic>> flags() async => jsonDecode(utf8.decode((await http.get(_u('/v1/flags'), headers: _h)).bodyBytes));
+  Future<Map<String, dynamic>> adminFlags() async => jsonDecode(utf8.decode((await http.get(_u('/v1/admin/flags'), headers: _h)).bodyBytes));
+  Future<void> setFlag(String tenant, String feature, bool enabled, int pct) async {
+    final r = await http.put(_u('/v1/admin/flags'), headers: _h, body: jsonEncode({'tenant': tenant, 'feature': feature, 'enabled': enabled, 'rollout_pct': pct}));
+    if (r.statusCode >= 300) throw Exception(jsonDecode(utf8.decode(r.bodyBytes))['detail'] ?? 'Request failed (${r.statusCode})');
+  }
+
   // ---------- Notifications: quiet hours and priority senders (docs/NOTIFICATIONS.md) ----------
   Future<Map<String, dynamic>> notifySettings() async => jsonDecode(utf8.decode((await http.get(_u('/v1/notify/settings'), headers: _h)).bodyBytes));
   Future<void> saveNotifySettings(Map<String, dynamic> s) async {

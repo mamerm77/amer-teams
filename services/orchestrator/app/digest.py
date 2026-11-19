@@ -15,7 +15,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from . import agents, auth, db, guardian
 
-router = APIRouter()
+from . import flags
+router = APIRouter(dependencies=[Depends(flags.require("catch_up"))])
 MAX_ROOMS, MAX_MSGS, CACHE_S = 30, 60, 30 * 60
 BLOCKED = {"confidential", "restricted"}
 _cache: dict[str, tuple[float, str, dict]] = {}

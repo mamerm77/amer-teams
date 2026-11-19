@@ -6,6 +6,7 @@ import '../services/matrix_service.dart';
 import 'call_screen.dart';
 import '../services/meeting_service.dart';
 import 'find_time_screen.dart';
+import '../services/feature_flags.dart';
 
 /// Meetings are encrypted events inside chats. The Scheduler agent turns plain language into a meeting.
 class CalendarScreen extends StatefulWidget { const CalendarScreen({super.key}); @override State<CalendarScreen> createState() => _S(); }
@@ -36,7 +37,7 @@ class _S extends State<CalendarScreen> {
 
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: const Text('Calendar'), actions: [
-      TextButton.icon(icon: const Icon(Icons.manage_search), label: const Text('Find a time'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
+      if (Flags.instance.on('find_time')) TextButton.icon(icon: const Icon(Icons.manage_search), label: const Text('Find a time'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
       IconButton(tooltip: 'Out of office', icon: const Icon(Icons.beach_access_outlined), onPressed: () => showOutOfOffice(c)),
       IconButton(tooltip: 'Working hours and prayer times', icon: const Icon(Icons.schedule), onPressed: () => showCalendarSettings(c)),
       IconButton(icon: const Icon(Icons.refresh), onPressed: _reload)]),

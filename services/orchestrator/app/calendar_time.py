@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from . import auth, db
 
-router = APIRouter()
+from . import flags
+router = APIRouter(dependencies=[Depends(flags.require("find_time"))])
 METHODS = {"mwl": (18.0, 17.0), "uae": (18.2, 18.2), "umm_al_qura": (18.5, None), "egypt": (19.5, 17.5), "isna": (15.0, 15.0)}
 PRAYER_BLOCK_MIN = 20                                   # time kept free around each prayer that falls in working hours
 
