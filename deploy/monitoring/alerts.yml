@@ -1,16 +1,18 @@
 groups:
 - name: amer-teams-availability
   rules:
+  # Critical only when the service itself fails its health probe (what users feel).
   - alert: ServiceDown
-    expr: up == 0
-    for: 1m
-    labels: {severity: critical}
-    annotations: {summary: "{{ $labels.job }} is not answering ({{ $labels.instance }})"}
-  - alert: ProbeFailing
     expr: amer_service_up == 0
     for: 1m
     labels: {severity: critical}
-    annotations: {summary: "{{ $labels.service }} failed its health probe"}
+    annotations: {summary: "{{ $labels.service }} is down: its health probe is failing"}
+  # A failed metrics scrape is a monitoring problem, not an outage: the service is checked separately above.
+  - alert: MetricsUnavailable
+    expr: up == 0
+    for: 2m
+    labels: {severity: warning}
+    annotations: {summary: "Monitoring cannot read {{ $labels.job }} metrics ({{ $labels.instance }}); service health is checked separately"}
   - alert: SlowChatServer
     expr: amer_service_probe_latency_ms{service="chat (Synapse)"} > 500
     for: 5m

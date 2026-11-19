@@ -42,13 +42,13 @@ check("7. 8 alert rules loaded", sum(len(g["rules"]) for g in rules) == 8)
 # 2. real outage: media server
 subprocess.run(["pkill", "-f", "livekit-server"]); t0 = time.time()
 check("8. Media outage: ServiceDown alert fires", wait(lambda: firing("ServiceDown")), f"after {time.time()-t0:.0f} s")
-check("9. Media outage: ProbeFailing alert fires", wait(lambda: firing("ProbeFailing")))
+check("9. Media outage: MetricsUnavailable warning fires (metrics scrape also fails)", wait(lambda: firing("MetricsUnavailable"), 180))
 check("10. Alertmanager received the alerts", wait(lambda: am_has("ServiceDown"), 40))
 check("11. Alert written to tamper-evident audit log", wait(lambda: audit("alert.firing", "ServiceDown%") > 0, 60))
 app_alerts = h.get(f"{ORCH}/v1/ops/alerts", headers=H).json()
-check("12. App Health screen API lists the alert", any(a["name"] in ("ServiceDown", "ProbeFailing") for a in app_alerts), [a["name"] for a in app_alerts])
+check("12. App Health screen API lists the alert", any(a["name"] == "ServiceDown" for a in app_alerts), [a["name"] for a in app_alerts])
 subprocess.Popen("cd /opt/amer && exec setsid ./livekit-server --config lk.yaml >> lk.log 2>&1 < /dev/null", shell=True)
-check("13. Media restored: alerts resolve", wait(lambda: not firing("ServiceDown") and not firing("ProbeFailing"), 120))
+check("13. Media restored: alerts resolve", wait(lambda: not firing("ServiceDown") and not firing("MetricsUnavailable"), 120))
 check("14. Resolution recorded in audit log", wait(lambda: audit("alert.resolved", "ServiceDown%") > 0, 90))
 
 # 3. real outage: Redis
