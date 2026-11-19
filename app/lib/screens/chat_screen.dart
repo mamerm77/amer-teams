@@ -20,6 +20,7 @@ import 'chat_info_screen.dart';
 import '../services/chat_extras.dart';
 import '../services/outbox.dart';
 import '../services/compliance_service.dart';
+import '../services/workflow_engine.dart';
 
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
@@ -451,6 +452,38 @@ class _S extends State<ChatScreen> {
     return Icon(read ? Icons.done_all : Icons.done, size: 14, color: read ? cs.primary : null);
   }
 
+  /// A workflow's form or approval request (docs/WORKFLOWS.md). Only the people asked get the buttons; the answer is an
+  /// encrypted room event that the owner's workflow runner picks up.
+  Widget _workflowCard(BuildContext c, Event e, Map<String, Object?> wf) {
+    final cs = Theme.of(c).colorScheme;
+    final people = ((wf['people'] as List?) ?? const []).cast<String>();
+    final answers = (tl?.events ?? []).where((x) => x.type == kWfResponse && x.content['run'] == wf['run'] && x.content['step'] == wf['step'] && people.contains(x.senderId)).toList();
+    final done = answers.isNotEmpty ? answers.first : null;
+    final approval = wf['kind'] == 'approval', mine = people.contains(me) && done == null;
+    Future<void> respond(Map<String, Object?> extra) =>
+        room.sendEvent({'run': wf['run'], 'step': wf['step'], 'body': approval ? 'Workflow decision' : 'Workflow form answer', ...extra}, type: kWfResponse);
+    Future<void> fill() async {
+      final fields = ((wf['fields'] as List?) ?? const []).cast<String>();
+      final ctrls = {for (final f in fields) f: TextEditingController()};
+      final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: Text('${wf['workflow'] ?? 'Workflow'}'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [for (final f in fields) TextField(controller: ctrls[f], decoration: InputDecoration(labelText: f))]),
+        actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))]));
+      if (ok == true) await respond({'values': {for (final f in fields) f: ctrls[f]!.text.trim()}});
+    }
+    final status = done == null ? 'Waiting for ${people.map((p) => room.unsafeGetUserFromMemoryOrFallback(p).calcDisplayname()).join(', ')}'
+        : approval ? '${done.content['decision'] == 'approved' ? 'Approved' : 'Rejected'} by ${done.senderFromMemoryOrFallback.calcDisplayname()}'
+        : 'Answered by ${done.senderFromMemoryOrFallback.calcDisplayname()}';
+    return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(approval ? Icons.verified_outlined : Icons.assignment_outlined, size: 18, color: cs.primary), const SizedBox(width: 6),
+        Expanded(child: Text('${wf['workflow'] ?? 'Workflow'} · ${approval ? 'Approval' : 'Form'}', style: Theme.of(c).textTheme.titleSmall))]),
+      const SizedBox(height: 6), Text(e.body),
+      const SizedBox(height: 6), Text(status, style: TextStyle(fontSize: 12, color: done == null ? cs.outline : cs.primary)),
+      if (mine) Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(spacing: 8, children: approval
+          ? [OutlinedButton(onPressed: () => respond({'decision': 'rejected'}), child: const Text('Reject')), FilledButton(onPressed: () => respond({'decision': 'approved'}), child: const Text('Approve'))]
+          : [FilledButton(onPressed: fill, child: const Text('Fill in'))])),
+    ])));
+  }
+
   Widget _item(BuildContext c, Event e, {required bool isLastMine, bool read = false}) {
     final cs = Theme.of(c).colorScheme; final mine = e.senderId == me;
     if (e.type == kCallInviteEvent && e.content['version'] == 2) {
@@ -485,6 +518,8 @@ class _S extends State<ChatScreen> {
     if (e.type == kCallEndEvent) {
       return Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e.body, style: Theme.of(c).textTheme.labelSmall)));
     }
+    final wf = e.type == EventTypes.Message ? e.content[kWfContent] : null;
+    if (wf is Map && (wf['kind'] == 'form' || wf['kind'] == 'approval')) return _workflowCard(c, e, Map<String, Object?>.from(wf));
     if (e.type == 'com.amerteams.meeting') {
       final id = e.content['meeting_id'] as String?;
       final st = DateTime.tryParse(e.content['start'] as String? ?? '')?.toLocal();

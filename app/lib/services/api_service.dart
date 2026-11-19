@@ -37,6 +37,24 @@ class ApiService {
   /// Ask-the-meeting agent: question plus the last 20 minutes of the meeting's on-device transcript (docs/MEETING_AGENT.md).
   Future<Map<String, dynamic>> askMeeting(String callId, String roomId, String question, List<Map<String, Object?>> transcript) =>
       _post('/v1/meetings/${Uri.encodeComponent(callId)}/ask', {'room_id': roomId, 'question': question, 'transcript': transcript});
+  // ---------- Workflows (docs/WORKFLOWS.md) ----------
+  Future<List<dynamic>> workflows() => _get('/v1/workflows');
+  Future<Map<String, dynamic>> workflowDraft(String text, List<Map<String, String>> rooms) => _post('/v1/workflows/draft', {'text': text, 'rooms': rooms});
+  Future<Map<String, dynamic>> workflowSave(Map<String, Object?> d, {String? id, bool enabled = false}) => _post('/v1/workflows', {'definition': d, 'id': id, 'enabled': enabled});
+  Future<void> workflowEnable(String id, bool on) => _post('/v1/workflows/${Uri.encodeComponent(id)}/enable', {'enabled': on});
+  Future<Map<String, dynamic>> workflowDryRun(Map<String, Object?> d, Map<String, Object?> sample) => _post('/v1/workflows/dry-run', {'definition': d, 'sample': sample});
+  Future<List<dynamic>> workflowRuns(String id) => _get('/v1/workflows/${Uri.encodeComponent(id)}/runs');
+  Future<Map<String, dynamic>> workflowStart(String id, Map<String, Object?> trigger, {String? idempotencyKey}) async {
+    final r = await http.post(_u('/v1/workflows/${Uri.encodeComponent(id)}/runs'), headers: {..._h, if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey}, body: jsonEncode({'trigger': trigger}));
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j;
+  }
+  Future<void> workflowStep(String run, String step, String status, {int attempt = 1, List<String> fields = const [], String error = ''}) =>
+      _post('/v1/workflows/runs/${Uri.encodeComponent(run)}/steps', {'step_id': step, 'status': status, 'attempt': attempt, 'fields': fields, 'error': error});
+  Future<void> workflowFinish(String run, String status, {String error = ''}) => _post('/v1/workflows/runs/${Uri.encodeComponent(run)}/finish', {'status': status, 'error': error});
+  Future<Map<String, dynamic>> workflowHttp(String run, String step, Map<String, Object?> body) => _post('/v1/workflows/runs/${Uri.encodeComponent(run)}/http', {'step_id': step, 'body': body});
+
   /// Catch-up digest of unread chats (docs/CATCH_UP.md).
   Future<Map<String, dynamic>> digest(Map<String, Object?> body) => _post('/v1/ai/digest', body);
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});

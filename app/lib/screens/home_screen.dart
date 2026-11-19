@@ -16,6 +16,7 @@ import '../services/compliance_service.dart';
 import 'agent_ops_screen.dart';
 import 'catch_up_screen.dart';
 import '../services/catch_up.dart';
+import '../services/workflow_runner.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -24,9 +25,10 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     final m = context.read<MatrixService>();
     ComplianceService.instance.start(m.client, ApiService(m));     // business tenants with archiving: add the archiver to chats
     WidgetsBinding.instance.addObserver(this);
+    WorkflowRunner.instance.start(m.client, ApiService(m));        // the owner's workflows run on this device
     _checkAway();
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

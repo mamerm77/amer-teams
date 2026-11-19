@@ -4,6 +4,7 @@ import 'package:matrix/matrix.dart';
 import '../services/api_service.dart';
 import '../services/matrix_service.dart';
 import 'chat_screen.dart';
+import 'workflows_screen.dart';
 
 /// Opens (or creates) the encrypted direct chat with the Amer assistant account.
 Future<void> openAmerChat(BuildContext c) async {
@@ -29,6 +30,7 @@ class _S extends State<CopilotScreen> {
     setState(() => busy = false);
   }
   @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Amer co-pilot'), actions: [
+    TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: const Text('Workflows'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
       Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with Amer')))]),
     body: Column(children: [
     const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Tip: chat with Amer like a colleague, or @mention Amer in any group chat after adding it to the group.')),

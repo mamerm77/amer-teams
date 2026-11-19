@@ -268,6 +268,18 @@ void main() {
       expectFound(await waitFor(find.byIcon(Icons.alternate_email)), 'mention count on the card');
       await t.pageBack(); await wait(1);
     });
+    await step('Workflows: create from a template and save', () async {
+      await home(); await tap(find.text('Amer'), 'Amer tab'); await tap(find.text('Workflows'), 'Workflows');
+      await tap(find.text('New workflow'), 'New workflow'); await tap(find.text('Start from a template'), 'template');
+      await tap(find.text('Save workflow'), 'Save workflow');
+      expectFound(await waitFor(find.text('Approval request'), secs: 20), 'saved workflow in the list');
+    });
+    await step('Workflows: a message triggers an approval card; approving continues the run', () async {
+      await home(); await openChat(); await sendText('please approve the budget');
+      expectFound(await waitFor(find.text('Approve'), secs: 40), 'approval card with Approve');
+      await tap(find.text('Approve'), 'Approve');
+      expectFound(await waitFor(find.textContaining('Approved by @moh'), secs: 40), 'the workflow posted the result');
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
