@@ -1,3 +1,4 @@
+import '../services/premortem.dart';
 import '../services/office_text.dart';
 import 'file_preview_screen.dart';
 import 'dart:math' show min;
@@ -162,7 +163,7 @@ class _S extends State<ChatScreen> {
   static const slash = {
     '/poll': 'Create a poll', '/meet': 'Start a meeting in this chat now', '/remind': '/remind 30 text: remind me in 30 minutes',
     '/ask': '/ask question: ask Amer, answer only you see', '/announce': '/announce text: announcement everyone acknowledges',
-    '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases'};
+    '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases', '/premortem': '/premortem plan: how could this fail? (or the recent chat)'};
   Future<bool> _command(String t) async {
     if (!t.startsWith('/')) return false;
     final sp = t.indexOf(' '); final cmd = (sp < 0 ? t : t.substring(0, sp)).toLowerCase(); final arg = sp < 0 ? '' : t.substring(sp + 1).trim();
@@ -179,6 +180,7 @@ class _S extends State<ChatScreen> {
         if (m == null) { _snack('Use /remind 30 what to remember'); return true; }
         Reminders.instance.add(room.id, '', m.group(2)!.isEmpty ? 'Reminder' : m.group(2)!, DateTime.now().add(Duration(minutes: int.parse(m.group(1)!))));
         _snack('I will remind you in ${m.group(1)} minutes');
+      case '/premortem': await _premortem(arg);
       case '/ask':
         if (arg.isEmpty) { _snack('Write a question after /ask'); return true; }
         final g = aiFor(room); if (!g.allowed) { _snack(g.where); return true; }
@@ -194,6 +196,34 @@ class _S extends State<ChatScreen> {
         _snack('Unknown command $cmd. Try ${near.isEmpty ? slash.keys.join(', ') : near}');
     }
     return true;
+  }
+
+  /// Pre-mortem agent (docs/PREMORTEM.md): risks only you see first; share them or turn mitigations into tasks.
+  Future<void> _premortem(String plan) async {
+    final g = aiFor(room); if (!g.allowed) { _snack(g.where); return; }
+    final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+    final ctx = plan.isNotEmpty ? plan : (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(40).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
+    if (ctx.trim().isEmpty) { _snack('Write the plan after /premortem'); return; }
+    _snack('Amer is imagining how this could fail…');
+    try {
+      final r = await context.read<ApiService>().ask('Run a pre-mortem on this plan.', context: ctx, agent: 'premortem', labels: [if (label != null) label], encrypted: room.encrypted);
+      if (r['blocked'] == true) { _snack('${r['answer']}'); return; }
+      final p = PreMortem.parse('${r['answer']}');
+      if (!mounted) return;
+      final picked = <int>{};
+      await showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => StatefulBuilder(builder: (s, set) => DraggableScrollableSheet(expand: false, initialChildSize: 0.8, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
+        Text('Pre-mortem · only you can see this', style: Theme.of(s).textTheme.titleMedium), if (p.summary.isNotEmpty) Text(p.summary), Text(g.where, style: const TextStyle(fontSize: 12)),
+        for (var i = 0; i < p.risks.length; i++) CheckboxListTile(value: picked.contains(i), onChanged: (v) => set(() => v! ? picked.add(i) : picked.remove(i)),
+          title: Text('${p.risks[i]['risk']}'), subtitle: Text('Likelihood ${p.risks[i]['likelihood']} · impact ${p.risks[i]['impact']}\n${p.risks[i]['why_it_fails']}\nWatch for: ${p.risks[i]['early_warning']}\nMitigation: ${p.risks[i]['mitigation']}'), isThreeLine: true),
+        Wrap(spacing: 8, children: [
+          OutlinedButton.icon(icon: const Icon(Icons.share), label: const Text('Share in chat'), onPressed: () async { Navigator.pop(s); await room.sendTextEvent(p.toMessage()); }),
+          FilledButton.icon(icon: const Icon(Icons.add_task), label: Text('Make ${picked.length} mitigation task${picked.length == 1 ? '' : 's'}'), onPressed: picked.isEmpty ? null : () async {
+            Navigator.pop(s);
+            for (final i in picked) { await saveTask(room, {'task_id': 'pm-${DateTime.now().microsecondsSinceEpoch}-$i', 'title': 'Mitigate: ${p.risks[i]['mitigation']}', 'owner': room.client.userID, 'status': 'open', 'reason': 'Pre-mortem risk: ${p.risks[i]['risk']}'}); }
+            _snack('Added ${picked.length} task(s)'); }),
+        ]),
+      ]))));
+    } catch (e) { _snack('Pre-mortem failed: $e'); }
   }
 
   Future<void> send() async {

@@ -37,6 +37,7 @@ class ApiService {
   }
   /// The agents' instructions (as in services/orchestrator/app/agents.py), for requests that go through the enclave.
   static const kAgentPrompts = {
+    'premortem': 'You run pre-mortems. Imagine it is six months later and the plan has failed. Work back to why. Reply ONLY as JSON: {"summary": str, "risks": [{"risk": str, "why_it_fails": str, "likelihood": "low"|"medium"|"high", "impact": "low"|"medium"|"high", "early_warning": str, "mitigation": str}]}. Give 4 to 7 risks, the most likely and damaging first. Be specific to the plan; no generic risks. British English.',
     'summ': 'You summarise workplace conversations and meeting transcripts. Output: 3-6 bullet key points, then "Decisions:" and "Actions:" with owners. British English. Be concise.',
     'trans': 'You translate faithfully between Arabic, English and Chinese. Keep technical terms (e.g. OSNR, ROADM) untranslated. Output only the translation.',
     'minutes': 'You write formal meeting minutes from a transcript: Attendees, Agenda, Discussion, Decisions, Actions (owner, due). British English.',

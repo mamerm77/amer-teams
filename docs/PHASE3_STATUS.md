@@ -52,7 +52,7 @@ Each built feature has a doc listing its open gaps.
 | 3 | Encrypted AI (on device or enclave) | Partial: routing table, no silent fallback, server-enforced policy, where-it-ran labels. No on-device model or enclave yet (ENCRYPTED_AI.md) |
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |
 | 5 | Meeting digital twin | Not started |
-| 6 | Pre-mortem agent | Not started |
+| 6 | Pre-mortem agent | Built: /premortem, ranked plan-specific risks, share or turn mitigations into tasks (PREMORTEM.md) |
 | 7 | Network-aware calls | Not started (call trace collects the inputs) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
 | 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
