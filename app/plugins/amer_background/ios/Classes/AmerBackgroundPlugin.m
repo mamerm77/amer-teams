@@ -1,20 +1,27 @@
 #import "AmerBackgroundPlugin.h"
 #import <Vision/Vision.h>
 #import <CoreImage/CoreImage.h>
-#import <flutter_webrtc/FlutterWebRTCPlugin.h>
-#import <flutter_webrtc/LocalVideoTrack.h>
-#import <flutter_webrtc/VideoProcessingAdapter.h>
-#import <WebRTC/WebRTC.h>
+#import <CoreVideo/CoreVideo.h>
+#import <objc/message.h>
 
-/// One frame: person mask (Vision, iOS 15+) -> blurred background + sharp person, optional brightening.
-@interface AmerBlur : NSObject<ExternalVideoProcessingDelegate>
+// flutter_webrtc ships as a Swift package and this plugin as a CocoaPod, which cannot link to each other. So the
+// WebRTC classes are reached at run time through the Objective-C runtime: FlutterWebRTCPlugin.sharedSingleton,
+// its localTracks, LocalVideoTrack addProcessing:/removeProcessing:, and RTCCVPixelBuffer / RTCVideoFrame.
+// The processor implements flutter_webrtc's ExternalVideoProcessingDelegate method -onFrame:.
+
+@interface AmerBlur : NSObject
 @property(nonatomic) int radius; @property(nonatomic) BOOL lowLight; @property(nonatomic, strong) CIContext *ctx;
+- (id)onFrame:(id)frame;
 @end
+
 @implementation AmerBlur
-- (RTCVideoFrame *)onFrame:(RTCVideoFrame *)frame {
+- (id)onFrame:(id)frame {
   @try {
-    if (![frame.buffer isKindOfClass:[RTCCVPixelBuffer class]]) return frame;
-    CVPixelBufferRef pb = ((RTCCVPixelBuffer *)frame.buffer).pixelBuffer;
+    id buffer = [frame valueForKey:@"buffer"];
+    Class pbClass = NSClassFromString(@"RTCCVPixelBuffer");
+    if (!pbClass || ![buffer isKindOfClass:pbClass]) return frame;
+    CVPixelBufferRef pb = ((CVPixelBufferRef (*)(id, SEL))objc_msgSend)(buffer, NSSelectorFromString(@"pixelBuffer"));
+    if (!pb) return frame;
     CIImage *img = [CIImage imageWithCVPixelBuffer:pb]; CIImage *out = img;
     if (self.lowLight) out = [out imageByApplyingFilter:@"CIColorControls" withInputParameters:@{@"inputBrightness": @0.08, @"inputContrast": @1.1}];
     if (self.radius > 0) {
@@ -37,8 +44,12 @@
                         (__bridge CFDictionaryRef)@{(id)kCVPixelBufferIOSurfacePropertiesKey: @{}}, &dst);
     if (!dst) return frame;
     [self.ctx render:out toCVPixelBuffer:dst];
-    RTCCVPixelBuffer *rb = [[RTCCVPixelBuffer alloc] initWithPixelBuffer:dst]; CVPixelBufferRelease(dst);
-    return [[RTCVideoFrame alloc] initWithBuffer:rb rotation:frame.rotation timeStampNs:frame.timeStampNs];
+    id rb = ((id (*)(id, SEL, CVPixelBufferRef))objc_msgSend)([pbClass alloc], NSSelectorFromString(@"initWithPixelBuffer:"), dst);
+    CVPixelBufferRelease(dst);
+    NSInteger rotation = ((NSInteger (*)(id, SEL))objc_msgSend)(frame, NSSelectorFromString(@"rotation"));
+    int64_t ts = ((int64_t (*)(id, SEL))objc_msgSend)(frame, NSSelectorFromString(@"timeStampNs"));
+    Class fc = NSClassFromString(@"RTCVideoFrame"); if (!fc || !rb) return frame;
+    return ((id (*)(id, SEL, id, NSInteger, int64_t))objc_msgSend)([fc alloc], NSSelectorFromString(@"initWithBuffer:rotation:timeStampNs:"), rb, rotation, ts);
   } @catch (NSException *e) { return frame; }   // never drop video because of an effect
 }
 @end
@@ -51,11 +62,14 @@
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
   if (![call.method isEqualToString:@"apply"]) { result(FlutterMethodNotImplemented); return; }
   NSString *tid = call.arguments[@"trackId"]; int blur = [call.arguments[@"blur"] intValue]; BOOL low = [call.arguments[@"lowLight"] boolValue];
-  id t = [FlutterWebRTCPlugin sharedSingleton].localTracks[tid];
-  if (![t isKindOfClass:[LocalVideoTrack class]]) { result(@NO); return; }
-  LocalVideoTrack *track = t;
-  AmerBlur *old = _active[tid]; if (old) { [track removeProcessing:old]; [_active removeObjectForKey:tid]; }
-  if (blur > 0 || low) { AmerBlur *b = [AmerBlur new]; b.radius = blur; b.lowLight = low; b.ctx = [CIContext context]; [track addProcessing:b]; _active[tid] = b; }
+  Class pc = NSClassFromString(@"FlutterWebRTCPlugin"); Class vt = NSClassFromString(@"LocalVideoTrack");
+  if (!pc || !vt) { result(@NO); return; }
+  id plugin = ((id (*)(id, SEL))objc_msgSend)(pc, NSSelectorFromString(@"sharedSingleton"));
+  id track = [[plugin valueForKey:@"localTracks"] objectForKey:tid];
+  if (![track isKindOfClass:vt]) { result(@NO); return; }
+  SEL add = NSSelectorFromString(@"addProcessing:"), rm = NSSelectorFromString(@"removeProcessing:");
+  AmerBlur *old = _active[tid]; if (old) { ((void (*)(id, SEL, id))objc_msgSend)(track, rm, old); [_active removeObjectForKey:tid]; }
+  if (blur > 0 || low) { AmerBlur *b = [AmerBlur new]; b.radius = blur; b.lowLight = low; b.ctx = [CIContext context]; ((void (*)(id, SEL, id))objc_msgSend)(track, add, b); _active[tid] = b; }
   result(@YES);
 }
 @end
