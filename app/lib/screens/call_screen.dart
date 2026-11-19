@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../services/decisions_tasks.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:matrix/matrix.dart' as mx;
@@ -39,6 +40,60 @@ class _S extends State<CallScreen> {
   /// participants shared over the encrypted data channel. Gone when the meeting screen closes.
   final lines = <Map<String, Object?>>[];
   static const _aiState = 'com.amerteams.meeting.ai';
+  // ---------- agenda with a timer and a parking lot (docs/MEETING_AGENDA.md) ----------
+  static const _agState = 'com.amerteams.meeting.agenda', _parkType = 'com.amerteams.meeting.parking';
+  static const agendaTemplates = {
+    'Weekly sync': [('Updates', 10), ('Blockers', 10), ('Next steps', 5)],
+    'Vendor review': [('Commercials', 15), ('Technical fit', 20), ('Risks', 10), ('Decision', 5)],
+    'Incident review': [('Timeline', 10), ('Root cause', 15), ('Actions and owners', 10)],
+    'Retrospective': [('What went well', 10), ('What to improve', 10), ('Actions', 10)]};
+  Map<String, Object?>? get agenda { final a = room.getState(_agState)?.content; return a != null && a['call_id'] == callId && a['items'] is List ? Map<String, Object?>.from(a) : null; }
+  List<String> get parking => [for (final e in (_parkTl?.events ?? const <mx.Event>[]).where((e) => e.type == _parkType && e.content['call_id'] == callId).toList().reversed) '${e.content['text']}'];
+  mx.Timeline? _parkTl;
+  Future<void> _setAgenda(List<(String, int)> items) => room.client.setRoomStateWithKey(room.id, _agState, '', {'call_id': callId,
+      'items': [for (final (t, m) in items) {'t': t, 'min': m}], 'idx': 0, 'item_started_ms': DateTime.now().millisecondsSinceEpoch});
+  Future<void> _moveAgenda(int d) async {
+    final a = agenda; if (a == null) return;
+    final n = (a['items'] as List).length, idx = ((a['idx'] as num).toInt() + d);
+    if (idx >= n) { await room.client.setRoomStateWithKey(room.id, _agState, '', {...a, 'idx': n, 'done': true}); return; }
+    await room.client.setRoomStateWithKey(room.id, _agState, '', {...a, 'idx': idx.clamp(0, n - 1), 'item_started_ms': DateTime.now().millisecondsSinceEpoch});
+  }
+  Future<void> _agendaDialog() async {
+    final custom = TextEditingController();
+    final pick = await showDialog<List<(String, int)>>(context: context, builder: (d) => SimpleDialog(title: const Text('Meeting agenda'), children: [
+      for (final e in agendaTemplates.entries) SimpleDialogOption(onPressed: () => Navigator.pop(d, e.value),
+        child: ListTile(title: Text(e.key), subtitle: Text(e.value.map((x) => '${x.$1} ${x.$2}′').join(' · ')))),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: TextField(controller: custom, maxLines: 4, decoration: const InputDecoration(labelText: 'Or your own: one item per line, "Title, minutes"'))),
+      Align(alignment: Alignment.centerRight, child: TextButton(onPressed: () {
+        final items = [for (final l in custom.text.split('\n').where((l) => l.trim().isNotEmpty)) () {
+          final i = l.lastIndexOf(','); final m = i > 0 ? int.tryParse(l.substring(i + 1).trim()) : null;
+          return (m != null ? l.substring(0, i).trim() : l.trim(), m ?? 10); }()];
+        Navigator.pop(d, items.isEmpty ? null : items); }, child: const Text('Use my agenda'))),
+    ]));
+    if (pick != null) { await _setAgenda(pick); _snack('Agenda set: everyone sees the current item and time left'); }
+  }
+  Widget? _agendaBar(BuildContext c) {
+    final a = agenda; if (a == null) return null;
+    final items = (a['items'] as List).cast<Map>(); final idx = (a['idx'] as num).toInt();
+    if (a['done'] == true || idx >= items.length) return MaterialBanner(leading: const Icon(Icons.flag), content: Text('Agenda complete${parking.isNotEmpty ? ' · ${parking.length} in the parking lot' : ''}'),
+      actions: [if (isHost) TextButton(onPressed: () => _moveAgenda(-1), child: const Text('Back')), TextButton(onPressed: _showParking, child: const Text('Parking lot'))]);
+    final it = items[idx]; final total = Duration(minutes: (it['min'] as num).toInt());
+    final used = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch((a['item_started_ms'] as num).toInt()));
+    final left = total - used, frac = used.inSeconds / total.inSeconds.clamp(1, 1 << 30);
+    final col = frac >= 1 ? Colors.red : frac >= .8 ? Colors.orange : Colors.green;
+    String mmss(Duration d) => '${d.isNegative ? '+' : ''}${d.inMinutes.abs()}:${(d.inSeconds.abs() % 60).toString().padLeft(2, '0')}';
+    return MaterialBanner(leading: Icon(Icons.timer_outlined, color: col),
+      content: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text('Item ${idx + 1} of ${items.length}: ${it['t']} · ${frac >= 1 ? 'over by ${mmss(left)}' : '${mmss(left)} left'}', style: TextStyle(fontWeight: FontWeight.w600, color: frac >= .8 ? col : null)),
+        const SizedBox(height: 4), LinearProgressIndicator(value: frac.clamp(0, 1).toDouble(), color: col),
+        if (idx + 1 < items.length) Padding(padding: const EdgeInsets.only(top: 4), child: Text('Next: ${items[idx + 1]['t']}', style: const TextStyle(fontSize: 12))),
+      ]),
+      actions: [TextButton(onPressed: _showParking, child: Text('Parking lot (${parking.length})')), if (isHost) TextButton(onPressed: () => _moveAgenda(1), child: Text(idx + 1 < items.length ? 'Next item' : 'Finish'))]);
+  }
+  Future<void> _showParking() => showModalBottomSheet(context: context, builder: (s) => SafeArea(child: ListView(shrinkWrap: true, children: [
+    const ListTile(title: Text('Parking lot'), subtitle: Text('Topics raised off the agenda. Add one with /park in the meeting chat.')),
+    for (final p in parking) ListTile(leading: const Icon(Icons.local_parking), title: Text(p)),
+    if (parking.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Empty'))])));
   bool get aiOn { final s = room.getState(_aiState)?.content; return s?['enabled'] == true && s?['call_id'] == callId; }
   bool asking = false;
   Timer? tick; EventsListener<RoomEvent>? ev;
@@ -107,7 +162,7 @@ class _S extends State<CallScreen> {
     _snack('Breakout rooms opened');
   }
   void _onRoomEvent(mx.Event e) async {
-    if (e.roomId == widget.roomId && e.type == _aiState) { if (mounted) setState(() {}); return; }
+    if (e.roomId == widget.roomId && (e.type == _aiState || e.type == _agState || e.type == _parkType)) { if (mounted) setState(() {}); return; }
     if (e.roomId != widget.roomId || e.type != 'com.amerteams.breakout' || e.senderId == me) return;
     final mine = ((e.content['rooms'] as List?) ?? []).cast<Map>().where((r) => (r['members'] as List).contains(me)).firstOrNull;
     if (mine == null || !mounted) return;
@@ -158,6 +213,7 @@ class _S extends State<CallScreen> {
       call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
+      _parkTl = await room.getTimeline(onUpdate: _refresh);
       cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
       mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
       for (final w in call!.deviceWarnings) { _snack(w); }
@@ -305,6 +361,26 @@ class _S extends State<CallScreen> {
     ]))));
   }
 
+  /// Automatic follow-up (docs/MEETING_AGENDA.md): decisions become proposals to confirm, actions become tasks.
+  Future<void> _followUp(ApiService api, String transcript) async {
+    try {
+      final people = room.getParticipants().where((u) => u.membership == mx.Membership.join).toList();
+      final r = await api.ask('From this meeting, reply ONLY with JSON {"decisions":[{"text":str,"owner":name}],"actions":[{"title":str,"owner":name,"due_days":int}]}. Use only what was said. Names must be from: ${people.map((u) => u.calcDisplayname()).join(', ')}.',
+          context: transcript, agent: 'assist');
+      final m = RegExp(r'\{.*\}', dotAll: true).firstMatch('${r['answer']}'); if (m == null) return;
+      final j = jsonDecode(m.group(0)!) as Map;
+      String? who(Object? n) => people.where((u) => u.calcDisplayname().toLowerCase() == '$n'.toLowerCase()).firstOrNull?.id;
+      for (final d in ((j['decisions'] as List?) ?? const []).take(10)) {
+        await proposeDecision(room, text: '${d['text']}', owner: who(d['owner']) ?? me);          // still needs the owner and one more to confirm
+      }
+      for (final a in ((j['actions'] as List?) ?? const []).take(20)) {
+        final days = (a['due_days'] as num?)?.toInt();
+        await saveTask(room, {'task_id': newId('task'), 'title': '${a['title']}', 'owner': who(a['owner']) ?? me, 'status': 'open',
+            if (days != null) 'due': DateTime.now().add(Duration(days: days)).toIso8601String().substring(0, 10)});
+      }
+    } catch (_) {/* minutes are posted either way */}
+  }
+
   Future<void> _switchCamera() async {
     final t = call!.lk.localParticipant?.videoTrackPublications.firstOrNull?.track;
     if (t is LocalVideoTrack) { front = !front; await t.setCameraPosition(front ? CameraPosition.front : CameraPosition.back); }
@@ -318,8 +394,11 @@ class _S extends State<CallScreen> {
     tick?.cancel(); await stt.stop(); await ev?.dispose(); await call?.leave();
     if (amerNotes && (transcript.isNotEmpty || lines.isNotEmpty) && mounted) {
       final full = lines.isEmpty ? transcript.toString() : lines.map((l) => '${l['speaker']}: ${l['text']}').join('\n');
-      final r = await context.read<ApiService>().ask('Write minutes', context: full, agent: 'minutes');
+      final ag = agenda; final outline = ag == null ? '' : 'Agenda (use it as the outline): ${(ag['items'] as List).map((x) => x['t']).join('; ')}\nParking lot: ${parking.join('; ')}\n';
+      final api = context.read<ApiService>();
+      final r = await api.ask('Write minutes', context: '$outline$full', agent: 'minutes');
       await room.sendTextEvent('📝 Minutes by Amer\n\n${r['answer']}');
+      if (r['error'] != true && r['blocked'] != true) await _followUp(api, '$outline$full');
     }
     if (mounted) Navigator.pop(context);
   }
@@ -384,6 +463,7 @@ class _S extends State<CallScreen> {
               case 'muteall': _host('mute_all');
               case 'lock': _toggleLock();
               case 'amer': _toggleAi();
+              case 'agenda': _agendaDialog();
               case 'webinar': _setWebinar(!webinar);
               case 'end': _host('end');
             }
@@ -395,6 +475,7 @@ class _S extends State<CallScreen> {
             if (isHost) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'lock', child: ListTile(leading: Icon(locked ? Icons.lock_open : Icons.lock), title: Text(locked ? 'Unlock meeting' : 'Lock meeting'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'webinar', child: ListTile(leading: const Icon(Icons.campaign), title: Text(webinar ? 'Turn off webinar mode' : 'Webinar mode'))),
+            if (isHost && widget.meeting) const PopupMenuItem(value: 'agenda', child: ListTile(leading: Icon(Icons.list_alt), title: Text('Agenda and timer'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
@@ -404,6 +485,7 @@ class _S extends State<CallScreen> {
         if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
           content: Text("You're the only one here.${mid != null ? ' Share meeting ID ${MeetingService.format(mid)} or invite people.' : ' Invite people to join.'}"),
           actions: [FilledButton.tonal(onPressed: _shareLink, child: const Text('Invite people'))]),
+        if (widget.meeting && _agendaBar(c) != null) _agendaBar(c)!,
         if (aiOn) MaterialBanner(leading: const Icon(Icons.hearing, color: Colors.deepPurple),
           content: Text(captions ? 'AI listening · Amer is on for this meeting. Your speech is transcribed on this device and shared encrypted with the meeting.'
                                  : 'AI listening · Amer is on for this meeting. Your speech is not shared until you turn on Captions.'),
@@ -516,6 +598,7 @@ class _S extends State<CallScreen> {
   Future<void> _sendChat() async {
     final t = chatInput.text.trim(); if (t.isEmpty) return; chatInput.clear();
     if (t.toLowerCase().startsWith('/ask')) { final q = t.substring(4).trim(); return _askDialog(q.isEmpty ? null : q); }   // private: never posted
+    if (t.toLowerCase().startsWith('/park ')) { await room.sendEvent({'call_id': callId, 'text': t.substring(6).trim(), 'body': '🅿️ Parking lot: ${t.substring(6).trim()}'}, type: _parkType); _snack('Added to the parking lot'); return; }
     await room.sendTextEvent(t);
   }
 }

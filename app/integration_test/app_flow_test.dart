@@ -222,9 +222,21 @@ void main() {
       expectFound(find.text('Share to everyone').evaluate().isNotEmpty, 'share option');
       await tap(find.text('Close'), 'Close');
     });
+    await step('Meeting: agenda with timer, parking lot, next item', () async {
+      await tap(find.byTooltip('More'), 'More'); await tap(find.text('Agenda and timer'), 'Agenda and timer'); await tap(find.text('Weekly sync'), 'Weekly sync');
+      expectFound(await waitFor(find.textContaining('Item 1 of 3: Updates'), secs: 20), 'current agenda item with time left');
+      await t.enterText(field('Message everyone (encrypted)'), '/park Pricing model'); await t.testTextInput.receiveAction(TextInputAction.done); await wait(2);
+      expectFound(await waitFor(find.text('Parking lot (1)'), secs: 20), 'parked topic counted');
+      await tap(find.text('Next item'), 'Next item');
+      expectFound(await waitFor(find.textContaining('Item 2 of 3: Blockers'), secs: 20), 'moved to the next item');
+    });
     await step('Meeting: whiteboard', () async {
       await tap(find.byTooltip('More'), 'More');
       await tap(find.text('Whiteboard'), 'Whiteboard'); await wait(3);
+      await tap(find.byTooltip('Templates'), 'Templates'); await tap(find.text('Network sketch (optical and IP)'), 'network template');
+      await tap(find.text('Use template'), 'Use template'); await wait(3);
+      await tap(find.byTooltip('Text'), 'Text tool'); await t.tapAt(t.getCenter(find.byType(CustomPaint).last)); await wait(1);
+      await t.enterText(find.byType(TextField).last, 'Core site'); await tap(find.text('Add'), 'Add label'); await wait(2);
       await t.pageBack(); await wait(1);
     });
     await step('Meeting: leave', () async { await tap(find.text('Leave'), 'Leave'); await wait(3); });
