@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
@@ -60,14 +61,14 @@ class _S extends State<PersonalAgentsScreen> {
     final c = TextEditingController(text: '${p[key]}');
     final v = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('Edit before approving'),
       content: TextField(controller: c, maxLines: 6, autofocus: true),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Approve edited'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, c.text), child: Text(L.t(context, 'Approve edited')))]));
     if (v != null) await GlassBox.instance.decide(a['id'] as String, 'edit', edited: {...p, key: v});
   }
   Future<void> _reject(Map<String, dynamic> a) async {
     final c = TextEditingController();
     final v = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('Reject'),
       content: TextField(controller: c, decoration: const InputDecoration(labelText: 'Reason (the agent will re-plan)')),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, c.text), child: const Text('Reject'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, c.text), child: Text(L.t(context, 'Reject')))]));
     if (v != null) await GlassBox.instance.decide(a['id'] as String, 'reject', reason: v);
   }
 
@@ -85,9 +86,9 @@ class _S extends State<PersonalAgentsScreen> {
       Text('Cost: not estimated · expires ${TimeOfDay.fromDateTime(exp).format(c)}', style: TextStyle(fontSize: 12, color: cs.outline)),
       const SizedBox(height: 6),
       Wrap(spacing: 8, children: [
-        OutlinedButton(onPressed: () => _reject(a), child: const Text('Reject')),
-        OutlinedButton(onPressed: () => _edit(a), child: const Text('Edit')),
-        FilledButton(onPressed: () => GlassBox.instance.decide(a['id'] as String, 'approve'), child: const Text('Approve')),
+        OutlinedButton(onPressed: () => _reject(a), child: Text(L.t(context, 'Reject'))),
+        OutlinedButton(onPressed: () => _edit(a), child: Text(L.t(context, 'Edit'))),
+        FilledButton(onPressed: () => GlassBox.instance.decide(a['id'] as String, 'approve'), child: Text(L.t(context, 'Approve'))),
       ]),
     ])));
   }
@@ -107,7 +108,7 @@ class _S extends State<PersonalAgentsScreen> {
     final rooms = cl.rooms.where((r) => r.membership == Membership.join && !r.isSpace).take(30).toList();
     final used = (budget?['tokens_used'] as num?) ?? 0, cap = (budget?['tokens_cap'] as num?) ?? 1;
     return Scaffold(
-      appBar: AppBar(title: const Text('My agent team')),
+      appBar: AppBar(title: Text(L.t(context, 'My agent team'))),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
         for (final a in GlassBox.instance.awaiting) _approval(c, a),
         Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -118,7 +119,7 @@ class _S extends State<PersonalAgentsScreen> {
           Wrap(spacing: 6, children: [for (final r in rooms) FilterChip(label: Text(r.getLocalizedDisplayname()), selected: picked.contains(r.id),
             onSelected: (v) => setState(() => v ? picked.add(r.id) : picked.remove(r.id)))]),
           const SizedBox(height: 8),
-          FilledButton.icon(onPressed: busy || goal.text.trim().length < 10 ? null : _start, icon: const Icon(Icons.rocket_launch_outlined), label: const Text('Start my team')),
+          FilledButton.icon(onPressed: busy || goal.text.trim().length < 10 ? null : _start, icon: const Icon(Icons.rocket_launch_outlined), label: Text(L.t(context, 'Start my team'))),
           if (note != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(note!, style: TextStyle(color: cs.error))),
           const SizedBox(height: 8),
           LinearProgressIndicator(value: (used / cap).clamp(0, 1).toDouble()),
@@ -133,13 +134,13 @@ class _S extends State<PersonalAgentsScreen> {
               color: p['status'] == 'running' ? Colors.blue : p['status'] == 'done' ? Colors.green : Colors.red),
           title: Text('${p['name']}'), subtitle: Text('${p['status']}${p['cost_usd'] != null ? ' · \$${(p['cost_usd'] as num).toStringAsFixed(3)}' : ''}'),
           children: [
-            if (p['status'] == 'running') TextButton.icon(icon: const Icon(Icons.stop), label: const Text('Stop the team'), onPressed: () => api.personalStop(p['project_id'] as String)),
+            if (p['status'] == 'running') TextButton.icon(icon: const Icon(Icons.stop), label: Text(L.t(context, 'Stop the team')), onPressed: () => api.personalStop(p['project_id'] as String)),
             for (final e in (events[p['project_id']] ?? const []).reversed.take(40)) ListTile(dense: true, title: Text(_line(e), maxLines: 3, overflow: TextOverflow.ellipsis)),
             FutureBuilder<List<dynamic>>(future: api.deliverables(p['project_id'] as String), builder: (_, s) => Column(children: [
               for (final d in s.data ?? const []) ListTile(leading: const Icon(Icons.description_outlined), title: Text('${d['name']}'),
                 onTap: () => showDialog(context: c, builder: (x) => AlertDialog(title: Text('${d['name']}'),
                   content: SingleChildScrollView(child: SelectableText('${d['markdown']}')),
-                  actions: [TextButton(onPressed: () => Navigator.pop(x), child: const Text('Close'))])))])),
+                  actions: [TextButton(onPressed: () => Navigator.pop(x), child: Text(L.t(context, 'Close')))])))])),
           ])),
       ]),
     );

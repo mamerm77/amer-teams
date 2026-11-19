@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -29,7 +30,7 @@ class _S extends State<AnalyticsScreen> {
   @override
   Widget build(BuildContext c) {
     final x = d;
-    return Scaffold(appBar: AppBar(title: const Text('Usage analytics'), actions: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Usage analytics')), actions: [
       DropdownButton<int>(value: days, items: const [DropdownMenuItem(value: 7, child: Text('7 days')), DropdownMenuItem(value: 30, child: Text('30 days')), DropdownMenuItem(value: 90, child: Text('90 days'))],
         onChanged: (v) { days = v!; _load(); }), const SizedBox(width: 12)]),
       body: err != null ? Center(child: Text(err!)) : x == null ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(12), children: [

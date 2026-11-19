@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -48,7 +49,7 @@ class _S extends State<CallsScreen> {
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Share this meeting ID. People who join wait in the waiting room until you admit them.'),
           const SizedBox(height: 12), SelectableText(MeetingService.format(id), style: Theme.of(context).textTheme.headlineSmall)]),
-        actions: [FilledButton(onPressed: () => Navigator.pop(d), child: const Text('Start meeting'))]));
+        actions: [FilledButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Start meeting')))]));
       if (mounted) await Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(roomId: roomId, meeting: true)));
     } catch (e) { _err(e); }
   }
@@ -59,7 +60,7 @@ class _S extends State<CallsScreen> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: ctl, autofocus: true, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Meeting ID', hintText: '123 456 789')),
         SwitchListTile(contentPadding: EdgeInsets.zero, value: video, onChanged: (v) => set(() => video = v), title: const Text('Join with video'))]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Join'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Join')))])));
     if (ok != true || !mounted) return;
     final nav = Navigator.of(context);
     showDialog(context: context, barrierDismissible: false, builder: (_) => const AlertDialog(content: Row(children: [
@@ -90,12 +91,12 @@ class _S extends State<CallsScreen> {
           onChanged: (v) => set(() => repeat = v!)),
         const SizedBox(height: 8),
         Wrap(spacing: 6, children: [for (final e in invite.entries) Chip(label: Text(e.value), onDeleted: () => set(() => invite.remove(e.key)))]),
-        TextButton.icon(icon: const Icon(Icons.person_add), label: const Text('Add people'), onPressed: () async {
+        TextButton.icon(icon: const Icon(Icons.person_add), label: Text(L.t(context, 'Add people')), onPressed: () async {
           final p = await pickPeople(d, multiple: true, title: 'Invite to meeting');
           if (p != null) set(() { for (final x in p) { invite[x.userId] = x.displayName ?? x.userId; } });
         }),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Schedule'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Schedule')))])));
     if (ok != true) return;
     try {
       final (_, id) = await meet.create(title.text.trim().isEmpty ? 'Meeting' : title.text.trim(), invite: invite.keys.toList(), start: date, minutes: minutes, recurrence: repeat);
@@ -109,7 +110,7 @@ class _S extends State<CallsScreen> {
       const SizedBox(height: 4), Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium)]))));
 
   @override Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Calls & meetings'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+    appBar: AppBar(title: Text(L.t(context, 'Calls & meetings')), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
     body: ListView(children: [
       Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Wrap(alignment: WrapAlignment.spaceEvenly, runSpacing: 12, children: [
         _action(Icons.add_call, 'New call', _newCall),

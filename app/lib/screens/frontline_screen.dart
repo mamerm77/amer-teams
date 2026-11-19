@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -38,7 +39,7 @@ class _Shifts extends State<ShiftsScreen> {
         Expanded(child: TextButton(onPressed: () async { final v = await showTimePicker(context: d, initialTime: to); if (v != null) set(() => to = v); }, child: Text('To ${to.format(d)}'))),
       ]),
       TextField(controller: role, decoration: const InputDecoration(labelText: 'Role or site (optional)')),
-    ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Publish'))])));
+    ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Publish')))])));
     if (ok != true || !mounted) return;
     final s = DateTime(day.year, day.month, day.day, from.hour, from.minute); var e = DateTime(day.year, day.month, day.day, to.hour, to.minute);
     if (!e.isAfter(s)) e = e.add(const Duration(days: 1));                              // night shift past midnight
@@ -49,7 +50,7 @@ class _Shifts extends State<ShiftsScreen> {
   Widget build(BuildContext c) {
     final api = context.read<ApiService>();
     return Scaffold(appBar: AppBar(title: Text('Shifts · ${widget.room.getLocalizedDisplayname()}')),
-      floatingActionButton: manager ? FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add), label: const Text('Shift')) : null,
+      floatingActionButton: manager ? FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add), label: Text(L.t(context, 'Shift'))) : null,
       body: err != null ? Center(child: Text(err!)) : rows == null ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(children: [
         if (rows!.isEmpty) const ListTile(title: Text('No shifts this week'), subtitle: Text('Team managers (chat hosts) publish shifts.')),
         for (final s in rows!) () {
@@ -60,10 +61,10 @@ class _Shifts extends State<ShiftsScreen> {
             subtitle: Text([if ('${s['role']}'.isNotEmpty) s['role'], if (s['clock_in'] != null) 'in ${_t(s['clock_in']).split(' ').last}', if (s['clock_out'] != null) 'out ${_t(s['clock_out']).split(' ').last}',
               if (s['swap_state'] == 'offered') 'offered for swap', if (s['swap_state'] == 'claimed') 'claimed by ${_name(s['swap_to'])}, waiting for a manager'].join(' · ')),
             trailing: Wrap(spacing: 4, children: [
-              if (mine && s['clock_in'] == null) TextButton(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/clock', {'action': 'in'})), child: const Text('Clock in')),
-              if (mine && s['clock_in'] != null && s['clock_out'] == null) TextButton(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/clock', {'action': 'out'})), child: const Text('Clock out')),
+              if (mine && s['clock_in'] == null) TextButton(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/clock', {'action': 'in'})), child: Text(L.t(context, 'Clock in'))),
+              if (mine && s['clock_in'] != null && s['clock_out'] == null) TextButton(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/clock', {'action': 'out'})), child: Text(L.t(context, 'Clock out'))),
               if (mine && s['clock_in'] == null && s['swap_state'] == 'none') IconButton(tooltip: 'Offer for swap', icon: const Icon(Icons.swap_horiz), onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/offer', {}))),
-              if (!mine && s['swap_state'] == 'offered') FilledButton.tonal(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/claim', {})), child: const Text('Take it')),
+              if (!mine && s['swap_state'] == 'offered') FilledButton.tonal(onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/claim', {})), child: Text(L.t(context, 'Take it'))),
               if (manager && s['swap_state'] == 'claimed') ...[
                 IconButton(tooltip: 'Approve swap', icon: const Icon(Icons.check), onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/decide', {'approve': true}))),
                 IconButton(tooltip: 'Decline swap', icon: const Icon(Icons.close), onPressed: () => _do(() => api.postMap('/v1/shifts/${s['id']}/decide', {'approve': false})))],

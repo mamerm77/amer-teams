@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'expertise_screen.dart';
 import 'skills_screen.dart';
 import 'package:flutter/material.dart';
@@ -33,14 +34,14 @@ class _S extends State<CopilotScreen> {
     catch (e) { msgs.add((false, 'Error: $e', [])); }
     setState(() => busy = false);
   }
-  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Amer co-pilot'), actions: [
+  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Amer co-pilot')), actions: [
     ListenableBuilder(listenable: Flags.instance, builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
-      if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
-      TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: const Text('Skills and marketplace'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
-      TextButton.icon(icon: const Icon(Icons.person_search), label: const Text('Who knows about…'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const ExpertiseScreen()))),
-      if (Flags.instance.on('workflows')) TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: const Text('Workflows'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
+      if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: Text(L.t(context, 'My agents')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+      TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: Text(L.t(context, 'Skills and marketplace')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
+      TextButton.icon(icon: const Icon(Icons.person_search), label: Text(L.t(context, 'Who knows about…')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const ExpertiseScreen()))),
+      if (Flags.instance.on('workflows')) TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: Text(L.t(context, 'Workflows')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),
     ])),
-      Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with Amer')))]),
+      Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.chat_bubble_outline), label: Text(L.t(context, 'Chat with Amer'))))]),
     body: Column(children: [
     const ListTile(dense: true, leading: Icon(Icons.info_outline), title: Text('Tip: chat with Amer like a colleague, or @mention Amer in any group chat after adding it to the group.')),
     Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [for (final m in msgs) Align(alignment: m.$1 ? Alignment.centerRight : Alignment.centerLeft, child: Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/focus.dart';
 import 'calendars_screen.dart';
 import '../services/calendar_connector.dart';
@@ -80,7 +81,7 @@ class _S extends State<FindTimeScreen> {
 
   @override Widget build(BuildContext c) {
     final rooms = context.read<MatrixService>().client.rooms.where((r) => r.membership == Membership.join && !r.isSpace).toList();
-    return Scaffold(appBar: AppBar(title: const Text('Find a time'), actions: [IconButton(tooltip: 'Connected calendars', icon: const Icon(Icons.event_note), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CalendarsScreen())))]), body: ListView(padding: const EdgeInsets.all(16), children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Find a time')), actions: [IconButton(tooltip: 'Connected calendars', icon: const Icon(Icons.event_note), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CalendarsScreen())))]), body: ListView(padding: const EdgeInsets.all(16), children: [
       DropdownButtonFormField<String>(value: room?.id, decoration: const InputDecoration(labelText: 'With the members of'),
         items: [for (final r in rooms) DropdownMenuItem(value: r.id, child: Text(r.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis))],
         onChanged: (v) => setState(() { room = rooms.firstWhere((r) => r.id == v); slots = null; })),
@@ -93,7 +94,7 @@ class _S extends State<FindTimeScreen> {
       Row(children: [const Text('Within'), const SizedBox(width: 12), DropdownButton<int>(value: days, items: const [DropdownMenuItem(value: 2, child: Text('2 days')), DropdownMenuItem(value: 5, child: Text('5 days')),
           DropdownMenuItem(value: 10, child: Text('10 days')), DropdownMenuItem(value: 30, child: Text('30 days'))], onChanged: (v) => setState(() => days = v!))]),
       const SizedBox(height: 12),
-      FilledButton.icon(onPressed: room == null || busy ? null : _find, icon: const Icon(Icons.manage_search), label: const Text('Find the best times')),
+      FilledButton.icon(onPressed: room == null || busy ? null : _find, icon: const Icon(Icons.manage_search), label: Text(L.t(context, 'Find the best times'))),
       if (busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
       if (err != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(err!, style: TextStyle(color: Theme.of(c).colorScheme.error))),
       if (slots != null) ...[
@@ -101,7 +102,7 @@ class _S extends State<FindTimeScreen> {
         Text(slots!.isEmpty ? 'No time when everyone is free in this window' : 'Everyone is free at:', style: Theme.of(c).textTheme.titleSmall),
         for (final s in slots!) Card(child: ListTile(leading: const Icon(Icons.event_available),
           title: Text(DateFormat('EEEE d MMM, HH:mm').format(DateTime.parse('${s['start']}').toLocal())), subtitle: Text('$minutes min · your time'),
-          trailing: FilledButton(onPressed: () => _book(s as Map), child: const Text('Book')))),
+          trailing: FilledButton(onPressed: () => _book(s as Map), child: Text(L.t(context, 'Book'))))),
         if (missing.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(
           'Not checked (they have not opened Amer Teams\' calendar yet): ${missing.map((u) => room!.unsafeGetUserFromMemoryOrFallback('$u').calcDisplayname()).join(', ')}',
           style: TextStyle(fontSize: 12, color: Theme.of(c).colorScheme.outline))),
@@ -137,7 +138,7 @@ Future<void> showCalendarSettings(BuildContext context) async {
           DropdownMenuItem(value: 'umm_al_qura', child: Text('Umm al-Qura')), DropdownMenuItem(value: 'egypt', child: Text('Egyptian authority'))], onChanged: (v) => set(() => p.v['method'] = v)),
       SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Ramadan working hours'), subtitle: const Text('Two hours shorter working day in Ramadan'),
         value: p.v['ramadan'] == true, onChanged: (v) => set(() => p.v['ramadan'] = v)),
-    ])), actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () async { await p.save(); if (d.mounted) Navigator.pop(d); }, child: const Text('Save'))]);
+    ])), actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () async { await p.save(); if (d.mounted) Navigator.pop(d); }, child: Text(L.t(context, 'Save')))]);
   }));
   if (context.mounted) await CalendarPrefs.publish(context.read<MatrixService>(), context.read<ApiService>()).catchError((_) {});
 }
@@ -158,7 +159,7 @@ Future<void> showOutOfOffice(BuildContext context) async {
       TextField(controller: msg, maxLines: 3, decoration: const InputDecoration(labelText: 'Automatic reply (direct chats, once a day per person)')),
       TextField(controller: del, decoration: const InputDecoration(labelText: 'Delegate (e.g. @sara:your.server)')),
     ])),
-    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Save')))])));
   if (ok != true) return;
   await o.save(enabled: on, start: DateTime(from.year, from.month, from.day), end: DateTime(to.year, to.month, to.day), message: msg.text.trim(), delegate: del.text.trim().isEmpty ? null : del.text.trim());
   if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(on ? (o.active ? 'Out of office is on: ${o.statusText()}' : 'Out of office set for ${DateFormat('d MMM').format(from)}') : 'Out of office is off')));

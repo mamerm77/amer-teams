@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
@@ -80,7 +81,7 @@ class _DS extends State<_Discover> {
         return ListView(children: [for (final t in s.data!) ListTile(
           leading: CircleAvatar(child: Text(_initials(t.name ?? '?'))), title: Text(t.name ?? t.roomId),
           subtitle: Text('${t.topic ?? ''}${(t.topic ?? '').isEmpty ? '' : ' · '}${t.numJoinedMembers} members', maxLines: 2),
-          trailing: FilledButton(child: const Text('Join'), onPressed: () async {
+          trailing: FilledButton(child: Text(L.t(context, 'Join')), onPressed: () async {
             await m.joinTeam(t.roomId);
             if (c.mounted) Navigator.pushReplacement(c, MaterialPageRoute(builder: (_) => TeamScreen(teamId: t.roomId)));
           }))]);
@@ -190,7 +191,7 @@ class _CS extends State<ChannelScreen> {
           SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
             Expanded(child: TextField(controller: post, minLines: 1, maxLines: 5, decoration: const InputDecoration(hintText: 'Start a new post (encrypted)', border: OutlineInputBorder()))),
             const SizedBox(width: 8),
-            FilledButton(onPressed: () async { final t = post.text.trim(); if (t.isEmpty) return; post.clear(); await room.sendTextEvent(t); }, child: const Text('Post'))]))),
+            FilledButton(onPressed: () async { final t = post.text.trim(); if (t.isEmpty) return; post.clear(); await room.sendTextEvent(t); }, child: Text(L.t(context, 'Post')))]))),
         ]),
         ChatScreen(roomId: room.id, filesOnly: true),
       ])));

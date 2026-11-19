@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
@@ -17,7 +18,7 @@ class _L extends State<CanvasListScreen> {
     final t = TextEditingController();
     final name = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('New canvas'),
       content: TextField(controller: t, autofocus: true, decoration: const InputDecoration(labelText: 'Title'), onSubmitted: (v) => Navigator.pop(d, v)),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: const Text('Create'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: Text(L.t(context, 'Create')))]));
     if (name == null || name.trim().isEmpty || !mounted) return;
     final id = await CanvasDoc.create(widget.room, name.trim());
     if (!mounted) return;
@@ -26,7 +27,7 @@ class _L extends State<CanvasListScreen> {
   }
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: Text('Canvases · ${widget.room.getLocalizedDisplayname()}')),
-    floatingActionButton: FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.note_add_outlined), label: const Text('New canvas')),
+    floatingActionButton: FloatingActionButton.extended(onPressed: _new, icon: const Icon(Icons.note_add_outlined), label: Text(L.t(context, 'New canvas'))),
     body: FutureBuilder<List<Event>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
       if (s.data!.isEmpty) return const Center(child: Text('No canvases in this chat yet'));
@@ -133,12 +134,12 @@ class _C extends State<CanvasScreen> {
         return Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(switch ('${blk['val']}') {
           'todo' => '${v.get(b, 'checked') == true ? '☑' : '☐'} ${v.text('$b:text')}', 'table' => '[table]', 'msg' => '❝ ${v.get(b, 'body')}', _ => v.text('$b:text') },
           style: '${blk['val']}' == 'h' ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 18) : null)); }()]))),
-    actions: [TextButton(onPressed: () => Navigator.pop(x), child: const Text('Close'))]));
+    actions: [TextButton(onPressed: () => Navigator.pop(x), child: Text(L.t(context, 'Close')))]));
 
   Future<void> _rename() async {
     final t = TextEditingController(text: d.title);
     final v = await showDialog<String>(context: context, builder: (x) => AlertDialog(title: const Text('Rename canvas'), content: TextField(controller: t, autofocus: true),
-      actions: [TextButton(onPressed: () => Navigator.pop(x), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(x, t.text), child: const Text('Save'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(x), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(x, t.text), child: Text(L.t(context, 'Save')))]));
     if (v != null && v.trim().isNotEmpty) d.setTitle(v.trim());
   }
 
@@ -158,7 +159,7 @@ class _C extends State<CanvasScreen> {
         SafeArea(top: false, child: SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), child: Row(children: [
           for (final (k, l, ic) in [('h', 'Heading', Icons.title), ('p', 'Text', Icons.notes), ('todo', 'Checklist', Icons.check_box_outlined), ('table', 'Table', Icons.table_chart_outlined)])
             Padding(padding: const EdgeInsets.only(right: 6), child: ActionChip(avatar: Icon(ic, size: 18), label: Text(l), onPressed: () => d.addBlock(k))),
-          ActionChip(avatar: const Icon(Icons.format_quote, size: 18), label: const Text('Message'), onPressed: _embed),
+          ActionChip(avatar: const Icon(Icons.format_quote, size: 18), label: Text(L.t(context, 'Message')), onPressed: _embed),
         ]))),
       ]),
     );

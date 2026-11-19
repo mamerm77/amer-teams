@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
@@ -73,7 +74,7 @@ class _S extends State<_PreJoin> {
       const SizedBox(height: 8),
       Row(children: const [Icon(Icons.lock, size: 16, color: Colors.green), SizedBox(width: 6), Expanded(child: Text('End-to-end encrypted with quantum-safe keys. Your preview stays on this device until you join.'))]),
       const SizedBox(height: 16),
-      FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), icon: const Icon(Icons.login), label: const Text('Join now'),
+      FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)), icon: const Icon(Icons.login), label: Text(L.t(context, 'Join now')),
         onPressed: () async { await preview?.stop(); preview = null; if (c.mounted) Navigator.pop(c, PreJoinChoice(mic: mic, cam: cam, micId: micId, camId: camId, speakerId: speakerId)); }),
     ]))));
   }

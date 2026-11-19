@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -17,7 +18,7 @@ class _S extends State<CallTraceScreen> {
   static Color oc(String? o) => switch (o) { 'completed' => Colors.green, 'in_progress' || 'ringing' => Colors.blue, 'missed' || 'cancelled' => Colors.orange, _ => Colors.red };
 
   @override Widget build(BuildContext ctx) => Scaffold(
-    appBar: AppBar(title: const Text('Call trace'), actions: [
+    appBar: AppBar(title: Text(L.t(context, 'Call trace')), actions: [
       PopupMenuButton<String?>(icon: const Icon(Icons.filter_list), onSelected: (v) { outcome = v; _load(); }, itemBuilder: (_) => [
         const PopupMenuItem(value: null, child: Text('All')),
         for (final o in ['completed', 'missed', 'declined', 'busy', 'cancelled', 'failed']) PopupMenuItem(value: o, child: Text(o))]),

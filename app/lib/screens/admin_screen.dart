@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'guest_accounts_screen.dart';
 import 'analytics_screen.dart';
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ class _S extends State<AdminScreen> {
     await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Invite code created'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [SelectableText(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 22)),
         const SizedBox(height: 8), const Text('Copied. Valid for one sign-up within 7 days.')]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Done'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Done')))]));
     _load();
   }
 
@@ -40,24 +41,24 @@ class _S extends State<AdminScreen> {
         TextField(controller: n, decoration: const InputDecoration(labelText: 'Display name')),
         TextField(controller: p, decoration: const InputDecoration(labelText: 'Temporary password')),
         CheckboxListTile(value: adm, onChanged: (v) => set(() => adm = v!), title: const Text('Administrator'), contentPadding: EdgeInsets.zero)]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Create'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Create')))])));
     if (ok != true) return;
     try { final r = await api.createUser(u.text.trim(), p.text, name: n.text.trim(), admin: adm); _msg('Created ${r['user_id']}'); _load(); }
     catch (e) { _msg('$e'.replaceFirst('Exception: ', '')); }
   }
 
   @override Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Users'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+    appBar: AppBar(title: Text(L.t(context, 'Users')), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
     body: err != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(err!)))
       : ListView(padding: const EdgeInsets.all(12), children: [
         Wrap(spacing: 8, children: [
-          FilledButton.icon(onPressed: _invite, icon: const Icon(Icons.vpn_key), label: const Text('New invite code')),
-          OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: const Text('Create user')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CallTraceScreen())), icon: const Icon(Icons.timeline), label: const Text('Call trace')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FlagsScreen())), icon: const Icon(Icons.flag_outlined), label: const Text('Feature flags')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const AnalyticsScreen())), icon: const Icon(Icons.insights), label: const Text('Usage analytics')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const GuestAccountsScreen())), icon: const Icon(Icons.badge_outlined), label: const Text('Guests and residency')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PartnersScreen())), icon: const Icon(Icons.handshake_outlined), label: const Text('Partners'))]),
+          FilledButton.icon(onPressed: _invite, icon: const Icon(Icons.vpn_key), label: Text(L.t(context, 'New invite code'))),
+          OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: Text(L.t(context, 'Create user'))),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CallTraceScreen())), icon: const Icon(Icons.timeline), label: Text(L.t(context, 'Call trace'))),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FlagsScreen())), icon: const Icon(Icons.flag_outlined), label: Text(L.t(context, 'Feature flags'))),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const AnalyticsScreen())), icon: const Icon(Icons.insights), label: Text(L.t(context, 'Usage analytics'))),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const GuestAccountsScreen())), icon: const Icon(Icons.badge_outlined), label: Text(L.t(context, 'Guests and residency'))),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PartnersScreen())), icon: const Icon(Icons.handshake_outlined), label: Text(L.t(context, 'Partners')))]),
         const SizedBox(height: 16), Text('Accounts (${users.length})', style: Theme.of(c).textTheme.titleMedium),
         for (final u in users) ListTile(
           leading: Icon(u['deactivated'] ? Icons.person_off : u['admin'] ? Icons.admin_panel_settings : Icons.person),
@@ -66,7 +67,7 @@ class _S extends State<AdminScreen> {
             if (a == 'deact') { await api.deactivate(u['user_id']); _msg('Deactivated'); }
             if (a == 'reset') { final t = TextEditingController();
               final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('New password'), content: TextField(controller: t),
-                actions: [FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Reset'))]));
+                actions: [FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Reset')))]));
               if (ok == true) { await api.resetPassword(u['user_id'], t.text); _msg('Password reset; user signed out everywhere'); } }
             _load();
           }, itemBuilder: (_) => const [PopupMenuItem(value: 'reset', child: Text('Reset password')), PopupMenuItem(value: 'deact', child: Text('Deactivate'))])),

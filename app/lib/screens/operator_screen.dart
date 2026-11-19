@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +36,7 @@ class _S extends State<OperatorScreen> {
         TextField(controller: service, decoration: InputDecoration(labelText: 'Service or network', helperText: oncall?.isNotEmpty == true ? 'Rotas: ${oncall!.map((o) => o['service']).join(', ')}' : null)),
         TextField(controller: impact, decoration: const InputDecoration(labelText: 'Customer impact (optional), e.g. 1,200 FTTH, 3 enterprise circuits')),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Open war room'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Open war room')))])));
     if (ok != true || !mounted) return;
     final api = context.read<ApiService>(); final m = context.read<MatrixService>();
     try {
@@ -63,8 +64,8 @@ class _S extends State<OperatorScreen> {
   @override
   Widget build(BuildContext c) {
     final rooms = context.watch<MatrixService>().client.rooms.where((r) => r.getState(kIncident) != null).toList();
-    return Scaffold(appBar: AppBar(title: const Text('Operator'), actions: [IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh), onPressed: _load)]),
-      floatingActionButton: FloatingActionButton.extended(backgroundColor: Colors.red, foregroundColor: Colors.white, onPressed: () => _declare(), icon: const Icon(Icons.campaign), label: const Text('Declare incident')),
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Operator')), actions: [IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh), onPressed: _load)]),
+      floatingActionButton: FloatingActionButton.extended(backgroundColor: Colors.red, foregroundColor: Colors.white, onPressed: () => _declare(), icon: const Icon(Icons.campaign), label: Text(L.t(context, 'Declare incident'))),
       body: err != null ? Center(child: Text(err!)) : oncall == null ? const Center(child: CircularProgressIndicator()) : RefreshIndicator(onRefresh: _load, child: ListView(children: [
         const ListTile(title: Text('On call now')),
         if (oncall!.isEmpty) const ListTile(dense: true, title: Text('No rotas yet'), subtitle: Text('An administrator sets them up (PUT /v1/oncall/rotas)')),
@@ -76,7 +77,7 @@ class _S extends State<OperatorScreen> {
           return ListTile(leading: CircleAvatar(backgroundColor: _sev('${i['severity']}'), child: Text('${i['severity']}', style: const TextStyle(color: Colors.white, fontSize: 12))),
             title: Text('${i['number']} · ${room?.getLocalizedDisplayname().split(' · ').last ?? i['service']}'),
             subtitle: Text('${i['state']}${i['acked_by'] != null ? ' · acknowledged by ${i['acked_by']}' : ' · not acknowledged'}${i['source'] == 'alert' ? ' · from monitoring' : ''}'),
-            trailing: room != null ? const Icon(Icons.chevron_right) : FilledButton.tonal(onPressed: () => _declare(fromAlert: i), child: const Text('Open war room')),
+            trailing: room != null ? const Icon(Icons.chevron_right) : FilledButton.tonal(onPressed: () => _declare(fromAlert: i), child: Text(L.t(context, 'Open war room'))),
             onTap: room == null ? null : () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id))));
         }(),
         const Divider(),

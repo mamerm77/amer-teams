@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'rooms_screen.dart';
 import 'package:matrix/matrix.dart' show MatrixException, MatrixError;
 import 'package:flutter/material.dart';
@@ -62,7 +63,7 @@ class _S extends State<LoginScreen> {
       if (err != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(err!, style: TextStyle(color: Theme.of(c).colorScheme.error))),
       const SizedBox(height: 20),
       FilledButton(onPressed: busy ? null : go, child: Text(busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in')),
-      TextButton.icon(icon: const Icon(Icons.tablet), label: const Text('Set up as a room display'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const RoomDisplayScreen()))),
+      TextButton.icon(icon: const Icon(Icons.tablet), label: Text(L.t(context, 'Set up as a room display')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const RoomDisplayScreen()))),
     ]))))));
 }
 

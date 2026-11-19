@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,9 +14,9 @@ class _S extends State<OpsScreen> {
 
   @override Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    if (d == null) return Scaffold(appBar: AppBar(title: const Text('Performance & availability')), body: Center(child: Text(err ?? 'Loading live telemetry…')));
+    if (d == null) return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Performance & availability'))), body: Center(child: Text(err ?? 'Loading live telemetry…')));
     final now = d!['now'], avail = Map<String, dynamic>.from(d!['availability_pct']), hist = List.from(d!['history']);
-    return Scaffold(appBar: AppBar(title: const Text('Performance & availability')), body: ListView(padding: const EdgeInsets.all(12), children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Performance & availability'))), body: ListView(padding: const EdgeInsets.all(12), children: [
       Wrap(spacing: 12, runSpacing: 12, children: [
         _kpi(c, 'Active calls', '${now['media']['active_calls'] ?? '–'}'),
         _kpi(c, 'In calls now', '${now['media']['participants'] ?? '–'}'),

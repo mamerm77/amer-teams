@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -29,8 +30,8 @@ class _S extends State<WorkflowsScreen> {
   @override Widget build(BuildContext c) {
     final r = WorkflowRunner.instance;
     return Scaffold(
-      appBar: AppBar(title: const Text('Workflows'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
-      floatingActionButton: FloatingActionButton.extended(onPressed: () => _open(), icon: const Icon(Icons.add), label: const Text('New workflow')),
+      appBar: AppBar(title: Text(L.t(context, 'Workflows')), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
+      floatingActionButton: FloatingActionButton.extended(onPressed: () => _open(), icon: const Icon(Icons.add), label: Text(L.t(context, 'New workflow'))),
       body: list == null ? Center(child: err != null ? Text(err!) : const CircularProgressIndicator())
         : ListView(padding: const EdgeInsets.only(bottom: 96), children: [
             const Padding(padding: EdgeInsets.fromLTRB(16, 12, 16, 4), child: Text(
@@ -48,8 +49,8 @@ class _S extends State<WorkflowsScreen> {
               }),
               children: [
                 Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [
-                  TextButton.icon(icon: const Icon(Icons.edit_outlined), label: const Text('Edit'), onPressed: () => _open(w)),
-                  TextButton.icon(icon: const Icon(Icons.play_arrow), label: const Text('Run now'), onPressed: () async {
+                  TextButton.icon(icon: const Icon(Icons.edit_outlined), label: Text(L.t(context, 'Edit')), onPressed: () => _open(w)),
+                  TextButton.icon(icon: const Icon(Icons.play_arrow), label: Text(L.t(context, 'Run now')), onPressed: () async {
                     final id = await WorkflowRunner.instance.runNow(w);
                     if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(id != null ? 'Started' : WorkflowRunner.instance.lastError)));
                     setState(() {});
@@ -172,15 +173,15 @@ class _E extends State<WorkflowEditor> {
     return Scaffold(
       appBar: AppBar(title: Text(widget.existing == null ? 'New workflow' : 'Edit ${widget.existing!['name']}'), actions: [
         if (d != null) TextButton(onPressed: () => setState(() { if (raw) _readJson(); else json.text = const JsonEncoder.withIndent('  ').convert(d); raw = !raw; }), child: Text(raw ? 'Flow' : 'JSON')),
-        if (d != null) FilledButton(onPressed: busy ? null : _save, child: const Text('Save'))]),
+        if (d != null) FilledButton(onPressed: busy ? null : _save, child: Text(L.t(context, 'Save')))]),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
         if (widget.existing == null) Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(controller: describe, minLines: 2, maxLines: 4, decoration: const InputDecoration(border: OutlineInputBorder(),
             labelText: 'Describe the workflow', hintText: 'When someone posts a quote in RFP, ask Sara to approve it and post the result in RFP log')),
           const SizedBox(height: 8),
           Row(children: [
-            FilledButton.icon(onPressed: busy ? null : _draft, icon: const Icon(Icons.auto_awesome), label: const Text('Draft with Amer')),
-            const SizedBox(width: 8), TextButton(onPressed: _template, child: const Text('Start from a template')),
+            FilledButton.icon(onPressed: busy ? null : _draft, icon: const Icon(Icons.auto_awesome), label: Text(L.t(context, 'Draft with Amer'))),
+            const SizedBox(width: 8), TextButton(onPressed: _template, child: Text(L.t(context, 'Start from a template'))),
           ]),
           if (note != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(note!, style: TextStyle(color: cs.error))),
         ])),
@@ -199,7 +200,7 @@ class _E extends State<WorkflowEditor> {
           ],
           ExpansionTile(title: const Text('Dry run (sends nothing)'), children: [
             Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextField(controller: sample, maxLines: 8, style: const TextStyle(fontFamily: 'monospace', fontSize: 12), decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Sample data'))),
-            Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.all(8), child: OutlinedButton.icon(onPressed: busy ? null : _dry, icon: const Icon(Icons.science_outlined), label: const Text('Dry run')))),
+            Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.all(8), child: OutlinedButton.icon(onPressed: busy ? null : _dry, icon: const Icon(Icons.science_outlined), label: Text(L.t(context, 'Dry run'))))),
             if (dry != null) for (final s in dry!) ListTile(dense: true, leading: const Icon(Icons.check, size: 16), title: Text('${s['step']}: ${s['would']}')),
           ]),
           SwitchListTile(title: const Text('Switch on after saving'), value: enable, onChanged: (v) => setState(() => enable = v)),

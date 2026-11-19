@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'skills_screen.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -126,8 +127,8 @@ class _S extends State<AgentOpsScreen> with SingleTickerProviderStateMixin {
       title: const Text('New project for the agent team'),
       content: SizedBox(width: 520, child: TextField(controller: t, maxLines: 6, autofocus: true, decoration: const InputDecoration(
         hintText: 'e.g. Build a CLI that converts a DWDM inventory CSV into a GNPy topology JSON, with tests', border: OutlineInputBorder()))),
-      actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-        FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => Navigator.pop(c, true), child: const Text('Run team'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: Text(L.t(context, 'Cancel'))),
+        FilledButton(style: FilledButton.styleFrom(backgroundColor: _red), onPressed: () => Navigator.pop(c, true), child: Text(L.t(context, 'Run team')))]));
     if (ok == true && t.text.trim().length >= 10) { follow = true; await _guard(() => context.read<ApiService>().agentopsStart(t.text.trim())); }
   }
 
@@ -136,16 +137,16 @@ class _S extends State<AgentOpsScreen> with SingleTickerProviderStateMixin {
   Widget build(BuildContext c) {
     final p = _cur; final wide = MediaQuery.sizeOf(c).width > 900;
     return Scaffold(
-      appBar: AppBar(title: const Text('Agent Ops'), actions: [
-        TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
-        TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: const Text('Skills and marketplace'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
+      appBar: AppBar(title: Text(L.t(context, 'Agent Ops')), actions: [
+        TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: Text(L.t(context, 'My agents')), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+        TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: Text(L.t(context, 'Skills and marketplace')), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
         if (order.isNotEmpty) SizedBox(width: wide ? 260 : 130, child: DropdownButton<String>(isExpanded: true, value: selected, underline: const SizedBox(), hint: const Text('Project'),
           items: [for (final id in order) DropdownMenuItem(value: id, child: Text(projects[id]!.name.isEmpty ? id : projects[id]!.name, overflow: TextOverflow.ellipsis))],
           onChanged: (v) => setState(() { selected = v; follow = false; }))),
         if (p != null && p.live) IconButton(tooltip: 'Stop project', icon: const Icon(Icons.stop_circle_outlined), onPressed: () => _guard(() => context.read<ApiService>().agentopsStop(p.id))),
         IconButton(tooltip: 'Replay sample run', icon: const Icon(Icons.replay), onPressed: () { follow = true; _guard(() => context.read<ApiService>().agentopsReplay()); }),
         if (wide) Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: _red),
-          onPressed: _newProject, icon: const Icon(Icons.play_arrow), label: const Text('Run team')))
+          onPressed: _newProject, icon: const Icon(Icons.play_arrow), label: Text(L.t(context, 'Run team'))))
         else IconButton(tooltip: 'Run team', color: _red, icon: const Icon(Icons.play_circle_fill), onPressed: _newProject),
       ]),
       body: p == null ? _empty(c) : wide ? _wide(c, p) : _narrow(c, p),

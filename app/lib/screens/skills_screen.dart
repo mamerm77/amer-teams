@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/labels.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
@@ -36,7 +37,7 @@ class _S extends State<SkillsScreen> {
         TextField(controller: ins, minLines: 4, maxLines: 10, decoration: InputDecoration(labelText: 'Instructions',
           helperText: kind == 'skill' ? 'Use {{input_name}} for what the person fills in, e.g. Draft an RFP clause about {{topic}}.' : 'Who the agent is and how it answers, e.g. You are our DWDM capacity planner…', helperMaxLines: 3)),
       ]))),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Save')))])));
     if (ok != true || !mounted) return;
     final api = context.read<ApiService>(); final body = {'kind': kind, 'name': name.text, 'description': desc.text, 'instructions': ins.text};
     try { s == null ? await api.postMap('/v1/skills', body) : await api.putMap('/v1/skills/${s['id']}', body); _load(); } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
@@ -50,7 +51,7 @@ class _S extends State<SkillsScreen> {
         if (widget.context != null) const Text('Uses this chat\'s recent messages as context.', style: TextStyle(fontSize: 12)),
         for (final e in ctrls.entries) TextField(controller: e.value, minLines: 1, maxLines: 4, decoration: InputDecoration(labelText: e.key == 'input' ? 'Your request' : e.key.replaceAll('_', ' '))),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Run'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Run')))]));
     if (ok != true || !mounted) return;
     final label = widget.room == null ? null : labelOf(widget.room!);
     try {
@@ -59,7 +60,7 @@ class _S extends State<SkillsScreen> {
       if (!mounted) return;
       await showModalBottomSheet(context: context, isScrollControlled: true, builder: (b) => DraggableScrollableSheet(expand: false, initialChildSize: 0.7, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
         Text('${s['name']} · only you see this', style: Theme.of(b).textTheme.titleMedium), const SizedBox(height: 8), SelectableText('${res['answer']}'),
-        if (widget.room != null && res['blocked'] != true && res['error'] != true) Padding(padding: const EdgeInsets.only(top: 12), child: FilledButton.icon(icon: const Icon(Icons.share), label: const Text('Share in chat'),
+        if (widget.room != null && res['blocked'] != true && res['error'] != true) Padding(padding: const EdgeInsets.only(top: 12), child: FilledButton.icon(icon: const Icon(Icons.share), label: Text(L.t(context, 'Share in chat')),
           onPressed: () async { Navigator.pop(b); await widget.room!.sendTextEvent('${res['answer']}'); })),
       ])));
     } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
@@ -75,9 +76,9 @@ class _S extends State<SkillsScreen> {
         IconButton(tooltip: 'Approve', icon: const Icon(Icons.check), onPressed: () async { await context.read<ApiService>().postMap('/v1/skills/${s['id']}/review', {'approve': true}); _load(); }),
         IconButton(tooltip: 'Reject', icon: const Icon(Icons.close), onPressed: () async {
           final t = TextEditingController();
-          final why = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('Why is it rejected?'), content: TextField(controller: t), actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text), child: const Text('Reject'))]));
+          final why = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('Why is it rejected?'), content: TextField(controller: t), actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text), child: Text(L.t(context, 'Reject')))]));
           if (why != null && why.isNotEmpty && mounted) { await context.read<ApiService>().postMap('/v1/skills/${s['id']}/review', {'approve': false, 'note': why}); _load(); } }),
-      ] else if (market && s['installed'] != true) FilledButton.tonal(onPressed: () async { await context.read<ApiService>().postMap('/v1/skills/${s['id']}/install', {}); _load(); }, child: const Text('Install'))
+      ] else if (market && s['installed'] != true) FilledButton.tonal(onPressed: () async { await context.read<ApiService>().postMap('/v1/skills/${s['id']}/install', {}); _load(); }, child: Text(L.t(context, 'Install')))
       else ...[
         IconButton(tooltip: 'Run', icon: const Icon(Icons.play_arrow), onPressed: () => _run(s)),
         if (!market && s['status'] == 'private') IconButton(tooltip: 'Submit to the marketplace', icon: const Icon(Icons.storefront), onPressed: () async { await context.read<ApiService>().postMap('/v1/skills/${s['id']}/submit', {}); _snack('Sent for review'); _load(); }),
@@ -87,8 +88,8 @@ class _S extends State<SkillsScreen> {
 
   @override
   Widget build(BuildContext c) => DefaultTabController(length: queue == null ? 2 : 3, child: Scaffold(
-    appBar: AppBar(title: const Text('Skills and agents'), bottom: TabBar(tabs: [const Tab(text: 'Mine'), const Tab(text: 'Marketplace'), if (queue != null) Tab(text: 'Review (${queue!.length})')])),
-    floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add), label: const Text('New')),
+    appBar: AppBar(title: Text(L.t(context, 'Skills and agents')), bottom: TabBar(tabs: [const Tab(text: 'Mine'), const Tab(text: 'Marketplace'), if (queue != null) Tab(text: 'Review (${queue!.length})')])),
+    floatingActionButton: FloatingActionButton.extended(onPressed: () => _edit(), icon: const Icon(Icons.add), label: Text(L.t(context, 'New'))),
     body: err != null ? Center(child: Text(err!)) : mine == null ? const Center(child: CircularProgressIndicator()) : TabBarView(children: [
       ListView(children: [if (mine!.isEmpty) const ListTile(title: Text('No skills yet'), subtitle: Text('Make one for a task you repeat, or install one from the marketplace.')), for (final s in mine!) _tile(s, market: s['owner'] != context.read<ApiService>().me)]),
       ListView(children: [if (market!.isEmpty) const ListTile(title: Text('Nothing published in your organisation yet')), for (final s in market!) _tile(s, market: true)]),

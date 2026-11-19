@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
@@ -39,7 +40,7 @@ class _S extends State<SearchScreen> {
             for (final r in rooms) DropdownMenuItem(value: r.id, child: Text(r.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis))], onChanged: (v) { setState(() => room = v); _run(); }),
           const SizedBox(width: 8),
           DropdownButton<String?>(value: person, hint: const Text('From anyone'), underline: const SizedBox(), items: [const DropdownMenuItem(value: null, child: Text('From anyone')),
-            DropdownMenuItem(value: cl.userID, child: const Text('From me')), for (final e in senders.entries) DropdownMenuItem(value: e.key, child: Text(e.value))], onChanged: (v) { setState(() => person = v); _run(); }),
+            DropdownMenuItem(value: cl.userID, child: Text(L.t(context, 'From me'))), for (final e in senders.entries) DropdownMenuItem(value: e.key, child: Text(e.value))], onChanged: (v) { setState(() => person = v); _run(); }),
           const SizedBox(width: 8),
           DropdownButton<String>(value: when, underline: const SizedBox(), items: const [DropdownMenuItem(value: 'any', child: Text('Any time')), DropdownMenuItem(value: '7', child: Text('Last 7 days')),
             DropdownMenuItem(value: '30', child: Text('Last 30 days'))], onChanged: (v) { setState(() => when = v!); _run(); }),

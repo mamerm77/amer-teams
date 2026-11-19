@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -26,7 +27,7 @@ class _S extends State<ExpertiseScreen> {
   @override
   Widget build(BuildContext c) {
     final m = context.read<MatrixService>();
-    return Scaffold(appBar: AppBar(title: const Text('Who knows about…')), body: ListView(padding: const EdgeInsets.all(12), children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Who knows about…'))), body: ListView(padding: const EdgeInsets.all(12), children: [
       TextField(controller: q, decoration: InputDecoration(hintText: 'e.g. ROADM, 800G ZR+, vendor SLAs', suffixIcon: IconButton(tooltip: 'Search', icon: const Icon(Icons.search), onPressed: _search)), onSubmitted: (_) => _search()),
       if (found != null && found!.isEmpty) const ListTile(title: Text('Nobody has published that topic yet')),
       for (final p in found ?? const []) ListTile(leading: const Icon(Icons.person_search),
@@ -40,7 +41,7 @@ class _S extends State<ExpertiseScreen> {
       Wrap(spacing: 6, children: [for (final t in mine) InputChip(label: Text(t), onDeleted: () => setState(() => mine.remove(t)))]),
       TextField(decoration: const InputDecoration(hintText: 'Add a topic and press Enter'), onSubmitted: (v) { if (v.trim().isNotEmpty) setState(() => mine.add(v.trim().toLowerCase())); }),
       Wrap(spacing: 6, children: [for (final t in suggested) ActionChip(avatar: const Icon(Icons.add, size: 16), label: Text(t), onPressed: () => setState(() { mine.add(t); suggested.remove(t); }))]),
-      Row(children: [TextButton.icon(onPressed: _suggest, icon: const Icon(Icons.auto_awesome), label: const Text('Suggest from my messages')), const Spacer(), FilledButton(onPressed: _save, child: const Text('Publish'))]),
+      Row(children: [TextButton.icon(onPressed: _suggest, icon: const Icon(Icons.auto_awesome), label: Text(L.t(context, 'Suggest from my messages'))), const Spacer(), FilledButton(onPressed: _save, child: Text(L.t(context, 'Publish')))]),
     ]));
   }
 }

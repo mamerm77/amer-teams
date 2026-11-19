@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
@@ -46,14 +47,14 @@ class _S extends State<PhoneScreen> {
 
   @override Widget build(BuildContext c) {
     final off = policy != null && (policy!['enabled'] != true || policy!['trunk_configured'] != true);
-    return Scaffold(appBar: AppBar(title: const Text('Phone')), body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Phone'))), body: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
       child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
         MaterialBanner(leading: const Icon(Icons.lock_outline), content: const Text('Phone calls are encrypted to the phone network (TLS + SRTP) but not end-to-end. Use an Amer Teams call for confidential topics.'), actions: const [SizedBox.shrink()]),
         const SizedBox(height: 16),
         if (room == null && (incoming?.isNotEmpty ?? false)) Card(color: Colors.green.withValues(alpha: 0.12), child: Column(children: [
           const ListTile(leading: Icon(Icons.phone_callback), title: Text('Incoming calls to the company line')),
           for (final i in incoming!) ListTile(title: Text('${i['caller']}'), subtitle: Text('waiting ${((DateTime.now().millisecondsSinceEpoch ~/ 1000 - (i['arrived_at'] as int)) ).clamp(0, 3600)} s'),
-            trailing: FilledButton.icon(onPressed: () => _connect(() => context.read<ApiService>().postMap('/v1/phone/inbound/${Uri.encodeComponent(i['call'])}/answer', {}), 'Connected to ${i['caller']}'), icon: const Icon(Icons.call), label: const Text('Answer'))),
+            trailing: FilledButton.icon(onPressed: () => _connect(() => context.read<ApiService>().postMap('/v1/phone/inbound/${Uri.encodeComponent(i['call'])}/answer', {}), 'Connected to ${i['caller']}'), icon: const Icon(Icons.call), label: Text(L.t(context, 'Answer')))),
         ])),
         if (off) Text(policy!['enabled'] != true ? 'Phone calls are switched off by your administrator.' : 'No phone line is configured yet.'),
         if (policy != null && !off) Text('Allowed: ${(policy!['allowed_prefixes'] as List).join(', ')}', style: Theme.of(c).textTheme.bodySmall),
@@ -62,7 +63,7 @@ class _S extends State<PhoneScreen> {
         if (status != null) Padding(padding: const EdgeInsets.only(top: 16), child: Text(status!, style: Theme.of(c).textTheme.titleMedium)),
         if (err != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(err!, style: TextStyle(color: Theme.of(c).colorScheme.error))),
         const SizedBox(height: 24),
-        if (room == null) FilledButton.icon(onPressed: off ? null : call, icon: const Icon(Icons.call), label: const Text('Call'))
+        if (room == null) FilledButton.icon(onPressed: off ? null : call, icon: const Icon(Icons.call), label: Text(L.t(context, 'Call')))
         else Wrap(spacing: 12, children: [
           IconButton.filledTonal(icon: Icon(muted ? Icons.mic_off : Icons.mic), onPressed: () { muted = !muted; room!.localParticipant?.setMicrophoneEnabled(!muted); setState(() {}); }),
           IconButton.filled(style: IconButton.styleFrom(backgroundColor: Colors.red), icon: const Icon(Icons.call_end), onPressed: hangUp)]),

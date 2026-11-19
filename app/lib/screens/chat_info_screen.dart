@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/labels.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +23,7 @@ class _S extends State<ChatInfoScreen> {
   Future<String?> _ask(String title, String initial) async {
     final c = TextEditingController(text: initial);
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: Text(title), content: TextField(controller: c, autofocus: true, maxLines: null),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Save')))]));
     return ok == true ? c.text.trim() : null;
   }
   int? get lifetimeMs => (room.getState('m.room.retention')?.content['max_lifetime'] as num?)?.toInt();
@@ -92,7 +93,7 @@ class _S extends State<ChatInfoScreen> {
       const Divider(),
       if (dm == null) ...[
         ListTile(title: Text('${members.length} members', style: Theme.of(c).textTheme.titleSmall),
-          trailing: room.canInvite ? TextButton.icon(icon: const Icon(Icons.person_add), label: const Text('Add'), onPressed: () async {
+          trailing: room.canInvite ? TextButton.icon(icon: const Icon(Icons.person_add), label: Text(L.t(context, 'Add')), onPressed: () async {
             final p = await pickPeople(c, multiple: true, title: 'Add members');
             for (final x in p ?? []) { await room.invite(x.userId); }
             setState(() {});

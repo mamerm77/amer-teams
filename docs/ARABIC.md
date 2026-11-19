@@ -21,3 +21,7 @@ mirrors for right-to-left" (docs/PHASE3_REQUIREMENTS.docx).
 ## Tests (in-use, CI)
 Switching to Arabic shows the navigation as الأمان and the layout is right to left; switching back to English
 restores it.
+
+## Update
+- **Hijri dates:** today's Hijri date heads the calendar, and each meeting shows its Hijri day and month. This uses the tabular (Kuwaiti) calendar, the same as the server's find-a-time (`app/lib/services/hijri.dart`, tested against the server's values), so it can differ by a day from the local moon sighting.
+- **Buttons and titles:** about 180 more strings across the Phase 3 screens are translated, through `L.t(context, …)`. Longer help texts and status lines are still English.

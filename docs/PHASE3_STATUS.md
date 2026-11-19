@@ -55,7 +55,7 @@ Each built feature has a doc listing its open gaps.
 | 6 | Pre-mortem agent | Built: /premortem, ranked plan-specific risks, share or turn mitigations into tasks (PREMORTEM.md) |
 | 7 | Network-aware calls | Built: per-tile quality, automatic data saver then audio-only (screen share kept), recovery; manual modes (NETWORK_AWARE.md) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
-| 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; full string translation and Hijri calendar view open (ARABIC.md) |
+| 9 | Arabic-first co-pilot | Partial: Arabic UI with right-to-left layout (navigation and key screens translated), prayer times, Ramadan hours, Arabic decision phrases; Hijri dates in the calendar (tabular, matching the server); about 180 more buttons and titles translated across the Phase 3 screens; body texts and messages still English (ARABIC.md) |
 | 10 | Focus guardian | Built: server holds pushes (priority senders only), status, DM auto-reply, busy in find-a-time, summary of what waited (FOCUS.md) |
 | 11 | Wellbeing signals | Built: private, on-device weekly signals and nudges; no team view by design (WELLBEING.md) |
 | 12 | Live expertise map | Built: opt-in self-published topics, on-device suggestions from your own messages, ranked search; tested 3/3 (EXPERTISE.md) |
@@ -97,4 +97,4 @@ Each built feature has a doc listing its open gaps.
 |---|---|
 | Modern 3D UI with 2.5D and flat fallbacks | Not started |
 | Feature flags per tenant | Built: per tenant, stable rollout %, server-gated, admin screen (FEATURE_FLAGS.md) |
-| Arabic and English strings (ARB), RTL | Partial: locale switch, RTL, Flutter widgets localised, key strings translated |
+| Arabic and English strings (ARB), RTL | Partial: locale switch, RTL, Flutter widgets localised; navigation, titles and buttons translated (about 200 strings); longer help texts still English |

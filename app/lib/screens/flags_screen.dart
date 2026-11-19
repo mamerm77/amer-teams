@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -15,18 +16,18 @@ class _S extends State<FlagsScreen> {
   Future<void> _load() async { try { final x = await api.adminFlags(); if (mounted) setState(() => d = x); } catch (e) { if (mounted) setState(() => err = '$e'); } }
   Map<String, dynamic>? row(String f) => ((d?['rows'] as List?) ?? const []).cast<Map<String, dynamic>>().where((r) => r['tenant'] == tenant && r['feature'] == f).firstOrNull;
   @override Widget build(BuildContext c) {
-    if (d == null) return Scaffold(appBar: AppBar(title: const Text('Feature flags')), body: Center(child: err != null ? Text(err!) : const CircularProgressIndicator()));
+    if (d == null) return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Feature flags'))), body: Center(child: err != null ? Text(err!) : const CircularProgressIndicator()));
     final feats = (d!['features'] as Map).cast<String, String>(), defs = (d!['defaults'] as Map).cast<String, bool>();
     final tenants = {'*', ...((d!['rows'] as List).map((r) => '${r['tenant']}'))};
-    return Scaffold(appBar: AppBar(title: const Text('Feature flags')), body: ListView(children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Feature flags'))), body: ListView(children: [
       Padding(padding: const EdgeInsets.all(12), child: Row(children: [
         const Text('Applies to '), const SizedBox(width: 8),
         DropdownButton<String>(value: tenant, items: [for (final t in tenants) DropdownMenuItem(value: t, child: Text(t == '*' ? 'every tenant' : t))], onChanged: (v) => setState(() => tenant = v!)),
         const Spacer(),
         TextButton(onPressed: () async { final t = TextEditingController();
           final v = await showDialog<String>(context: c, builder: (x) => AlertDialog(title: const Text('Tenant id'), content: TextField(controller: t, autofocus: true),
-            actions: [FilledButton(onPressed: () => Navigator.pop(x, t.text.trim()), child: const Text('Use'))]));
-          if (v != null && v.isNotEmpty) setState(() => tenant = v); }, child: const Text('Other tenant')),
+            actions: [FilledButton(onPressed: () => Navigator.pop(x, t.text.trim()), child: Text(L.t(context, 'Use')))]));
+          if (v != null && v.isNotEmpty) setState(() => tenant = v); }, child: Text(L.t(context, 'Other tenant'))),
       ])),
       for (final f in feats.entries) () {
         final r = row(f.key); final on = r?['enabled'] as bool? ?? defs[f.key] ?? false; final pct = (r?['rollout_pct'] as num?)?.toInt() ?? 100;

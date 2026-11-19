@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -10,7 +11,7 @@ class _S extends State<ControlScreen> {
   @override void initState() { super.initState(); _load(); t = Timer.periodic(const Duration(seconds: 3), (_) => _load()); }
   @override void dispose() { t?.cancel(); super.dispose(); }
   Future<void> _load() async { if (!mounted) return; final a = context.read<ApiService>(); try { final r = await Future.wait([a.agents(), a.audit()]); if (mounted) setState(() { agents = r[0]; audit = r[1]; err = null; }); } catch (e) { if (mounted) setState(() => err = '$e'); } }
-  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Control centre')), body: ListView(padding: const EdgeInsets.all(12), children: [
+  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Control centre'))), body: ListView(padding: const EdgeInsets.all(12), children: [
     if (err != null) Text('Cannot reach the AI engine: $err', style: TextStyle(color: Theme.of(c).colorScheme.error)),
     Text('Agents', style: Theme.of(c).textTheme.titleMedium),
     for (final a in agents) Card(child: SwitchListTile(value: a['enabled'], title: Text(a['name']),

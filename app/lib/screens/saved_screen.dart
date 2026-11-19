@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
@@ -23,12 +24,12 @@ class _S extends State<SavedScreen> {
   Future<void> _newFolder() async {
     final t = TextEditingController();
     final n = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('New folder'), content: TextField(controller: t, autofocus: true, maxLength: 40),
-      actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text.trim()), child: const Text('Create'))]));
+      actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text.trim()), child: Text(L.t(context, 'Create')))]));
     if (n != null && n.isNotEmpty && !folders.contains(n)) await _save([...folders, n], assign);
   }
   Future<void> _move(Event e) async {
     final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: const Text('Move to folder'), children: [
-      SimpleDialogOption(onPressed: () => Navigator.pop(d, ''), child: const Text('No folder')),
+      SimpleDialogOption(onPressed: () => Navigator.pop(d, ''), child: Text(L.t(context, 'No folder'))),
       for (final x in folders) SimpleDialogOption(onPressed: () => Navigator.pop(d, x), child: Text(x))]));
     if (v == null) return;
     final a = assign; v.isEmpty ? a.remove(e.eventId) : a[e.eventId] = v; await _save(folders, a);
@@ -37,7 +38,7 @@ class _S extends State<SavedScreen> {
     final a = assign..removeWhere((_, v) => v == x); await _save(folders.where((y) => y != x).toList(), a); setState(() => folder = null);
   }
 
-  @override Widget build(BuildContext ctx) => Scaffold(appBar: AppBar(title: const Text('Saved messages'), actions: [IconButton(tooltip: 'New folder', icon: const Icon(Icons.create_new_folder_outlined), onPressed: _newFolder)]),
+  @override Widget build(BuildContext ctx) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Saved messages')), actions: [IconButton(tooltip: 'New folder', icon: const Icon(Icons.create_new_folder_outlined), onPressed: _newFolder)]),
     body: FutureBuilder<List<Event>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
       if (s.data!.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Long-press any message and choose Save to keep it here.', textAlign: TextAlign.center)));

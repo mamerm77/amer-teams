@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import '../services/calendar_connector.dart';
 
@@ -17,7 +18,7 @@ class _S extends State<CalendarsScreen> {
         TextField(controller: name, decoration: const InputDecoration(labelText: 'Name, e.g. Work Outlook')),
         TextField(controller: url, decoration: const InputDecoration(labelText: 'https://… or webcal://…')),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Connect'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Connect')))]));
     if (ok != true) return;
     setState(() => busy = true);
     try { final e = await cc.add(name.text, url.text); if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e == null ? 'Connected' : 'Saved, but it could not be read: $e'))); }
@@ -26,8 +27,8 @@ class _S extends State<CalendarsScreen> {
   }
   @override
   Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Connected calendars'), actions: [IconButton(tooltip: 'Sync now', icon: const Icon(Icons.sync), onPressed: busy ? null : () async { setState(() => busy = true); await cc.sync(); if (mounted) setState(() => busy = false); })]),
-    floatingActionButton: FloatingActionButton.extended(onPressed: busy ? null : _add, icon: const Icon(Icons.add), label: const Text('Connect calendar')),
+    appBar: AppBar(title: Text(L.t(context, 'Connected calendars')), actions: [IconButton(tooltip: 'Sync now', icon: const Icon(Icons.sync), onPressed: busy ? null : () async { setState(() => busy = true); await cc.sync(); if (mounted) setState(() => busy = false); })]),
+    floatingActionButton: FloatingActionButton.extended(onPressed: busy ? null : _add, icon: const Icon(Icons.add), label: Text(L.t(context, 'Connect calendar'))),
     body: ListView(children: [
       if (busy) const LinearProgressIndicator(),
       if (cc.feeds.isEmpty) const ListTile(title: Text('No calendars connected'), subtitle: Text('Connect Outlook, Google or any iCal calendar: find-a-time uses your busy times, and "out of office" or leave events set your status.')),

@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
@@ -63,7 +64,7 @@ class _S extends State<WhiteboardScreen> {
   Future<void> _addText(Offset at, Size s) async {
     final t = TextEditingController();
     final v = await showDialog<String>(context: context, builder: (d) => AlertDialog(title: const Text('Add a label'), content: TextField(controller: t, autofocus: true),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: const Text('Add'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: Text(L.t(context, 'Add')))]));
     if (v == null || v.trim().isEmpty) return;
     await room.sendEvent({'x': at.dx / s.width, 'y': at.dy / s.height, 'text': v.trim(), 'size': 18.0, 'color': colour.toARGB32(), 'body': '🏷 ${v.trim()}'}, type: kWbText);
   }
@@ -77,10 +78,10 @@ class _S extends State<WhiteboardScreen> {
   }
 
   @override Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Whiteboard'), actions: [
+    appBar: AppBar(title: Text(L.t(context, 'Whiteboard')), actions: [
       PopupMenuButton<String>(tooltip: 'Templates', icon: const Icon(Icons.dashboard_customize_outlined), onSelected: (k) async {
         final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Use a template?'), content: const Text('This replaces the board for everyone.'),
-          actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Use template'))]));
+          actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Use template')))]));
         if (ok == true) await room.sendEvent({...wbTemplate(k), 'body': '🧩 whiteboard template: ${wbTemplate(k)['name']}'}, type: kWbTemplate);
       }, itemBuilder: (_) => const [PopupMenuItem(value: 'retro', child: Text('Retrospective')), PopupMenuItem(value: 'swot', child: Text('SWOT')),
         PopupMenuItem(value: 'network', child: Text('Network sketch (optical and IP)'))]),

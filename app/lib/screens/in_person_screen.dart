@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/labels.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -77,7 +78,7 @@ class _S extends State<InPersonScreen> {
   @override
   Widget build(BuildContext c) {
     final chats = context.watch<MatrixService>().chats;
-    return Scaffold(appBar: AppBar(title: const Text('In-person meeting notes')), body: Column(children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'In-person meeting notes'))), body: Column(children: [
       Padding(padding: const EdgeInsets.all(12), child: Column(children: [
         DropdownButtonFormField<String>(value: room?.id, decoration: const InputDecoration(labelText: 'Post the minutes to'), isExpanded: true,
           items: [for (final r in chats) DropdownMenuItem(value: r.id, child: Text(r.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis))], onChanged: (v) => setState(() => room = chats.firstWhere((r) => r.id == v))),
@@ -88,10 +89,10 @@ class _S extends State<InPersonScreen> {
         Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
           const Text('Now speaking:'),
           for (final s in speakers) ChoiceChip(label: Text(s), selected: speaker == s, onSelected: (_) => setState(() => speaker = s)),
-          ActionChip(avatar: const Icon(Icons.add, size: 16), label: const Text('Name a speaker'), onPressed: () async {
+          ActionChip(avatar: const Icon(Icons.add, size: 16), label: Text(L.t(context, 'Name a speaker')), onPressed: () async {
             final t = TextEditingController();
             final n = await showDialog<String>(context: c, builder: (d) => AlertDialog(content: TextField(controller: t, autofocus: true, decoration: const InputDecoration(labelText: 'Name, as in the chat')),
-              actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text.trim()), child: const Text('Add'))]));
+              actions: [FilledButton(onPressed: () => Navigator.pop(d, t.text.trim()), child: Text(L.t(context, 'Add')))]));
             if (n != null && n.isNotEmpty) setState(() { speakers.add(n); speaker = n; });
           }),
         ]),
@@ -105,7 +106,7 @@ class _S extends State<InPersonScreen> {
       SafeArea(child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
         Expanded(child: FilledButton.icon(onPressed: busy ? null : _toggle, icon: Icon(on ? Icons.pause : Icons.mic), label: Text(on ? 'Pause' : (lines.isEmpty ? 'Start' : 'Resume')))),
         const SizedBox(width: 12),
-        Expanded(child: OutlinedButton.icon(onPressed: busy || lines.isEmpty ? null : _finish, icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.description), label: const Text('Finish and write minutes'))),
+        Expanded(child: OutlinedButton.icon(onPressed: busy || lines.isEmpty ? null : _finish, icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.description), label: Text(L.t(context, 'Finish and write minutes')))),
       ]))),
     ]));
   }

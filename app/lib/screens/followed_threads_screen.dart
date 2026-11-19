@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,7 @@ class FollowedThreadsScreen extends StatefulWidget {
 class _S extends State<FollowedThreadsScreen> {
   Future<List<(Room, Event, int)>>? f;
   @override void initState() { super.initState(); f = Threads.followedWithNew(context.read<MatrixService>().client); }
-  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Followed threads')),
+  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Followed threads'))),
     body: FutureBuilder<List<(Room, Event, int)>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
       if (s.data!.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No followed threads. Open a thread and choose Follow this thread.', textAlign: TextAlign.center)));

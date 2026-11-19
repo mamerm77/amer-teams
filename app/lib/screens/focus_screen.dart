@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -31,14 +32,14 @@ class _S extends State<FocusScreen> {
   @override
   Widget build(BuildContext c) {
     final u = f.until; final w = week;
-    return Scaffold(appBar: AppBar(title: const Text('Focus and wellbeing')), body: ListView(padding: const EdgeInsets.all(12), children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Focus and wellbeing'))), body: ListView(padding: const EdgeInsets.all(12), children: [
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(u == null ? 'Focus session' : 'Focusing until ${TimeOfDay.fromDateTime(u).format(c)}', style: Theme.of(c).textTheme.titleLarge),
         const SizedBox(height: 6),
         const Text('Notifications wait (even mentions) except from your priority senders; your status shows you are focusing; direct messages get one automatic reply; find-a-time sees you as busy.'),
         const SizedBox(height: 12),
         if (u == null) Wrap(spacing: 8, children: [for (final m in [30, 60, 90, 120]) FilledButton.tonal(onPressed: () => _start(m), child: Text(m < 60 ? '$m min' : '${m ~/ 60}${m % 60 == 0 ? '' : '.5'} h'))])
-        else FilledButton.icon(onPressed: _stop, icon: const Icon(Icons.stop), label: const Text('End focus now')),
+        else FilledButton.icon(onPressed: _stop, icon: const Icon(Icons.stop), label: Text(L.t(context, 'End focus now'))),
         if (summary != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(summary!)),
       ]))),
       Card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

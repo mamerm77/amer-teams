@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/labels.dart';
 import 'files_screen.dart';
 import '../services/private_notes.dart';
@@ -137,9 +138,9 @@ class _S extends State<ChatScreen> {
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: q, decoration: const InputDecoration(labelText: 'Question')),
         for (var i = 0; i < opts.length; i++) TextField(controller: opts[i], decoration: InputDecoration(labelText: 'Option ${i + 1}')),
-        if (opts.length < 10) TextButton.icon(onPressed: () => set(() => opts.add(TextEditingController())), icon: const Icon(Icons.add), label: const Text('Add option')),
+        if (opts.length < 10) TextButton.icon(onPressed: () => set(() => opts.add(TextEditingController())), icon: const Icon(Icons.add), label: Text(L.t(context, 'Add option'))),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send poll'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Send poll')))])));
     final answers = opts.map((o) => o.text.trim()).where((t) => t.isNotEmpty).toList();
     if (ok != true || q.text.trim().isEmpty || answers.length < 2) return;
     await room.startPoll(question: q.text.trim(), kind: PollKind.disclosed,
@@ -229,7 +230,7 @@ class _S extends State<ChatScreen> {
         for (var i = 0; i < p.risks.length; i++) CheckboxListTile(value: picked.contains(i), onChanged: (v) => set(() => v! ? picked.add(i) : picked.remove(i)),
           title: Text('${p.risks[i]['risk']}'), subtitle: Text('Likelihood ${p.risks[i]['likelihood']} · impact ${p.risks[i]['impact']}\n${p.risks[i]['why_it_fails']}\nWatch for: ${p.risks[i]['early_warning']}\nMitigation: ${p.risks[i]['mitigation']}'), isThreeLine: true),
         Wrap(spacing: 8, children: [
-          OutlinedButton.icon(icon: const Icon(Icons.share), label: const Text('Share in chat'), onPressed: () async { Navigator.pop(s); await room.sendTextEvent(p.toMessage()); }),
+          OutlinedButton.icon(icon: const Icon(Icons.share), label: Text(L.t(context, 'Share in chat')), onPressed: () async { Navigator.pop(s); await room.sendTextEvent(p.toMessage()); }),
           FilledButton.icon(icon: const Icon(Icons.add_task), label: Text('Make ${picked.length} mitigation task${picked.length == 1 ? '' : 's'}'), onPressed: picked.isEmpty ? null : () async {
             Navigator.pop(s);
             for (final i in picked) { await saveTask(room, {'task_id': 'pm-${DateTime.now().microsecondsSinceEpoch}-$i', 'title': 'Mitigate: ${p.risks[i]['mitigation']}', 'owner': room.client.userID, 'status': 'open', 'reason': 'Pre-mortem risk: ${p.risks[i]['risk']}'}); }
@@ -254,7 +255,7 @@ class _S extends State<ChatScreen> {
       await showModalBottomSheet(context: context, isScrollControlled: true, builder: (b) => DraggableScrollableSheet(expand: false, initialChildSize: 0.85, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
         Text('Draft post-incident review · only you see it until you share', style: Theme.of(b).textTheme.titleMedium), Text(g.where, style: const TextStyle(fontSize: 12)), const SizedBox(height: 8),
         SelectableText(text), const SizedBox(height: 12),
-        FilledButton.icon(onPressed: () async { Navigator.pop(b); await room.sendTextEvent('📝 Post-incident review (draft)\n$text'); }, icon: const Icon(Icons.share), label: const Text('Share in the war room')),
+        FilledButton.icon(onPressed: () async { Navigator.pop(b); await room.sendTextEvent('📝 Post-incident review (draft)\n$text'); }, icon: const Icon(Icons.share), label: Text(L.t(context, 'Share in the war room'))),
       ])));
     } catch (e) { _snack('Could not draft the review: $e'); }
   }
@@ -276,7 +277,7 @@ class _S extends State<ChatScreen> {
       if (hits.isNotEmpty) {
         await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Not sent'),
           content: Text('This channel is shared with another organisation, and your message contains a ${hits.map((h) => h.kind).toSet().join(' and a ')}. Remove it, or share it another way.'),
-          actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Edit message'))]));
+          actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Edit message')))]));
         return;                                                    // the text stays in the box
       }
     } else {
@@ -284,7 +285,7 @@ class _S extends State<ChatScreen> {
       if (hits.isNotEmpty && l?.toLowerCase() != 'restricted') {                  // docs/LABELS.md: personal and payment data belong in Restricted chats
         final go = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Sensitive data'),
           content: Text('Your message contains a ${hits.map((h) => h.kind).toSet().join(' and a ')}. This chat is ${l == null ? 'not labelled' : 'labelled $l'}. Such data should go only in a Restricted chat.'),
-          actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Edit message')), TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send anyway'))]));
+          actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Edit message'))), TextButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Send anyway')))]));
         if (go != true) return;
       }
     }
@@ -383,7 +384,7 @@ class _S extends State<ChatScreen> {
             if (v == 'edit') {
               final t = TextEditingController(text: '${i['text']}');
               final nt = await showDialog<String>(context: s, builder: (d) => AlertDialog(title: const Text('Edit scheduled message'), content: TextField(controller: t, maxLines: 5),
-                actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: const Text('Save'))]));
+                actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: Text(L.t(context, 'Save')))]));
               if (nt != null && nt.trim().isNotEmpty) ScheduledSender.instance.edit('${i['id']}', text: nt.trim());
             }
             if (v == 'time' && s.mounted) {
@@ -409,8 +410,8 @@ class _S extends State<ChatScreen> {
       content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: title, decoration: const InputDecoration(labelText: 'Title')),
         for (var i = 0; i < items.length; i++) TextField(controller: items[i], decoration: InputDecoration(labelText: 'Task ${i + 1}')),
-        TextButton.icon(onPressed: () => set(() => items.add(TextEditingController())), icon: const Icon(Icons.add), label: const Text('Add task'))])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))])));
+        TextButton.icon(onPressed: () => set(() => items.add(TextEditingController())), icon: const Icon(Icons.add), label: Text(L.t(context, 'Add task')))])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Send')))])));
     final list = items.map((i) => i.text.trim()).where((t) => t.isNotEmpty).toList();
     if (ok != true || list.isEmpty) return;
     await room.sendEvent({'title': title.text.trim().isEmpty ? 'Checklist' : title.text.trim(), 'items': list,
@@ -621,7 +622,7 @@ class _S extends State<ChatScreen> {
             const SizedBox(height: 8),
             const Text('Messages and calls in this chat are end-to-end encrypted. Only the people in it can read or listen to them.', textAlign: TextAlign.center),
             if (_peerInvitedOnly) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${peerName(room)} hasn\'t signed in yet. They will get your messages (✓✓) once they do.', textAlign: TextAlign.center, style: TextStyle(color: cs.primary))),
-            if (evs.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: ActionChip(avatar: const Text('👋'), label: const Text('Say hello'), onPressed: () { input.text = 'Hello 👋'; send(); })),
+            if (evs.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: ActionChip(avatar: const Text('👋'), label: Text(L.t(context, 'Say hello')), onPressed: () { input.text = 'Hello 👋'; send(); })),
           ])))),
         Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
@@ -729,7 +730,7 @@ class _S extends State<ChatScreen> {
       final ctrls = {for (final f in fields) f: TextEditingController()};
       final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: Text('${wf['workflow'] ?? 'Workflow'}'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [for (final f in fields) TextField(controller: ctrls[f], decoration: InputDecoration(labelText: f))]),
-        actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))]));
+        actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Send')))]));
       if (ok == true) await respond({'values': {for (final f in fields) f: ctrls[f]!.text.trim()}});
     }
     final status = done == null ? 'Waiting for ${people.map((p) => room.unsafeGetUserFromMemoryOrFallback(p).calcDisplayname()).join(', ')}'
@@ -741,8 +742,8 @@ class _S extends State<ChatScreen> {
       const SizedBox(height: 6), Text(e.body),
       const SizedBox(height: 6), Text(status, style: TextStyle(fontSize: 12, color: done == null ? cs.outline : cs.primary)),
       if (mine) Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(spacing: 8, children: approval
-          ? [OutlinedButton(onPressed: () => respond({'decision': 'rejected'}), child: const Text('Reject')), FilledButton(onPressed: () => respond({'decision': 'approved'}), child: const Text('Approve'))]
-          : [FilledButton(onPressed: fill, child: const Text('Fill in'))])),
+          ? [OutlinedButton(onPressed: () => respond({'decision': 'rejected'}), child: Text(L.t(context, 'Reject'))), FilledButton(onPressed: () => respond({'decision': 'approved'}), child: Text(L.t(context, 'Approve')))]
+          : [FilledButton(onPressed: fill, child: Text(L.t(context, 'Fill in')))])),
     ])));
   }
 
@@ -794,15 +795,15 @@ class _S extends State<ChatScreen> {
       Text(confirms.isEmpty ? 'No confirmations yet: the owner and one other member are needed' : 'Confirmed by ${confirms.map((u) => room.unsafeGetUserFromMemoryOrFallback(u).calcDisplayname()).join(', ')}',
           style: TextStyle(fontSize: 12, color: cs.outline)),
       Wrap(spacing: 8, children: [
-        if (status == null && !expired && !confirms.contains(me)) FilledButton.icon(icon: const Icon(Icons.check), label: const Text('Confirm'), onPressed: () async {
+        if (status == null && !expired && !confirms.contains(me)) FilledButton.icon(icon: const Icon(Icons.check), label: Text(L.t(context, 'Confirm')), onPressed: () async {
           try { final r = await confirmDecision(room, context.read<ApiService>(), e); _ledgerAt = null;
             _snack(r['status'] == 'confirmed' ? 'Confirmed: the decision is in the ledger' : 'Confirmed. Still needs ${r['needs']}.'); }
           catch (x) { debugPrint('DECISION confirm failed: $x');
             if (mounted) showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Could not confirm'), content: Text('$x'.replaceFirst('Exception: ', '')),
-              actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('OK'))])); } }),
-        if (status != 'superseded') TextButton(onPressed: () => proposeDialog(c, room, previous: e), child: const Text('Change (new version)')),
+              actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'OK')))])); } }),
+        if (status != 'superseded') TextButton(onPressed: () => proposeDialog(c, room, previous: e), child: Text(L.t(context, 'Change (new version)'))),
         if (led != null && e.content['owner'] == me && (status == 'confirmed' || status == 'in_progress')) TextButton(onPressed: () async {
-          await context.read<ApiService>().decisionStatus('${e.content['decision_id']}', room.id, (e.content['version'] as num).toInt(), 'done'); _ledgerAt = null; setState(() {}); }, child: const Text('Mark done')),
+          await context.read<ApiService>().decisionStatus('${e.content['decision_id']}', room.id, (e.content['version'] as num).toInt(), 'done'); _ledgerAt = null; setState(() {}); }, child: Text(L.t(context, 'Mark done'))),
       ]),
     ])));
   }
@@ -820,12 +821,12 @@ class _S extends State<ChatScreen> {
       const SizedBox(height: 8), Text('${e.content['text'] ?? e.body}', style: const TextStyle(fontSize: 16)),
       const SizedBox(height: 8),
       Text('${acks.length} of ${members.length} acknowledged', style: TextStyle(fontSize: 12, color: cs.outline)),
-      if (!mineAnn && !acks.contains(me)) Padding(padding: const EdgeInsets.only(top: 6), child: FilledButton.icon(icon: const Icon(Icons.check), label: const Text('I acknowledge'),
+      if (!mineAnn && !acks.contains(me)) Padding(padding: const EdgeInsets.only(top: 6), child: FilledButton.icon(icon: const Icon(Icons.check), label: Text(L.t(context, 'I acknowledge')),
           onPressed: () => room.sendEvent({'announcement': e.eventId, 'body': 'Acknowledged'}, type: kAck))),
       if (!mineAnn && acks.contains(me)) const Padding(padding: EdgeInsets.only(top: 6), child: Text('✓ You acknowledged this')),
       if (mineAnn) ExpansionTile(tilePadding: EdgeInsets.zero, title: Text(pending.isEmpty ? 'Everyone acknowledged' : '${pending.length} pending'), children: [
         for (final u in members) ListTile(dense: true, leading: Icon(acks.contains(u.id) ? Icons.check_circle : Icons.schedule, color: acks.contains(u.id) ? Colors.green : cs.outline), title: Text(u.calcDisplayname())),
-        if (pending.isNotEmpty) Align(alignment: Alignment.centerLeft, child: TextButton.icon(icon: const Icon(Icons.notifications_active_outlined), label: const Text('Remind pending'),
+        if (pending.isNotEmpty) Align(alignment: Alignment.centerLeft, child: TextButton.icon(icon: const Icon(Icons.notifications_active_outlined), label: Text(L.t(context, 'Remind pending')),
           onPressed: () => room.sendTextEvent('Reminder: please acknowledge the announcement. ${pending.map((u) => mentionMarkdown(u.calcDisplayname(), u.id)).join(' ')}'))),
       ]),
     ])));
@@ -858,7 +859,7 @@ class _S extends State<ChatScreen> {
       }
       return ListTile(leading: CircleAvatar(child: Icon(v ? Icons.videocam : Icons.call)), title: Text(v ? 'Video call' : 'Voice call'),
         subtitle: Text('${e.senderFromMemoryOrFallback.calcDisplayname()} · ${DateFormat('HH:mm').format(e.originServerTs)} · encrypted'),
-        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => meet
+        trailing: FilledButton(child: Text(L.t(context, 'Join')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => meet
             ? CallScreen(roomId: room.id, meeting: true, video: v) : CallScreen(roomId: room.id, video: v)))));
     }
     if (e.type == kCallEndEvent && e.content['version'] == 2) return const SizedBox.shrink();   // shown on the call card
@@ -889,7 +890,7 @@ class _S extends State<ChatScreen> {
         title: Text('${e.content['title'] as String? ?? 'Meeting'}${(e.content['recurrence'] ?? 'none') != 'none' ? ' · repeats ${e.content['recurrence']}' : ''}'),
         subtitle: Text('${st != null ? DateFormat('EEE d MMM, HH:mm').format(st) : ''} · ${e.content['duration_min']} min${id != null ? '\nID ${MeetingService.format(id)}' : ''}'),
         isThreeLine: id != null,
-        trailing: FilledButton(child: const Text('Join'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))),
+        trailing: FilledButton(child: Text(L.t(context, 'Join')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))),
         Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 10), child: Wrap(spacing: 6, children: [
           rsvp('yes', 'Accept', Icons.check), rsvp('maybe', 'Maybe', Icons.help_outline), rsvp('no', 'Decline', Icons.close)])),
       ]));
@@ -953,7 +954,7 @@ class _S extends State<ChatScreen> {
       if (looksLikeDecision(e.body) && !(tl?.events ?? []).any((x) => x.type == kDecisionProposal && x.content['source_event'] == e.eventId)) {
         body = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [body,
           TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact), icon: const Icon(Icons.gavel, size: 16),
-            label: const Text('Looks like a decision · propose it'), onPressed: () => proposeDialog(c, room, text: plainMentions(_text(e)), sourceEvent: e.eventId))]);
+            label: Text(L.t(context, 'Looks like a decision · propose it')), onPressed: () => proposeDialog(c, room, text: plainMentions(_text(e)), sourceEvent: e.eventId))]);
       }
     }
     final replyId = e.relationshipType == null ? (e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String?) : null;

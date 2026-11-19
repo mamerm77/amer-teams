@@ -59,8 +59,8 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     if (h == null || h['since'] == _handoffShown || !mounted) return;
     _handoffShown = h['since'] as int; final sm = ScaffoldMessenger.of(context);
     sm.showMaterialBanner(MaterialBanner(leading: const Icon(Icons.devices), content: Text('You are in a ${h['meeting'] == true ? 'meeting' : 'call'} on ${h['device_name']}.'), actions: [
-      TextButton(onPressed: sm.hideCurrentMaterialBanner, child: const Text('Not now')),
-      FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: const Text('Move it here'))]));
+      TextButton(onPressed: sm.hideCurrentMaterialBanner, child: Text(L.t(context, 'Not now'))),
+      FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: Text(L.t(context, 'Move it here')))]));
   }
   @override void dispose() { _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
@@ -70,10 +70,10 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     final r = Reminders.instance.due.value; if (r == null || !mounted) return;
     final sm = ScaffoldMessenger.of(context);
     sm.showMaterialBanner(MaterialBanner(leading: const Icon(Icons.alarm), content: Text('Reminder: ${r['preview']}'), actions: [
-      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.snooze('${r['id']}', const Duration(hours: 1)); }, child: const Text('In 1 hour')),
-      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.dismiss('${r['id']}'); }, child: const Text('Done')),
+      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.snooze('${r['id']}', const Duration(hours: 1)); }, child: Text(L.t(context, 'In 1 hour'))),
+      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.dismiss('${r['id']}'); }, child: Text(L.t(context, 'Done'))),
       FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.dismiss('${r['id']}');
-        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: '${r['room']}'))); }, child: const Text('Open')),
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: '${r['room']}'))); }, child: Text(L.t(context, 'Open'))),
     ]));
   }
 
@@ -85,9 +85,9 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     ScaffoldMessenger.of(context).showMaterialBanner(MaterialBanner(
       leading: const Icon(Icons.auto_awesome), content: Text('Welcome back. $unread chats have new messages.'),
       actions: [
-        TextButton(onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(), child: const Text('Later')),
+        TextButton(onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(), child: Text(L.t(context, 'Later'))),
         FilledButton(onPressed: () { ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const CatchUpScreen())); }, child: const Text('Catch me up')),
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CatchUpScreen())); }, child: Text(L.t(context, 'Catch me up'))),
       ]));
   }
 
@@ -138,7 +138,7 @@ Future<void> confirmSignOut(BuildContext c) async {
     content: Text(backedUp
         ? 'Your encrypted chat history is backed up. On your next sign-in, use your recovery key in Security to read old messages.'
         : 'You have not set up encrypted backup. If you sign out, old encrypted messages cannot be read on this or any new device. Set up backup in Security first.'),
-    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
-      FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Sign out'))]));
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))),
+      FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Sign out')))]));
   if (ok == true) await m.logout();
 }

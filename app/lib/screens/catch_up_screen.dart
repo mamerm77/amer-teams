@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -59,12 +60,12 @@ class _S extends State<CatchUpScreen> {
     final t = d?['totals'] as Map? ?? const {};
     final noAi = cards.isNotEmpty && cards.every((x) => x['status'] == 'no_ai' || x['status'] == 'label' || x['status'] == 'empty');
     return Scaffold(
-      appBar: AppBar(title: const Text('Catch me up'), actions: [
+      appBar: AppBar(title: Text(L.t(context, 'Catch me up')), actions: [
         IconButton(tooltip: 'Refresh', icon: const Icon(Icons.refresh), onPressed: busy ? null : () => _run(refresh: true))]),
       body: busy && d == null ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
           CircularProgressIndicator(), SizedBox(height: 12), Text('Reading your unread chats on this device…')]))
         : err != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Text(err!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _run, child: const Text('Try again'))])))
+            Text(err!, textAlign: TextAlign.center), const SizedBox(height: 12), FilledButton(onPressed: _run, child: Text(L.t(context, 'Try again')))])))
         : cards.isEmpty ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.done_all, size: 48, color: Colors.green), SizedBox(height: 8), Text("You're all caught up")]))
         : RefreshIndicator(onRefresh: () => _run(refresh: true), child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [

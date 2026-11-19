@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -26,18 +27,18 @@ class _S extends State<NotificationsScreen> {
     if (t != null) setState(() => s!['quiet'] = {...q, key: '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'});
   }
   @override Widget build(BuildContext c) {
-    if (s == null) return Scaffold(appBar: AppBar(title: const Text('Notifications')), body: Center(child: err != null ? Text(err!) : const CircularProgressIndicator()));
+    if (s == null) return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Notifications'))), body: Center(child: err != null ? Text(err!) : const CircularProgressIndicator()));
     final cl = context.read<MatrixService>().client;
     final prio = (s!['priority_senders'] as List).cast<String>();
     final people = {for (final r in cl.rooms.where((r) => r.isDirectChat && r.directChatMatrixID != null)) r.directChatMatrixID!: r.getLocalizedDisplayname()};
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final days = (q['days'] as List).cast<int>().toSet();
-    return Scaffold(appBar: AppBar(title: const Text('Notifications'), actions: [TextButton(onPressed: _save, child: const Text('Save'))]), body: ListView(children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Notifications')), actions: [TextButton(onPressed: _save, child: Text(L.t(context, 'Save')))]), body: ListView(children: [
       SwitchListTile(secondary: const Icon(Icons.bedtime_outlined), title: const Text('Quiet hours'), subtitle: const Text('Hold notifications at these times. Messages still arrive; you see them when you open the app.'),
         value: q['enabled'] == true, onChanged: (v) => setState(() => s!['quiet'] = {...q, 'enabled': v})),
       if (q['enabled'] == true) ...[
         ListTile(leading: const Icon(Icons.schedule), title: Text('From ${q['start']} to ${q['end']}'), subtitle: const Text('Tap the times to change them'),
-          trailing: Wrap(children: [TextButton(onPressed: () => _time('start'), child: const Text('Start')), TextButton(onPressed: () => _time('end'), child: const Text('End'))])),
+          trailing: Wrap(children: [TextButton(onPressed: () => _time('start'), child: Text(L.t(context, 'Start'))), TextButton(onPressed: () => _time('end'), child: Text(L.t(context, 'End')))])),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Wrap(spacing: 4, children: [for (var i = 0; i < 7; i++) FilterChip(label: Text(names[i]), selected: days.contains(i),
           onSelected: (v) => setState(() { v ? days.add(i) : days.remove(i); s!['quiet'] = {...q, 'days': days.toList()..sort()}; }))])),
         SwitchListTile(title: const Text('Let mentions, direct messages and calls through'), value: q['allow_high'] != false, onChanged: (v) => setState(() => s!['quiet'] = {...q, 'allow_high': v})),

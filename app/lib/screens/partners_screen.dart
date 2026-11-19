@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -19,7 +20,7 @@ class _S extends State<PartnersScreen> {
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Add a partner organisation'), content: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(controller: s, decoration: const InputDecoration(labelText: 'Their server name (e.g. vendor.example.com)')),
       TextField(controller: n, decoration: const InputDecoration(labelText: 'Note (e.g. Ciena)'))]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Approve on our side'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Approve on our side')))]));
     if (ok != true) return;
     try {
       final r = await api.addPartner(s.text.trim().toLowerCase(), n.text.trim());
@@ -27,12 +28,12 @@ class _S extends State<PartnersScreen> {
       await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Approved on our side'), content: SelectableText(
           'Give this one-time code to ${r['server']}\'s administrator. Their Amer Teams server confirms with it, and the connection becomes active.\n\n${r['code']}\n\n'
           'If they run another Matrix server, confirm here once they have allowed your server.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Done'))]));
+        actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Done')))]));
     } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
     _load();
   }
-  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: const Text('Partner organisations')),
-    floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_business), label: const Text('Add partner')),
+  @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Partner organisations'))),
+    floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_business), label: Text(L.t(context, 'Add partner'))),
     body: ps == null ? Center(child: err != null ? Text(err!) : const CircularProgressIndicator()) : ListView(children: [
       const Padding(padding: EdgeInsets.all(12), child: Text('Only active partners can connect. Everything from any other server is refused by the chat server itself, and ordinary chats can never be reached from outside.', style: TextStyle(fontSize: 12))),
       if (ps!.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('No partners yet'))),
@@ -61,7 +62,7 @@ Future<void> newSharedChannel(BuildContext c) async {
       items: [for (final p in partners) DropdownMenuItem(value: '${p['server']}', child: Text('${p['server']}${(p['note'] ?? '') != '' ? ' (${p['note']})' : ''}'))], onChanged: (v) => set(() => server = v!)),
     TextField(controller: people, decoration: InputDecoration(labelText: 'Invite (comma separated)', hintText: '@name:$server')),
     const Padding(padding: EdgeInsets.only(top: 8), child: Text('End-to-end encrypted. Card numbers, IBANs and Emirates IDs are stopped on your device before they are sent.', style: TextStyle(fontSize: 12))),
-  ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Create'))])));
+  ]), actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Create')))])));
   if (ok != true || name.text.trim().isEmpty) return;
   final inv = people.text.split(',').map((x) => x.trim()).where((x) => x.startsWith('@')).toList();
   try {

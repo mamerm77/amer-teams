@@ -30,7 +30,7 @@ class _S extends State<SecurityScreen> {
     final pw = TextEditingController();
     final ok = await showDialog<bool>(context: context, builder: (x) => AlertDialog(title: Text('Sign out ${d.displayName ?? d.deviceId}?'),
       content: TextField(controller: pw, obscureText: true, decoration: const InputDecoration(labelText: 'Confirm with your password')),
-      actions: [TextButton(onPressed: () => Navigator.pop(x, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(x, true), child: const Text('Sign out'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(x, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(x, true), child: Text(L.t(context, 'Sign out')))]));
     if (ok != true) return;
     try {
       await c.deleteDevice(d.deviceId, auth: AuthenticationPassword(password: pw.text, identifier: AuthenticationUserIdentifier(user: c.userID!)));
@@ -78,8 +78,8 @@ class _S extends State<SecurityScreen> {
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Your chat history is now backed up, encrypted with this key. You need it to read old messages on a new phone or PC. Store it somewhere safe; Amer Teams cannot recover it.'),
             const SizedBox(height: 12), SelectableText(shownKey!, style: const TextStyle(fontFamily: 'monospace', fontSize: 16))]),
-          actions: [TextButton(onPressed: () => Clipboard.setData(ClipboardData(text: shownKey!)), child: const Text('Copy')),
-            FilledButton(onPressed: () => Navigator.pop(d), child: const Text('I have saved it'))]));
+          actions: [TextButton(onPressed: () => Clipboard.setData(ClipboardData(text: shownKey!)), child: Text(L.t(context, 'Copy'))),
+            FilledButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'I have saved it')))]));
       } else { _msg('Backup unlocked: old messages will now decrypt on this device'); }
     } catch (e) { _msg(e); }
     setState(() {});
@@ -106,7 +106,7 @@ class _S extends State<SecurityScreen> {
     final k = TextEditingController();
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Enter your recovery key'),
       content: TextField(controller: k, decoration: const InputDecoration(hintText: 'EsT1 abcd …')),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Unlock'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Unlock')))]));
     return ok == true ? k.text.trim() : null;
   }
 
@@ -117,7 +117,7 @@ class _S extends State<SecurityScreen> {
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(controller: a, obscureText: true, keyboardType: TextInputType.number, maxLength: 8, decoration: const InputDecoration(labelText: 'PIN (4–8 digits)')),
         TextField(controller: b, obscureText: true, keyboardType: TextInputType.number, maxLength: 8, decoration: const InputDecoration(labelText: 'Repeat PIN'))]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Set'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Set')))]));
     if (ok != true) return;
     if (!RegExp(r'^\d{4,8}$').hasMatch(a.text) || a.text != b.text) { _msg('PINs must match and be 4–8 digits'); return; }
     await AppLock.setPin(a.text); setState(() => lockOn = true); _msg('App lock on: the app asks for your PIN after 1 minute in the background');
@@ -127,7 +127,7 @@ class _S extends State<SecurityScreen> {
     final p = TextEditingController();
     final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Turn off app lock'),
       content: TextField(controller: p, obscureText: true, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Current PIN')),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Turn off'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Turn off')))]));
     if (ok != true) return;
     if (await AppLock.disable(p.text)) { setState(() => lockOn = false); _msg('App lock off'); }
     else { final w = await AppLock.waitSeconds(); _msg(w > 0 ? 'Too many attempts. Try again in $w s' : 'Wrong PIN'); }
@@ -137,7 +137,7 @@ class _S extends State<SecurityScreen> {
     final mine = c.userDeviceKeys[c.userID]?.deviceKeys ?? {};
     final crossSigned = c.encryption?.crossSigning.enabled ?? false;
     final backup = c.encryption?.keyManager.enabled ?? false;
-    return Scaffold(appBar: AppBar(title: const Text('Security')), body: RefreshIndicator(onRefresh: _load, child: ListView(children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Security'))), body: RefreshIndicator(onRefresh: _load, child: ListView(children: [
       ListTile(title: Text('Encrypted backup', style: Theme.of(ctx).textTheme.titleSmall)),
       ListTile(leading: Icon(backup && crossSigned ? Icons.cloud_done : Icons.cloud_off, color: backup && crossSigned ? Colors.green : Colors.orange),
         title: Text(backup && crossSigned ? 'Chat history is backed up' : 'Set up secure backup'),
@@ -155,10 +155,10 @@ class _S extends State<SecurityScreen> {
             itemBuilder: (_) => [if (dk != null && !dk.verified) const PopupMenuItem(value: 'verify', child: Text('Verify')), const PopupMenuItem(value: 'out', child: Text('Sign out'))]));
       }(),
       const Divider(),
-      ListTile(leading: const Icon(Icons.language), title: Text(t(context, 'Language')),
+      ListTile(leading: const Icon(Icons.language), title: Text(L.t(context, 'Language')),
         subtitle: Text({'system': t(context, 'System'), 'en': 'English', 'ar': 'العربية'}[AppLocale.instance.mode]!),
         onTap: () async {
-          final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: Text(t(context, 'Language')), children: [
+          final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: Text(L.t(context, 'Language')), children: [
             for (final (k, l) in [('system', t(context, 'System')), ('en', 'English'), ('ar', 'العربية (من اليمين إلى اليسار)')])
               SimpleDialogOption(onPressed: () => Navigator.pop(d, k), child: Text(l))]));
           if (v != null) { await AppLocale.instance.set(v); if (mounted) setState(() {}); }
@@ -184,21 +184,21 @@ Future<void> showVerification(BuildContext context, KeyVerification v) async {
     switch (v.state) {
       case KeyVerificationState.askAccept:
         body = Text('${v.userId} wants to verify a device.');
-        actions = [TextButton(onPressed: () { v.rejectVerification(); close(); }, child: const Text('Decline')), FilledButton(onPressed: () => v.acceptVerification(), child: const Text('Start'))];
+        actions = [TextButton(onPressed: () { v.rejectVerification(); close(); }, child: Text(L.t(context, 'Decline'))), FilledButton(onPressed: () => v.acceptVerification(), child: Text(L.t(context, 'Start')))];
       case KeyVerificationState.askSas:
         body = Column(mainAxisSize: MainAxisSize.min, children: [
           const Text('Check that both screens show the same emoji, in the same order.'), const SizedBox(height: 12),
           Wrap(spacing: 12, runSpacing: 8, alignment: WrapAlignment.center, children: [for (final e in v.sasEmojis) Column(children: [Text(e.emoji, style: const TextStyle(fontSize: 32)), Text(e.name, style: const TextStyle(fontSize: 11))])])]);
-        actions = [TextButton(onPressed: () { v.rejectSas(); close(); }, child: const Text('They don’t match')), FilledButton(onPressed: () => v.acceptSas(), child: const Text('They match'))];
+        actions = [TextButton(onPressed: () { v.rejectSas(); close(); }, child: Text(L.t(context, 'They don’t match'))), FilledButton(onPressed: () => v.acceptSas(), child: Text(L.t(context, 'They match')))];
       case KeyVerificationState.done:
         body = const Row(children: [Icon(Icons.verified, color: Colors.green), SizedBox(width: 8), Expanded(child: Text('Verified. Messages and calls with this device are trusted.'))]);
-        actions = [FilledButton(onPressed: close, child: const Text('Done'))];
+        actions = [FilledButton(onPressed: close, child: Text(L.t(context, 'Done')))];
       case KeyVerificationState.error:
         body = Text('Verification was cancelled${v.canceledReason != null ? ': ${v.canceledReason}' : ''}.');
-        actions = [FilledButton(onPressed: close, child: const Text('Close'))];
+        actions = [FilledButton(onPressed: close, child: Text(L.t(context, 'Close')))];
       default:
         body = const Row(children: [CircularProgressIndicator(), SizedBox(width: 16), Expanded(child: Text('Waiting for the other device…'))]);
-        actions = [TextButton(onPressed: () { v.cancel(); close(); }, child: const Text('Cancel'))];
+        actions = [TextButton(onPressed: () { v.cancel(); close(); }, child: Text(L.t(context, 'Cancel')))];
     }
     return AlertDialog(title: const Text('Verify device'), content: body, actions: actions);
   }));

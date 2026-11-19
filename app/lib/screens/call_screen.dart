@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import '../services/labels.dart';
 import 'dart:math' show min, Random;
 import '../services/accessibility.dart';
@@ -80,7 +81,7 @@ class _S extends State<CallScreen> {
         final items = [for (final l in custom.text.split('\n').where((l) => l.trim().isNotEmpty)) () {
           final i = l.lastIndexOf(','); final m = i > 0 ? int.tryParse(l.substring(i + 1).trim()) : null;
           return (m != null ? l.substring(0, i).trim() : l.trim(), m ?? 10); }()];
-        Navigator.pop(d, items.isEmpty ? null : items); }, child: const Text('Use my agenda'))),
+        Navigator.pop(d, items.isEmpty ? null : items); }, child: Text(L.t(context, 'Use my agenda')))),
     ]));
     if (pick != null) { await _setAgenda(pick); _snack('Agenda set: everyone sees the current item and time left'); }
   }
@@ -88,7 +89,7 @@ class _S extends State<CallScreen> {
     final a = agenda; if (a == null) return null;
     final items = (a['items'] as List).cast<Map>(); final idx = (a['idx'] as num).toInt();
     if (a['done'] == true || idx >= items.length) return MaterialBanner(leading: const Icon(Icons.flag), content: Text('Agenda complete${parking.isNotEmpty ? ' · ${parking.length} in the parking lot' : ''}'),
-      actions: [if (isHost) TextButton(onPressed: () => _moveAgenda(-1), child: const Text('Back')), TextButton(onPressed: _showParking, child: const Text('Parking lot'))]);
+      actions: [if (isHost) TextButton(onPressed: () => _moveAgenda(-1), child: Text(L.t(context, 'Back'))), TextButton(onPressed: _showParking, child: Text(L.t(context, 'Parking lot')))]);
     final it = items[idx]; final total = Duration(minutes: (it['min'] as num).toInt());
     final used = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch((a['item_started_ms'] as num).toInt()));
     final left = total - used, frac = used.inSeconds / total.inSeconds.clamp(1, 1 << 30);
@@ -162,7 +163,7 @@ class _S extends State<CallScreen> {
         Text('${members.length} participants will be split evenly.'),
         Row(children: [const Text('Rooms'), Expanded(child: Slider(min: 2, max: members.length.clamp(2, 10).toDouble(), divisions: (members.length.clamp(2, 10) - 2).clamp(1, 8), value: n.toDouble(), label: '$n', onChanged: (v) => set(() => n = v.round()))), Text('$n')]),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Open rooms'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Open rooms')))])));
     if (ok != true) return;
     final groups = List.generate(n, (_) => <String>[]);
     for (var i = 0; i < members.length; i++) { groups[i % n].add(members[i].id); }
@@ -181,7 +182,7 @@ class _S extends State<CallScreen> {
     if (mine == null || !mounted) return;
     final go = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Breakout room'),
       content: Text('The host has moved you to ${mine['title']}.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Stay')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Join'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Stay'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Join')))]));
     if (go != true || !mounted) return;
     final child = room.client.getRoomById(mine['room_id'] as String);
     if (child != null && child.membership == mx.Membership.invite) await child.join();
@@ -358,7 +359,7 @@ class _S extends State<CallScreen> {
     final question = preset ?? await showDialog<String>(context: context, builder: (d) => AlertDialog(
       title: const Text('Ask Amer about this meeting'),
       content: TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'e.g. What did we decide about the budget?'), onSubmitted: (v) => Navigator.pop(d, v)),
-      actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, q.text), child: const Text('Ask'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, q.text), child: Text(L.t(context, 'Ask')))]));
     if (question == null || question.trim().isEmpty || !mounted) return;
     setState(() => asking = true);
     String answer;
@@ -376,8 +377,8 @@ class _S extends State<CallScreen> {
       const SizedBox(height: 8), Flexible(child: SingleChildScrollView(child: SelectableText(answer))),
       const SizedBox(height: 12),
       Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        TextButton(onPressed: () => Navigator.pop(s), child: const Text('Close')),
-        FilledButton.icon(icon: const Icon(Icons.share, size: 18), label: const Text('Share to everyone'), onPressed: () async {
+        TextButton(onPressed: () => Navigator.pop(s), child: Text(L.t(context, 'Close'))),
+        FilledButton.icon(icon: const Icon(Icons.share, size: 18), label: Text(L.t(context, 'Share to everyone')), onPressed: () async {
           Navigator.pop(s); await room.sendTextEvent('🤖 Amer, asked by ${room.unsafeGetUserFromMemoryOrFallback(me).calcDisplayname()}: ${question.trim()}\n\n$answer'); }),
       ]),
     ]))));
@@ -457,8 +458,8 @@ class _S extends State<CallScreen> {
       if (!mounted) return;
       await showDialog(context: context, builder: (d) => AlertDialog(title: Text('Live check: ${p.name}'),
         content: Text('A code was sent, end-to-end encrypted, to ${p.name}\'s own account. Ask them to read it aloud.\n\nThey should say:\n\n"$code"\n\nIf they cannot, the person in the video may not be who they appear to be. Synthetic video and voice cannot be ruled out by looking alone.'),
-        actions: [TextButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': false}); _snack('Recorded: ${p.name} did not pass the check'); }, child: const Text('They could not')),
-                  FilledButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': true}); setState(() => idChecked.add(p.identity)); }, child: const Text('They read it correctly'))]));
+        actions: [TextButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': false}); _snack('Recorded: ${p.name} did not pass the check'); }, child: Text(L.t(context, 'They could not'))),
+                  FilledButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': true}); setState(() => idChecked.add(p.identity)); }, child: Text(L.t(context, 'They read it correctly')))]));
     } catch (e) { _snack('Could not send the check: $e'); }
   }
   final idChecked = <String>{};
@@ -555,7 +556,7 @@ class _S extends State<CallScreen> {
     final v = await showDialog<String>(context: context, builder: (d) => SimpleDialog(title: const Text('Translated captions'), children: [
       Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Text('Captions from everyone who shares them (Amer on in this meeting) are translated for you only. ${gate.where}.', style: const TextStyle(fontSize: 12))),
       for (final l in capLangs) SimpleDialogOption(onPressed: () => Navigator.pop(d, l), child: Text(l)),
-      if (capLang != null) SimpleDialogOption(onPressed: () => Navigator.pop(d, ''), child: const Text('Turn off')),
+      if (capLang != null) SimpleDialogOption(onPressed: () => Navigator.pop(d, ''), child: Text(L.t(context, 'Turn off'))),
     ]));
     if (v == null) return;
     setState(() { capLang = v.isEmpty ? null : v; tCaps.clear(); _tq.clear(); });
@@ -587,9 +588,9 @@ class _S extends State<CallScreen> {
       await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Phone dial-in'),
         content: SelectableText('Dial ${r['number']}\nPIN ${r['pin']}#\n\nPhone callers join a separate phone bridge for this meeting. ${r['security']}: people who want to talk with them join the bridge too.'),
         actions: [
-          TextButton(onPressed: () async { Navigator.pop(d); await context.read<ApiService>().deletePath('/v1/phone/dialin/${Uri.encodeComponent(widget.roomId)}'); _snack('Dial-in closed'); }, child: const Text('Close dial-in')),
-          TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: 'Dial ${r['number']}, PIN ${r['pin']}#')); Navigator.pop(d); }, child: const Text('Copy')),
-          FilledButton(onPressed: () { Navigator.pop(d); Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneScreen(bridgeRoomId: widget.roomId))); }, child: const Text('Join the phone bridge')),
+          TextButton(onPressed: () async { Navigator.pop(d); await context.read<ApiService>().deletePath('/v1/phone/dialin/${Uri.encodeComponent(widget.roomId)}'); _snack('Dial-in closed'); }, child: Text(L.t(context, 'Close dial-in'))),
+          TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: 'Dial ${r['number']}, PIN ${r['pin']}#')); Navigator.pop(d); }, child: Text(L.t(context, 'Copy'))),
+          FilledButton(onPressed: () { Navigator.pop(d); Navigator.push(context, MaterialPageRoute(builder: (_) => PhoneScreen(bridgeRoomId: widget.roomId))); }, child: Text(L.t(context, 'Join the phone bridge'))),
         ]));
     } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
   }
@@ -608,7 +609,7 @@ class _S extends State<CallScreen> {
       if (!mounted) return;
       await showDialog(context: context, builder: (d) => AlertDialog(title: Text(webinar ? 'Webinar registration' : 'Guest link'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [SelectableText('$link'), const SizedBox(height: 8), Text(extra)]),
-        actions: [TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: '$link')); Navigator.pop(d); _snack('Link copied'); }, child: const Text('Copy'))]));
+        actions: [TextButton(onPressed: () { Clipboard.setData(ClipboardData(text: '$link')); Navigator.pop(d); _snack('Link copied'); }, child: Text(L.t(context, 'Copy')))]));
     } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
   }
 
@@ -722,7 +723,7 @@ class _S extends State<CallScreen> {
     final ok = await showDialog<bool>(context: context, barrierDismissible: false, builder: (d) => AlertDialog(
       title: const Text('Record this meeting?'),
       content: Text('$host wants to record${late ? ' (already recording)' : ''}. The recording includes video and audio of everyone and is shared in the meeting chat, end-to-end encrypted. It starts only if everyone agrees; you can withdraw at any time.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Decline')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('I agree'))]));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Decline'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'I agree')))]));
     _recPrompt = false;
     rec.id = id; if (ok == true) rec.agreed.add(_myId);
     final api = context.read<ApiService>(); api.recordingEvent(widget.roomId, callId, id, ok == true ? 'consent' : 'decline').catchError((_) => <String, dynamic>{});
@@ -753,7 +754,7 @@ class _S extends State<CallScreen> {
     final cs = Theme.of(c).colorScheme;
     if (err != null) return Scaffold(appBar: AppBar(), body: Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       Text('Could not join: $err', textAlign: TextAlign.center), const SizedBox(height: 16),
-      FilledButton(onPressed: () => Navigator.of(c).maybePop(), child: const Text('Back'))]))));
+      FilledButton(onPressed: () => Navigator.of(c).maybePop(), child: Text(L.t(context, 'Back')))]))));
     if (ctl != null && (call == null || ctl!.ended)) return _status(c);
     if (call == null) return Scaffold(body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const CircularProgressIndicator(), const SizedBox(height: 16), Text(widget.meeting ? 'Joining meeting…' : 'Connecting securely…')])));
     final lk = call!.lk;
@@ -774,8 +775,8 @@ class _S extends State<CallScreen> {
       if (waiting.isNotEmpty) Positioned(left: 12, right: 12, top: 56, child: Card(color: cs.tertiaryContainer, child: Column(children: [
         for (final u in waiting) ListTile(leading: const Icon(Icons.hourglass_top), title: Text('${u.calcDisplayname()} is in the waiting room'),
           trailing: Wrap(spacing: 6, children: [
-            TextButton(onPressed: () async { await meetings.decline(room, u.id); setState(() {}); }, child: const Text('Decline')),
-            FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: const Text('Admit'))])),
+            TextButton(onPressed: () async { await meetings.decline(room, u.id); setState(() {}); }, child: Text(L.t(context, 'Decline'))),
+            FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: Text(L.t(context, 'Admit')))])),
       ]))),
     ]);
 
@@ -791,7 +792,7 @@ class _S extends State<CallScreen> {
           ]),
         ]),
         actions: [
-          if (widget.meeting) Padding(padding: const EdgeInsets.only(right: 4), child: FilledButton.tonalIcon(onPressed: _shareLink, icon: const Icon(Icons.person_add_alt_1, size: 18), label: const Text('Invite'))),
+          if (widget.meeting) Padding(padding: const EdgeInsets.only(right: 4), child: FilledButton.tonalIcon(onPressed: _shareLink, icon: const Icon(Icons.person_add_alt_1, size: 18), label: Text(L.t(context, 'Invite')))),
           if (mid != null) TextButton.icon(icon: const Icon(Icons.copy, size: 16), label: Text(MeetingService.format(mid)),
             onPressed: () { Clipboard.setData(ClipboardData(text: MeetingService.format(mid))); ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Meeting ID copied'))); }),
           IconButton(tooltip: grid ? 'Speaker view' : 'Grid view', icon: Icon(grid ? Icons.person : Icons.grid_view), onPressed: () => setState(() => grid = !grid)),
@@ -842,20 +843,20 @@ class _S extends State<CallScreen> {
         ]),
       body: Column(children: [
         if (isHost) for (final g in lobby.entries) MaterialBanner(leading: const Icon(Icons.public), content: Text('${g.value.$2} is waiting in the lobby (browser guest)'),
-          actions: [TextButton(onPressed: () { lobby.remove(g.key); _host('remove', identity: g.key); setState(() {}); }, child: const Text('Remove')), FilledButton(onPressed: () => _admit(g.key), child: const Text('Let in'))]),
+          actions: [TextButton(onPressed: () { lobby.remove(g.key); _host('remove', identity: g.key); setState(() {}); }, child: Text(L.t(context, 'Remove'))), FilledButton(onPressed: () => _admit(g.key), child: Text(L.t(context, 'Let in')))]),
         if (attendee) MaterialBanner(content: const Text('You are an attendee in this webinar. Raise your hand to ask to speak.'), actions: [TextButton(onPressed: _toggleHand, child: Text(myHand ? 'Lower hand' : 'Raise hand'))]),
         if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
           content: Text("You're the only one here.${mid != null ? ' Share meeting ID ${MeetingService.format(mid)} or invite people.' : ' Invite people to join.'}"),
-          actions: [FilledButton.tonal(onPressed: _shareLink, child: const Text('Invite people'))]),
+          actions: [FilledButton.tonal(onPressed: _shareLink, child: Text(L.t(context, 'Invite people')))]),
         if (widget.meeting && _agendaBar(c) != null) _agendaBar(c)!,
         if (aiOn) MaterialBanner(leading: const Icon(Icons.hearing, color: Colors.deepPurple),
           content: Text(captions ? 'AI listening · Amer is on for this meeting. Your speech is transcribed on this device and shared encrypted with the meeting.'
                                  : 'AI listening · Amer is on for this meeting. Your speech is not shared until you turn on Captions.'),
           actions: [
-            if (!captions) TextButton(onPressed: _toggleCaptions, child: const Text('Share my speech')),
-            if (isHost) TextButton(onPressed: _toggleAi, child: const Text('Turn off')),
+            if (!captions) TextButton(onPressed: _toggleCaptions, child: Text(L.t(context, 'Share my speech'))),
+            if (isHost) TextButton(onPressed: _toggleAi, child: Text(L.t(context, 'Turn off'))),
             FilledButton.tonal(onPressed: asking ? null : () => _askDialog(), child: Text(asking ? 'Asking…' : 'Ask Amer'))]),
-        if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. The on-device transcript goes to the AI engine when you leave.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: const Text('Stop'))]),
+        if (amerNotes) MaterialBanner(content: const Text('Amer is taking notes. The on-device transcript goes to the AI engine when you leave.'), actions: [TextButton(onPressed: () => setState(() => amerNotes = false), child: Text(L.t(context, 'Stop')))]),
         Expanded(child: wide || panel == _Panel.none
             ? Row(children: [Expanded(child: stage), if (panel != _Panel.none) SizedBox(width: 340, child: _panel(people, waiting))])
             : _panel(people, waiting)),
@@ -877,7 +878,7 @@ class _S extends State<CallScreen> {
           _btn(captions ? Icons.closed_caption : Icons.closed_caption_off, 'Captions', _toggleCaptions, off: captions),
           if (aiOn) _btn(Icons.question_answer_outlined, 'Ask Amer', () => _askDialog()),
           _btn(Icons.auto_awesome, 'Amer minutes', () => setState(() => amerNotes = !amerNotes), off: amerNotes),
-          FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(110, 48)), onPressed: _leave, icon: const Icon(Icons.call_end), label: const Text('Leave')),
+          FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size(110, 48)), onPressed: _leave, icon: const Icon(Icons.call_end), label: Text(L.t(context, 'Leave'))),
         ]))),
       ]),
     ));
@@ -932,7 +933,7 @@ class _S extends State<CallScreen> {
     if (panel == _Panel.people) {
       return Material(child: ListView(padding: const EdgeInsets.all(12), children: [head,
         if (waiting.isNotEmpty) ...[const Text('Waiting room'), for (final u in waiting) ListTile(title: Text(u.calcDisplayname()),
-          trailing: FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: const Text('Admit')))],
+          trailing: FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: Text(L.t(context, 'Admit'))))],
         for (final p in people) ListTile(leading: CircleAvatar(child: Text(_initials(p.name.isEmpty ? p.identity : p.name))),
           title: Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
           subtitle: p is LocalParticipant ? null : Text(idChecked.contains(p.identity) ? 'Passed a live check' : _idBadge(p).$3, style: const TextStyle(fontSize: 11)),

@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
@@ -27,7 +28,7 @@ class _S extends State<TasksScreen> {
 
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: Text(widget.room == null ? 'My tasks' : 'Tasks · ${widget.room!.getLocalizedDisplayname()}'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _load)]),
-    floatingActionButton: widget.room == null ? null : FloatingActionButton.extended(icon: const Icon(Icons.add_task), label: const Text('New task'),
+    floatingActionButton: widget.room == null ? null : FloatingActionButton.extended(icon: const Icon(Icons.add_task), label: Text(L.t(context, 'New task')),
       onPressed: () async { await editTask(c, widget.room!); _load(); }),
     body: FutureBuilder<List<Task>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());

@@ -1,3 +1,4 @@
+import '../services/locale.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -30,7 +31,7 @@ class _S extends State<RoomsScreen> {
         SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Show the title on the room display'), value: show, onChanged: (v) => set(() => show = v)),
         const Text('Check in at the room or here within 10 minutes of the start, or the room is released.', style: TextStyle(fontSize: 12)),
       ]),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Book'))])));
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Book')))])));
     if (ok != true || !mounted) return;
     try {
       await context.read<ApiService>().postMap('/v1/rooms/bookings', {'room_id': r['id'], 'start': start.toUtc().toIso8601String(), 'end': start.add(Duration(minutes: minutes)).toUtc().toIso8601String(), 'title': title.text, 'show_title': show});
@@ -41,7 +42,7 @@ class _S extends State<RoomsScreen> {
   @override
   Widget build(BuildContext c) {
     final me = context.read<ApiService>().me;
-    return Scaffold(appBar: AppBar(title: const Text('Meeting rooms')), body: Column(children: [
+    return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Meeting rooms'))), body: Column(children: [
       Padding(padding: const EdgeInsets.all(8), child: Wrap(spacing: 8, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
         OutlinedButton.icon(icon: const Icon(Icons.schedule), label: Text('${start.toString().substring(0, 10)} ${TimeOfDay.fromDateTime(start).format(c)}'), onPressed: () async {
           final d = await showDatePicker(context: c, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 90)), initialDate: start);
@@ -58,7 +59,7 @@ class _S extends State<RoomsScreen> {
           title: Text('${r['name']} · ${r['capacity']} people'), subtitle: Text([if ('${r['site']}'.isNotEmpty) r['site'], if ((r['equipment'] as List).isNotEmpty) (r['equipment'] as List).join(', '),
             for (final b in r['bookings'] as List) '${b['start'].toString().substring(11, 16)}–${b['end'].toString().substring(11, 16)} UTC ${b['title']}${b['organiser'] == me ? ' (yours)' : ''}'].join('\n')),
           isThreeLine: true,
-          trailing: r['free'] ? FilledButton.tonal(onPressed: () => _book(r), child: const Text('Book')) : Wrap(children: [
+          trailing: r['free'] ? FilledButton.tonal(onPressed: () => _book(r), child: Text(L.t(context, 'Book'))) : Wrap(children: [
             for (final b in (r['bookings'] as List).where((b) => b['organiser'] == me)) ...[
               IconButton(tooltip: 'Check in', icon: const Icon(Icons.how_to_reg), onPressed: () async { try { await context.read<ApiService>().postMap('/v1/rooms/bookings/${b['id']}/check-in', {}); _load(); } catch (e) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e'.replaceFirst('Exception: ', '')))); } }),
               IconButton(tooltip: 'Cancel booking', icon: const Icon(Icons.event_busy), onPressed: () async { await context.read<ApiService>().deletePath('/v1/rooms/bookings/${b['id']}'); _load(); }),
@@ -91,11 +92,11 @@ class _D extends State<RoomDisplayScreen> {
   @override
   Widget build(BuildContext c) {
     if (server == null || code == null) {
-      return Scaffold(appBar: AppBar(title: const Text('Set up as a room display')), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+      return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Set up as a room display'))), body: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
         TextField(controller: s, decoration: const InputDecoration(labelText: 'Server, e.g. https://teams.example.ae')),
         TextField(controller: k, decoration: const InputDecoration(labelText: 'Room code from your administrator')),
         const SizedBox(height: 16),
-        FilledButton(onPressed: () async { server = s.text.trim(); code = k.text.trim(); await (await _f()).writeAsString(jsonEncode({'server': server, 'code': code})); setState(() {}); _load(); }, child: const Text('Pair this display')),
+        FilledButton(onPressed: () async { server = s.text.trim(); code = k.text.trim(); await (await _f()).writeAsString(jsonEncode({'server': server, 'code': code})); setState(() {}); _load(); }, child: Text(L.t(context, 'Pair this display'))),
       ])));
     }
     final x = d; final free = x?['free'] == true; final cur = x?['current'];
