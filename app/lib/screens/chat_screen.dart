@@ -41,7 +41,9 @@ class _S extends State<ChatScreen> {
   final _rec = AudioRecorder(); DateTime? _recStart; String? _recPath;
   final _player = AudioPlayer(); String? _playing;
   Future<CachedPresence>? _presence;
-  Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
+  // The SDK briefly drops rooms while it re-syncs (e.g. after blocking someone): keep the last known room, never crash.
+  Room? _room;
+  Room get room => _room = context.read<MatrixService>().client.getRoomById(widget.roomId) ?? _room ?? (throw StateError('This chat is no longer available'));
   String get me => room.client.userID!;
 
   late final Outbox outbox;
@@ -112,11 +114,12 @@ class _S extends State<ChatScreen> {
     if (a == 'check') await _newChecklist();
     if (a == 'later') await _sendLater();
   }
-  void _snack(String t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
+  void _snack(String t) => ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text(t), duration: const Duration(seconds: 3)));
 
   void _markRead() { final last = tl?.events.firstOrNull; if (last != null && last.senderId != me) tl!.setReadMarker(eventId: last.eventId); }
 
   void _onTyping(String t) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();      // notices must not cover the message box while typing
     if (!typing && t.isNotEmpty) { typing = true; _safeTyping(true, timeout: 10000); }
     typingOff?.cancel();
     typingOff = Timer(const Duration(seconds: 4), () { typing = false; _safeTyping(false); });

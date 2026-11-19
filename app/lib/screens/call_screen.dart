@@ -113,7 +113,9 @@ class _S extends State<CallScreen> {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(roomId: mine['room_id'] as String, meeting: true, video: cam)));
     _snack('Back in the main meeting');
   }
-  mx.Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
+  // The SDK briefly drops rooms while it re-syncs (e.g. after blocking someone): keep the last known room, never crash.
+  mx.Room? _room;
+  mx.Room get room => _room = context.read<MatrixService>().client.getRoomById(widget.roomId) ?? _room ?? (throw StateError('This chat is no longer available'));
   MeetingService get meetings => MeetingService(context.read<MatrixService>());
 
   @override void initState() { super.initState(); cam = widget.video; _start(); tick = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted) setState(() {}); }); }

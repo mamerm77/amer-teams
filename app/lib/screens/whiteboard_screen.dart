@@ -12,7 +12,9 @@ class WhiteboardScreen extends StatefulWidget { const WhiteboardScreen({super.ke
 class _S extends State<WhiteboardScreen> {
   Timeline? tl; List<Offset> current = []; Color colour = Colors.black; double width = 3; bool eraser = false;
   static const palette = [Colors.black, Colors.red, Colors.blue, Colors.green, Colors.orange, Colors.purple];
-  Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
+  // The SDK briefly drops rooms while it re-syncs (e.g. after blocking someone): keep the last known room, never crash.
+  Room? _room;
+  Room get room => _room = context.read<MatrixService>().client.getRoomById(widget.roomId) ?? _room ?? (throw StateError('This chat is no longer available'));
   @override void initState() { super.initState(); WidgetsBinding.instance.addPostFrameCallback((_) async { tl = await room.getTimeline(onUpdate: () { if (mounted) setState(() {}); }); setState(() {}); }); }
   @override void dispose() { tl?.cancelSubscriptions(); super.dispose(); }
 

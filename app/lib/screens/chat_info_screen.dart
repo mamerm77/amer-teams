@@ -12,7 +12,9 @@ import 'people_picker.dart';
 /// announcement mode, shared files, invite, archive, block, leave.
 class ChatInfoScreen extends StatefulWidget { const ChatInfoScreen({super.key, required this.roomId}); final String roomId; @override State<ChatInfoScreen> createState() => _S(); }
 class _S extends State<ChatInfoScreen> {
-  Room get room => context.read<MatrixService>().client.getRoomById(widget.roomId)!;
+  // The SDK briefly drops rooms while it re-syncs (e.g. after blocking someone): keep the last known room, never crash.
+  Room? _room;
+  Room get room => _room = context.read<MatrixService>().client.getRoomById(widget.roomId) ?? _room ?? (throw StateError('This chat is no longer available'));
   String get me => room.client.userID!;
   void _msg(Object t) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$t'.replaceFirst('Exception: ', ''))));
   Future<String?> _ask(String title, String initial) async {
@@ -107,7 +109,12 @@ class _S extends State<ChatInfoScreen> {
         onTap: () async { await room.client.unignoreUser(dm); _msg('Unblocked'); if (mounted) setState(() {}); }),
       if (dm != null && !room.client.ignoredUsers.contains(dm)) ListTile(leading: Icon(Icons.block, color: Theme.of(c).colorScheme.error), title: const Text('Block contact'),
         subtitle: const Text('You will no longer see their messages or calls. The server stops delivering them to you.'),
-        onTap: () async { await room.client.ignoreUser(dm); _msg('Blocked'); if (mounted) setState(() {}); }),
+        onTap: () async {
+          final nav = Navigator.of(c); final msg = ScaffoldMessenger.of(c);
+          await room.client.ignoreUser(dm);           // the SDK clears its cache and re-syncs so the server filters them out
+          nav.popUntil((r) => r.isFirst);
+          msg.showSnackBar(const SnackBar(content: Text('Blocked')));
+        }),
       ListTile(leading: Icon(Icons.logout, color: Theme.of(c).colorScheme.error), title: Text(dm != null ? 'Delete chat' : 'Leave group'),
         onTap: () async { await room.leave(); if (c.mounted) Navigator.popUntil(c, (r) => r.isFirst); }),
       const SizedBox(height: 24),

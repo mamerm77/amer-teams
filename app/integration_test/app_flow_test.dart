@@ -50,6 +50,7 @@ void main() {
     }
     Finder field(String label) => find.byWidgetPredicate((w) => w is TextField && (w.decoration?.labelText == label || w.decoration?.hintText == label));
     Future<void> sendText(String s) async {
+      for (var i = 0; i < 60 && find.byType(SnackBar).evaluate().isNotEmpty; i++) { await wait(.1); }   // a person waits for a notice to go
       await type(field('Message'), s, 'message box');
       await tap(find.byTooltip('Send (long-press to schedule)'), 'send button');
     }
@@ -64,7 +65,7 @@ void main() {
     final appErrors = <String>[];
     final prevOnError = FlutterError.onError;
     FlutterError.onError = (d) { appErrors.add(d.exceptionAsString().split('\n').first); // ignore: avoid_print
-      print('APP ERROR  ${d.exceptionAsString().split('\n').first}'); };
+      print('APP ERROR  ${d.exceptionAsString().split('\n').first}\n${(d.stack?.toString() ?? '').split('\n').where((l) => l.contains('amer_teams')).take(6).join('\n')}'); };
     app.main();
     await wait(3);
 
@@ -275,7 +276,8 @@ void main() {
     await step('Block: no messages or calls from Bob', () async {
       await home(); await openChat(); await sendText('bob: in 20s say hi'); await sendText('bob: in 20s call me');
       await chatInfo(); await tap(find.text('Block contact'), 'Block contact');
-      expectFound(await waitFor(find.text('Blocked')), 'Blocked confirmation');
+      expectFound(await waitFor(find.text('Blocked'), secs: 30), 'Blocked confirmation');
+      await wait(5);
       await home(); await openChat();
       await wait(35);
       if (find.text('hello while blocked').evaluate().isNotEmpty) throw StateError('message from blocked user was shown');
