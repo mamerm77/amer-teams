@@ -84,7 +84,7 @@ void main() {
       await tap(find.widgetWithText(FilledButton, 'Sign in'), 'Sign in button');
       expectFound(await waitFor(find.text('Chat'), secs: 60), 'home screen');
     });
-    await step('About shows build number', () async { expectFound(await waitFor(find.textContaining(RegExp(r'^b(\d+|dev)$'))), 'build label'); });
+    await step('About shows build number', () async { await tap(find.byTooltip('Your profile and settings'), 'profile menu'); expectFound(await waitFor(find.textContaining(RegExp(r'^Build (\d+|dev)'))), 'build label'); await t.tapAt(const Offset(5, 5)); await wait(.5); });
 
     // ---------------- chat ----------------
     await step('Chat list shows Bob', () async { await tap(find.text('Chat'), 'Chat tab'); expectFound(await waitFor(find.text('Bob Tester'), secs: 40), 'Bob Tester'); });

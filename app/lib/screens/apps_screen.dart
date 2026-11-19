@@ -95,7 +95,8 @@ class _S extends State<AppsScreen> {
     final f = q.text.trim().toLowerCase();
     bool hit(AppItem a) => f.isEmpty || a.name.toLowerCase().contains(f) || a.what.toLowerCase().contains(f) || L.t(c, a.name).contains(f);
     final cs = Theme.of(c).colorScheme;
-    return Scaffold(appBar: AppBar(title: Text(L.t(c, 'Apps'))), body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+    // every tile is built (not lazily), so search, screen readers and keyboard focus reach all of them
+    return Scaffold(appBar: AppBar(title: Text(L.t(c, 'Apps'))), body: SingleChildScrollView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextField(controller: q, onChanged: (_) => setState(() {}), decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: L.t(c, 'Find a feature'), border: const OutlineInputBorder(), isDense: true)),
       for (final (title, items) in _sections) if (items.any(hit)) ...[
         Padding(padding: const EdgeInsets.fromLTRB(4, 20, 4, 8), child: Text(L.t(c, title), style: Theme.of(c).textTheme.titleSmall?.copyWith(color: cs.primary))),
@@ -113,6 +114,6 @@ class _S extends State<AppsScreen> {
               ]))))) ]);
         }),
       ],
-    ]));
+    ])));
   }
 }
