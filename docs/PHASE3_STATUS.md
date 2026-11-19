@@ -49,7 +49,7 @@ Each built feature has a doc listing its open gaps.
 |---|---|---|
 | 1 | Personal agent team | Built |
 | 2 | Agent glass box | Built |
-| 3 | Encrypted AI (on device or enclave) | Not started: the gap behind every AI feature above |
+| 3 | Encrypted AI (on device or enclave) | Partial: routing table, no silent fallback, server-enforced policy, where-it-ran labels. No on-device model or enclave yet (ENCRYPTED_AI.md) |
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |
 | 5 | Meeting digital twin | Not started |
 | 6 | Pre-mortem agent | Not started |
@@ -96,5 +96,5 @@ Each built feature has a doc listing its open gaps.
 | Item | Status |
 |---|---|
 | Modern 3D UI with 2.5D and flat fallbacks | Not started |
-| Feature flags per tenant | Not started |
+| Feature flags per tenant | Built: per tenant, stable rollout %, server-gated, admin screen (FEATURE_FLAGS.md) |
 | Arabic and English strings (ARB), RTL | Not started |
