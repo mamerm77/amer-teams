@@ -12,6 +12,13 @@ class ApiService {
   Uri _u(String p) => m.homeserver!.replace(path: '$kApiPath$p');
   Uri url(String p) => _u(p);
   Map<String, String> get headers => _h;
+  String? get me => m.client.userID;
+  Future<Map<String, dynamic>> putMap(String p, Map body) async {
+    final r = await http.put(_u(p), headers: _h, body: jsonEncode(body));
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j as Map<String, dynamic>;
+  }
   Map<String, String> get _h => {'Authorization': 'Bearer ${m.accessToken}', 'Content-Type': 'application/json'};
 
   Future<Map<String, dynamic>> _post(String p, Map body) async {

@@ -1,3 +1,4 @@
+import 'skills_screen.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -137,6 +138,7 @@ class _S extends State<AgentOpsScreen> with SingleTickerProviderStateMixin {
     return Scaffold(
       appBar: AppBar(title: const Text('Agent Ops'), actions: [
         TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+        TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: const Text('Skills and marketplace'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
         if (order.isNotEmpty) SizedBox(width: wide ? 260 : 130, child: DropdownButton<String>(isExpanded: true, value: selected, underline: const SizedBox(), hint: const Text('Project'),
           items: [for (final id in order) DropdownMenuItem(value: id, child: Text(projects[id]!.name.isEmpty ? id : projects[id]!.name, overflow: TextOverflow.ellipsis))],
           onChanged: (v) => setState(() { selected = v; follow = false; }))),

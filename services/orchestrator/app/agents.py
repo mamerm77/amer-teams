@@ -32,14 +32,17 @@ class Trace:
     steps: list = field(default_factory=list)
     def add(self, agent, note, ms=0): self.steps.append({"agent": agent, "note": note, "ms": round(ms)})
 
-async def run(prompt: str, context: str = "", labels: list[str] | None = None, agent: str | None = None) -> dict:
+async def run(prompt: str, context: str = "", labels: list[str] | None = None, agent: str | None = None, system_override: tuple[str, str] | None = None) -> dict:
     tr = Trace()
     ok, why = guardian.check(prompt + context, labels)
     tr.add("Guardian", "policy check passed" if ok else why)
     if not ok:
         return {"answer": why, "agent": "Guardian", "trace": tr.steps, "blocked": True}
-    aid = agent or route(prompt); tr.add("Router", f"dispatched to {AGENTS[aid].name}")
-    a = AGENTS[aid]
+    if system_override:                                  # an organisation skill or custom agent (docs/SKILLS.md)
+        a = Agent("custom", system_override[0], system_override[1]); tr.add("Router", f"skill {a.name}")
+    else:
+        aid = agent or route(prompt); tr.add("Router", f"dispatched to {AGENTS[aid].name}")
+        a = AGENTS[aid]
     if not a.enabled:
         return {"answer": f"{a.name} is paused by an operator.", "agent": a.name, "trace": tr.steps, "blocked": True}
     user = guardian.redact((f"Context:\n{context}\n\n" if context else "") + f"Request:\n{prompt}")

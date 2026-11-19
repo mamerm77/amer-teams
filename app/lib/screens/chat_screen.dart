@@ -1,3 +1,4 @@
+import 'skills_screen.dart';
 import 'operator_screen.dart';
 import '../services/premortem.dart';
 import '../services/office_text.dart';
@@ -164,7 +165,7 @@ class _S extends State<ChatScreen> {
   static const slash = {
     '/poll': 'Create a poll', '/meet': 'Start a meeting in this chat now', '/remind': '/remind 30 text: remind me in 30 minutes',
     '/ask': '/ask question: ask Amer, answer only you see', '/announce': '/announce text: announcement everyone acknowledges',
-    '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases', '/premortem': '/premortem plan: how could this fail? (or the recent chat)'};
+    '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases', '/premortem': '/premortem plan: how could this fail? (or the recent chat)', '/skill': 'Run one of your skills or agents on this chat'};
   Future<bool> _command(String t) async {
     if (!t.startsWith('/')) return false;
     final sp = t.indexOf(' '); final cmd = (sp < 0 ? t : t.substring(0, sp)).toLowerCase(); final arg = sp < 0 ? '' : t.substring(sp + 1).trim();
@@ -182,6 +183,9 @@ class _S extends State<ChatScreen> {
         Reminders.instance.add(room.id, '', m.group(2)!.isEmpty ? 'Reminder' : m.group(2)!, DateTime.now().add(Duration(minutes: int.parse(m.group(1)!))));
         _snack('I will remind you in ${m.group(1)} minutes');
       case '/premortem': await _premortem(arg);
+      case '/skill':
+        final ctx = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(30).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
+        Navigator.push(context, MaterialPageRoute(builder: (_) => SkillsScreen(room: room, context: ctx)));
       case '/ask':
         if (arg.isEmpty) { _snack('Write a question after /ask'); return true; }
         final g = aiFor(room); if (!g.allowed) { _snack(g.where); return true; }

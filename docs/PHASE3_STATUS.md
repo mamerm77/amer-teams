@@ -26,7 +26,7 @@ Each built feature has a doc listing its open gaps.
 | Catch-up digest | Built (see top five) |
 | Agent inside a live meeting | Built (see top five) |
 | Video recap with chapters | Built: summary and timed chapters from captions, in the recording's thread; no seek-to-chapter (VIDEO_RECAP.md) |
-| Reusable AI skills and custom agents | Not started |
+| Reusable AI skills and custom agents | Built: skills with inputs, custom agents, /skill in chats, Guardian on every run; tested 13/13 (SKILLS.md) |
 | In-person meeting notes | Built: on-device transcription, speaker marking, AI minutes, decisions and tasks; no diarisation (IN_PERSON_NOTES.md) |
 | No-code workflows | Built |
 | Agent messages visible to one user | Partial: meeting answers and `/ask` are private on the asker's screen; the encrypted-to-one-user event is not built |
@@ -60,7 +60,7 @@ Each built feature has a doc listing its open gaps.
 | 11 | Wellbeing signals | Built: private, on-device weekly signals and nudges; no team view by design (WELLBEING.md) |
 | 12 | Live expertise map | Not started |
 | 13 | Ambient presence rooms | Not started |
-| 14 | Agent marketplace | Not started |
+| 14 | Agent marketplace | Built: submit, administrator review with notes, tenant marketplace, install counts, re-review on edit (SKILLS.md) |
 | 15 | Operator mode for telecoms | Built: on-call rotas, incident numbers, encrypted war rooms, paging through quiet hours, forward-only states, MTTA/MTTR, Alertmanager opens and resolves incidents; AI post-incident review; tested 12/12 (OPERATOR_MODE.md) |
 
 ## Practical (25)
