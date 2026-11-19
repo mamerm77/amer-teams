@@ -219,7 +219,7 @@ void main() {
     await step('Meeting: /ask answers privately', () async {
       await t.enterText(field('Message everyone (encrypted)'), '/ask what did we decide?'); await t.testTextInput.receiveAction(TextInputAction.done); await wait(1);
       expectFound(await waitFor(find.text('Only you can see this'), secs: 30), 'private answer sheet');
-      expectFound(find.text('Share to everyone'), 'share option');
+      expectFound(find.text('Share to everyone').evaluate().isNotEmpty, 'share option');
       await tap(find.text('Close'), 'Close');
     });
     await step('Meeting: whiteboard', () async {
