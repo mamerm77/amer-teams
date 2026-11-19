@@ -78,4 +78,14 @@ try {
 } catch { Write-Host "Could not create an invite code yet; sign in as admin and use Users > New invite code." }
 Write-Host "Admin created. Sign in to the app as 'admin'. More invite codes: Users > New invite code."
 Write-Host "`nServer ready. In the app, sign in with server  http://$ip"
-Write-Host "Allow Windows Firewall: TCP 80, 7881 and UDP 50000-50100 if prompted."
+# Phones on the same Wi-Fi must reach the server (TCP 80), and calls need the media ports (TCP 7881, UDP 50000-50100).
+try {
+  foreach ($r in @(@{n="Amer Teams web"; p="TCP"; l="80"}, @{n="Amer Teams media TCP"; p="TCP"; l="7881"}, @{n="Amer Teams media UDP"; p="UDP"; l="50000-50100"})) {
+    if (-not (Get-NetFirewallRule -DisplayName $r.n -ErrorAction SilentlyContinue)) {
+      New-NetFirewallRule -DisplayName $r.n -Direction Inbound -Protocol $r.p -LocalPort $r.l -Action Allow -Profile Private,Domain | Out-Null
+    }
+  }
+  Write-Host "Windows Firewall: opened TCP 80, 7881 and UDP 50000-50100 for private networks."
+} catch {
+  Write-Host "Could not add firewall rules (run PowerShell as Administrator). Calls from phones need TCP 80, 7881 and UDP 50000-50100 open."
+}
