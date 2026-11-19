@@ -365,6 +365,13 @@ void main() {
     await step('New device: old messages locked before restore', () async {
       await type(field('Server'), 'http://localhost', 'Server'); await type(field('Username'), 'moh', 'Username');
       await type(field('Password'), 'Moh-Pass-123!', 'Password'); await tap(find.widgetWithText(FilledButton, 'Sign in'), 'Sign in');
+      await wait(3);
+      final limited = find.textContaining('Too many sign-in attempts');
+      if (limited.evaluate().isNotEmpty) {                     // the server's brute-force limit: wait as the message says, then retry
+        final secs = int.tryParse(RegExp(r'(\d+) seconds').firstMatch((limited.evaluate().first.widget as Text).data ?? '')?.group(1) ?? '') ?? 30;
+        await shot('sign-in-rate-limit-message');
+        await wait(secs + 2.0); await tap(find.widgetWithText(FilledButton, 'Sign in'), 'Sign in (after waiting)');
+      }
       expectFound(await waitFor(find.text('Chat'), secs: 60), 'home');
       await tap(find.text('Chat'), 'Chat'); await tap(find.text('Bob Tester'), 'chat');
       await wait(5);

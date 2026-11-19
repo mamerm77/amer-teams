@@ -1,3 +1,4 @@
+import 'package:matrix/matrix.dart' show MatrixException, MatrixError;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../config.dart';
@@ -37,7 +38,7 @@ class _S extends State<LoginScreen> {
         await m.login(server.text.trim(), user.text.trim(), pass.text);
       }
     } catch (e) {
-      setState(() => err = e.toString().replaceFirst('Exception: ', ''));
+      setState(() => err = friendlyAuthError(e));
     } finally { if (mounted) setState(() => busy = false); }
   }
 
@@ -61,4 +62,25 @@ class _S extends State<LoginScreen> {
       const SizedBox(height: 20),
       FilledButton(onPressed: busy ? null : go, child: Text(busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in')),
     ]))))));
+}
+
+
+/// Server errors in words a person understands (the raw Matrix codes are not shown).
+String friendlyAuthError(Object e) {
+  if (e is MatrixException) {
+    switch (e.error) {
+      case MatrixError.M_LIMIT_EXCEEDED:
+        final s = ((e.retryAfterMs ?? 30000) / 1000).ceil();
+        return 'Too many sign-in attempts. For your security, try again in $s seconds.';
+      case MatrixError.M_FORBIDDEN: return 'Wrong username or password.';
+      case MatrixError.M_USER_DEACTIVATED: return 'This account has been deactivated. Contact your administrator.';
+      case MatrixError.M_USER_IN_USE: return 'That username is taken. Choose another.';
+      case MatrixError.M_INVALID_USERNAME: return 'Usernames can use lower-case letters, digits, dots, hyphens and underscores.';
+      case MatrixError.M_WEAK_PASSWORD: return 'Password too weak: use at least 10 characters with upper and lower case, a digit and a symbol.';
+      default: return e.errorMessage;
+    }
+  }
+  final t = e.toString().replaceFirst('Exception: ', '');
+  if (t.contains('SocketException') || t.contains('Failed host lookup') || t.contains('Connection refused')) return 'Cannot reach the server. Check the server address and your connection.';
+  return t;
 }

@@ -54,10 +54,14 @@ async def main():
             c.olm.key_verifications[txid] = sas
             await c.to_device(sas.start_verification()); save(stage="started (after ready)")
     c.add_to_device_callback(on_unknown, UnknownToDeviceEvent)
-    await c.to_device(ToDeviceMessage("m.key.verification.request", ME, app_dev.device_id,
-        {"from_device": c.device_id, "methods": ["m.sas.v1"], "timestamp": int(time.time() * 1000), "transaction_id": txid}))
-    save(stage="requested")
-    for _ in range(90):                                                      # up to ~3 minutes
+    # give the app time to learn about this new device (device-list update), as a real second device would
+    for _ in range(5): await c.sync(timeout=2000)
+    async def request():
+        await c.to_device(ToDeviceMessage("m.key.verification.request", ME, app_dev.device_id,
+            {"from_device": c.device_id, "methods": ["m.sas.v1"], "timestamp": int(time.time() * 1000), "transaction_id": txid}))
+    await request(); save(stage="requested")
+    for n in range(90):                                                      # up to ~3 minutes; re-request until the app answers
+        if n % 10 == 9 and state["stage"] == "requested": await request()
         await c.sync(timeout=2000)
         if state["stage"] in ("done", "cancelled", "error"): break
     await c.close()
