@@ -346,6 +346,13 @@ void main() {
       await tap(find.byTooltip('Task options').first, 'task options'); await tap(find.text('Mark done'), 'Mark done');
       expectFound(await waitFor(find.byIcon(Icons.check_circle), secs: 20), 'task done');
     });
+    await step('Encryption details: key types, honest about message keys, rotation', () async {
+      await home(); await openChat(); await tap(find.byTooltip('Encryption details'), 'padlock');
+      expectFound(await waitFor(find.text('Messages are not yet quantum-safe')), 'honest message-key line');
+      expectFound(find.text('Calls and meetings: quantum-safe').evaluate().isNotEmpty, 'call key line');
+      expectFound(find.textContaining('Your message key: created').evaluate().isNotEmpty, 'rotation info');
+      await t.pageBack(); await wait(1);
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

@@ -25,6 +25,7 @@ import '../services/workflow_engine.dart';
 import 'canvas_screen.dart';
 import 'find_time_screen.dart';
 import 'tasks_screen.dart';
+import 'security_badge.dart';
 import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
@@ -443,6 +444,7 @@ class _S extends State<ChatScreen> {
                 }),
               ]))]),
         actions: [
+          IconButton(tooltip: 'Encryption details', icon: Icon(room.encrypted ? Icons.lock : Icons.lock_open, color: room.encrypted ? Colors.green : Theme.of(c).colorScheme.error), onPressed: () => showSecurityDetails(c, room)),
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
           IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
