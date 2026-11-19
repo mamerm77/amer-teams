@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';  // also provides Uint8List
+import 'package:matrix/encryption.dart' show KeyVerificationMethod;
 import 'package:matrix/matrix.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart' as sqflite;
