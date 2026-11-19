@@ -32,7 +32,7 @@ Each built feature has a doc listing its open gaps.
 | Agent messages visible to one user | Partial: meeting answers and `/ask` are private on the asker's screen; the encrypted-to-one-user event is not built |
 | Canvases / Loop | Built |
 | Shared files tab with versions | Existing files view; versions and grouping not started |
-| Drafts, mentions, followed quick views | Not started |
+| Drafts, mentions, followed quick views | Built |
 | Shared channels across organisations | Not started |
 | Webinars and town halls | Existing webinar mode (attendees cannot publish); registration, Q&A and HLS not started |
 | Breakout rooms | Existing |
@@ -67,7 +67,7 @@ Each built feature has a doc listing its open gaps.
 | Feature | Status |
 |---|---|
 | Scheduled send and reminders | Built (CHAT_EXTRAS.md). Reminders are per device and in-app, not OS notifications |
-| Follow, mute, pop-out threads | Not started (threads exist) |
+| Follow, mute, pop-out threads | Built: follow and mute, Followed threads view; pop-out not started |
 | Rich text, code blocks, role mentions | Partial: Markdown and code blocks with copy; role and channel mentions not started |
 | Translate on tap | Partial: label-aware and cached, via the AI engine |
 | Bookmarks and folders | Existing saved messages; folders not started |
@@ -81,11 +81,11 @@ Each built feature has a doc listing its open gaps.
 | Whiteboard templates | Not started |
 | Automatic follow-up | Partial: Amer minutes posted to the chat; decisions and tasks not extracted from minutes |
 | Find-a-time | Built (FIND_A_TIME.md), with prayer times and Ramadan hours |
-| Out-of-office from calendar | Not started |
+| Out-of-office from calendar | Partial: set by hand (status, automatic reply, delegate); calendar-event trigger waits for connectors |
 | Message-to-task and task boards | Built (DECISIONS.md) |
 | File previews with comments | Partial: images preview; PDF and Office not started |
 | Unified search | Partial: in-chat search exists; cross-chat index not started |
-| Notification settings and quiet hours | Not started |
+| Notification settings and quiet hours | Built: server push filter, per-chat levels, priority senders (NOTIFICATIONS.md) |
 | Accessibility | Not started (beyond tooltips and labels) |
 | Multi-device handoff | Not started |
 | Calendar and tool connectors | Not started |
