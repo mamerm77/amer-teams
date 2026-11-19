@@ -79,6 +79,20 @@ class Peer:
         elif b.startswith("bob: ignore next"): self.mode = "ignore"
         elif b.startswith("bob: call me") or b.startswith("bob: video call me"): asyncio.create_task(self.call_moh(video="video" in b))
         elif b.startswith("bob: hang up"): asyncio.create_task(self.hangup_all())
+        elif b.startswith("bob: type"):
+            await self.c.room_typing(self.room, True, timeout=15000); await asyncio.sleep(10); await self.c.room_typing(self.room, False)
+        elif b.startswith("bob: mention me"):
+            await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
+                "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
+                "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: in 20s say hi"):
+            async def later():
+                await asyncio.sleep(20); await self.send("m.room.message", {"msgtype": "m.text", "body": "hello while blocked"})
+            asyncio.create_task(later())
+        elif b.startswith("bob: in 20s call me"):
+            async def later_call():
+                await asyncio.sleep(20); await self.call_moh(video=False)
+            asyncio.create_task(later_call())
 
     async def on_unknown(self, room, ev):
         t, c = ev.type, ev.source.get("content", {})

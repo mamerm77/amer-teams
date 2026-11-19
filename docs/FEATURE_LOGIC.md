@@ -17,21 +17,21 @@ proves it, and the status. Enforcement levels:
 |---|---|---|---|---|---|
 | Encrypted 1:1 and group chat | WhatsApp, Signal: end-to-end by default | Every room has `m.room.encryption`. The server policy forces it, and the app refuses to send if it is missing. The database stores ciphertext only. | Server + app | e2e_real 2–4; in-use "Open chat", "Send and get reply" | **Verified in use** |
 | Delivery ticks | WhatsApp: 1 grey = sent, 2 grey = delivered, 2 blue = read | 🕓 sending · ✓ stored on server for all recipients · ✓✓ (blue) read. A receipt on a later message implies earlier ones were read. Matrix has no per-device delivery receipt, so "delivered" and "sent" are the same tick. | Server (receipts) + app (display) | in-use "Read receipt ticks" | **Verified in use** |
-| Failed send | WhatsApp: red ⚠, tap to retry | ⚠ Not sent · tap → Retry / Delete. The message is kept on the device until resolved. | App | none yet | Gap: no test |
+| Failed send | WhatsApp: red ⚠, tap to retry | ⚠ Not sent · tap → Retry / Delete. The message is kept on the device until resolved. | App | in-use "Failed send … Retry" (server paused for real) | Testing |
 | Reply / quote | All four | Reply shows the quoted original and keeps the link to it (`m.in_reply_to`) | App + protocol | in-use "Reply" | **Verified in use** |
 | Reactions | All four | One emoji per user per message. Counts are aggregated from the timeline. | Protocol | in-use "React" | **Verified in use** |
 | Edit | WhatsApp: 15 min · Telegram: 48 h · Teams: any time, marked "Edited" | Own text messages only, **within 24 h**, marked "edited". Edits are re-encrypted. | App (Synapse has no edit window) | in-use "Edit" | **Verified in use** (24 h rule implemented) |
 | Delete for everyone | WhatsApp: own messages within 2 days; admins can delete others' messages, shown as "deleted by admin" | Own messages: within 2 days. Moderators (power ≥ 50): any member's message, shown as "Deleted by <name>". | Server (redaction power level) + app (time window) | in-use "Delete" | **Verified in use** (2-day / moderator rule implemented) |
-| Forward | All four, marked "Forwarded" | Re-encrypted into the target room, marked "Forwarded" | App | none yet | Gap: no test |
+| Forward | All four, marked "Forwarded" | Re-encrypted into the target room, marked "Forwarded" | App | in-use "Forward" | Testing |
 | Saved / starred | WhatsApp ★, Teams "Save" | Per-user list kept in encrypted account data and synced across the user's devices | Server (account data) | in-use "Save" | **Verified in use** |
 | Polls | All four | Single choice. One vote per user, and the latest vote counts. Results are live. | Protocol (MSC3381 poll events) | in-use "Create a poll" | **Verified in use** |
 | Checklists | Telegram, Teams Loop | Any member can tick items. The latest tick per item wins. | Protocol | in-use "Checklist" | **Verified in use** |
-| Typing indicator | All four | Sent while typing, stops after 30 s or on send | Server | none yet | Gap: no test |
+| Typing indicator | All four | Sent while typing, stops after 10 s idle or on send | Server | in-use "Typing indicator" | Testing |
 | Search in chat | All four | Searches decrypted messages on the device. The server cannot search ciphertext, by design. | App | in-use "Search" | **Verified in use** |
 | Scheduled send | Telegram, Teams | Stored on the device and sent at the chosen time **only while the app is running**. Labelled as such. | App | none yet | Partial (by design) |
 | Disappearing messages | WhatsApp: 24 h / 7 d / 90 d | Room retention policy. The server purges expired events. | Server (retention) | chat_features_test | Server-tested |
-| Block | All four | Blocked user's messages and calls are hidden and never ring (`m.ignored_user_list`) | Server + app | none yet | Gap: no test |
-| Mentions, Activity feed | Teams | @mention pill. Activity lists mentions, replies to me, reactions to me and missed calls. | App | none yet | Gap: no test |
+| Block | All four | Blocked user's messages and calls are not delivered: the server filters them via `m.ignored_user_list`. Unblock is available in Chat info. | **Server** + app | in-use "Block", "Unblock" | Testing |
+| Mentions, Activity feed | Teams | @mention pill with `m.mentions`. Activity lists mentions, replies to me, reactions to me and missed calls. | App | in-use "Mention reaches Activity" | Testing |
 
 ## Calls (protocol v2, docs/CALL_PROTOCOL.md)
 | Feature | Competitor rule | Amer Teams rule | Enforced | Test | Status |
@@ -60,7 +60,8 @@ proves it, and the status. Enforcement levels:
 | Admin-only tools | All | Users, invites, audit, agent switches and call trace need server-admin rights | **Server** | registration_test, call_trace_test 3, 17, 18 | Server-tested |
 | Call trace | Teams Call Quality Dashboard | Signalling, media events, quality and MOS, metadata only. Opening a trace is itself audited. | **Server** | call_trace_test (18) | Server-tested |
 | Compliance archiving per tenant | Teams Purview | Off for public users (enforced). Opt-in for business tenants, and users are told. | **Server** | call_trace_test 13–16 | Server-tested; archiver service is a gap |
-| Device verification, key backup, app lock | WhatsApp, Signal | Emoji verification (SAS), recovery key (SSSS), PIN after 1 min in the background | Protocol + app | none yet | Gap: no in-use test |
+| App lock | WhatsApp, Signal: PIN, lockout after failed attempts | PIN stored as PBKDF2-HMAC-SHA256 (150 000 iterations, random salt). Failed attempts persist across restarts, escalating lockout 30 s → 5 min → 1 h. Turning it off needs the PIN. Locks after 1 min in the background. | App | app_lock_test (RFC 7914 vectors), in-use "App lock" ×3 | Testing |
+| Device verification, key backup | WhatsApp, Signal | Emoji verification (SAS), recovery key (SSSS) | Protocol | none yet | Gap: needs a second device of the same user in the test |
 
 ## Sources
 - WhatsApp edit window, 15 min: [TechCrunch](https://techcrunch.com/2023/05/22/whatsapp-now-lets-you-edit-messages-with-a-15-minute-time-limit)

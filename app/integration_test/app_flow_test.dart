@@ -230,6 +230,75 @@ void main() {
       await wait(1); await t.pageBack(); await wait(1); await t.pageBack();
     });
 
+    // ---------------- remaining messaging and security features ----------------
+    Future<void> home() async { for (var i = 0; i < 5 && find.text('Activity').evaluate().isEmpty; i++) { await t.pageBack(); await wait(1); } }
+    Future<void> chatInfo() async { await openChat(); await tap(find.byType(PopupMenuButton<String>).last, 'chat menu'); await tap(find.text('Chat info'), 'Chat info'); }
+    Future<String> docker(List<String> a) async => ((await Process.run('docker', a)).stdout as String).trim();
+
+    await step('Typing indicator', () async {
+      await home(); await openChat(); await sendText('bob: type');
+      expectFound(await waitFor(find.textContaining('is typing…'), secs: 20), '"Bob Tester is typing…"');
+    });
+    await step('Mention reaches Activity', () async {
+      await sendText('bob: mention me');
+      expectFound(await waitFor(find.textContaining('please review the plan'), secs: 30), 'mention message');
+      await home(); await tap(find.text('Activity'), 'Activity tab');
+      expectFound(await waitFor(find.textContaining('mentioned you'), secs: 20), 'mention in Activity');
+    });
+    await step('Forward a message', () async {
+      await home(); await openChat();
+      await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
+      await tap(find.text('Forward'), 'Forward');
+      await tap(find.descendant(of: find.byType(SimpleDialog), matching: find.text('Bob Tester')), 'target chat');
+      expectFound(await waitFor(find.textContaining('Forwarded to'), secs: 10), 'Forwarded confirmation');
+    });
+    await step('Failed send shows ⚠ and Retry delivers it', () async {
+      final id = await docker(['ps', '-q', '--filter', 'name=synapse']);
+      if (id.isEmpty) throw StateError('synapse container not found');
+      await docker(['pause', id]);
+      try {
+        await sendText('sent while the server was down');
+        expectFound(await waitFor(find.textContaining('Not sent'), secs: 90), '⚠ Not sent');
+        await shot('failed-send');
+      } finally { await docker(['unpause', id]); }
+      await wait(5);
+      await tap(find.textContaining('Not sent'), 'Not sent · tap');
+      await tap(find.text('Retry'), 'Retry');
+      for (var i = 0; i < 60 && find.textContaining('Not sent').evaluate().isNotEmpty; i++) { await wait(1); }
+      if (find.textContaining('Not sent').evaluate().isNotEmpty) throw StateError('still not sent after retry');
+    });
+    await step('Block: no messages or calls from Bob', () async {
+      await home(); await sendText('bob: in 20s say hi'); await sendText('bob: in 20s call me');
+      await chatInfo(); await tap(find.text('Block contact'), 'Block contact');
+      expectFound(await waitFor(find.text('Blocked')), 'Blocked confirmation');
+      await home(); await openChat();
+      await wait(35);
+      if (find.text('hello while blocked').evaluate().isNotEmpty) throw StateError('message from blocked user was shown');
+      if (find.text('Accept').evaluate().isNotEmpty) throw StateError('call from blocked user rang');
+    });
+    await step('Unblock', () async {
+      await chatInfo(); await tap(find.text('Unblock contact'), 'Unblock contact');
+      expectFound(await waitFor(find.text('Unblocked')), 'Unblocked confirmation');
+      await home();
+    });
+    await step('App lock: set PIN', () async {
+      await home(); await tap(find.text('Security'), 'Security tab');
+      await tap(find.text('App lock'), 'App lock switch');
+      await type(field('PIN (4–8 digits)'), '4826', 'PIN'); await type(field('Repeat PIN'), '4826', 'repeat PIN');
+      await tap(find.text('Set'), 'Set');
+      expectFound(await waitFor(find.textContaining('App lock on'), secs: 30), 'App lock on');
+    });
+    await step('App lock: wrong PIN cannot turn it off', () async {
+      await wait(4); await tap(find.text('App lock'), 'App lock switch');
+      await type(field('Current PIN'), '0000', 'current PIN'); await tap(find.text('Turn off'), 'Turn off');
+      expectFound(await waitFor(find.text('Wrong PIN'), secs: 30), 'Wrong PIN');
+    });
+    await step('App lock: correct PIN turns it off', () async {
+      await wait(4); await tap(find.text('App lock'), 'App lock switch');
+      await type(field('Current PIN'), '4826', 'current PIN'); await tap(find.text('Turn off'), 'Turn off');
+      expectFound(await waitFor(find.text('App lock off'), secs: 30), 'App lock off');
+    });
+
     FlutterError.onError = prevOnError;
     results.add({'step': 'No app errors during the run', 'pass': appErrors.isEmpty, 'error': appErrors.toSet().join(' || ')});
     File('$shots/results.json').writeAsStringSync(const JsonEncoder.withIndent(' ').convert(results));

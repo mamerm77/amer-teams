@@ -103,6 +103,16 @@ class _S extends State<SecurityScreen> {
     await AppLock.setPin(a.text); setState(() => lockOn = true); _msg('App lock on: the app asks for your PIN after 1 minute in the background');
   }
 
+  Future<void> _disableLock() async {
+    final p = TextEditingController();
+    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Turn off app lock'),
+      content: TextField(controller: p, obscureText: true, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Current PIN')),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Turn off'))]));
+    if (ok != true) return;
+    if (await AppLock.disable(p.text)) { setState(() => lockOn = false); _msg('App lock off'); }
+    else { final w = await AppLock.waitSeconds(); _msg(w > 0 ? 'Too many attempts. Try again in $w s' : 'Wrong PIN'); }
+  }
+
   @override Widget build(BuildContext ctx) {
     final mine = c.userDeviceKeys[c.userID]?.deviceKeys ?? {};
     final crossSigned = c.encryption?.crossSigning.enabled ?? false;
@@ -126,7 +136,7 @@ class _S extends State<SecurityScreen> {
       }(),
       const Divider(),
       SwitchListTile(secondary: const Icon(Icons.pin), title: const Text('App lock'), subtitle: const Text('Ask for a PIN when you return to the app'),
-        value: lockOn ?? false, onChanged: (v) async { if (v) { await _setPin(); } else { await AppLock.clear(); setState(() => lockOn = false); } }),
+        value: lockOn ?? false, onChanged: (v) async { if (v) { await _setPin(); } else { await _disableLock(); } }),
     ])));
   }
 }
