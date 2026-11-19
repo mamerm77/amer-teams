@@ -42,7 +42,7 @@ Each built feature has a doc listing its open gaps.
 | AI call handling for phone lines | Partial: inbound calls to the company line reach a hunt group with first-to-answer; the AI receptionist needs server speech-to-text and text-to-speech, not deployed (PHONE_DIALIN.md) |
 | Room devices and booking | Built: booking with no double booking (database constraint), private titles, check-in and no-show release, paired room display; tested 12/12 (ROOMS.md) |
 | Frontline shifts and walkie-talkie | Built: manager-published shifts, no overlaps, clock in/out, approved swaps (tested 8/8); encrypted push-to-talk with floor control; no background PTT (FRONTLINE.md) |
-| DLP and inherited sensitivity labels | Partial: chat labels block AI (Guardian); DLP not started |
+| DLP and inherited sensitivity labels | Built: labels inherited from the team, labels travel with forwards (no downgrade), on-device DLP in every chat (LABELS.md) |
 
 ## Creative (15)
 | # | Feature | Status |
@@ -72,7 +72,7 @@ Each built feature has a doc listing its open gaps.
 | Translate on tap | Partial: label-aware and cached, via the AI engine |
 | Bookmarks and folders | Built: saved messages in your own folders (create, move, filter, delete), synced through account data |
 | Announcements with acknowledgement | Built |
-| Retention and auto-delete timers | Built (1 day to 7 years, server purge, banner); legal hold not started |
+| Retention and auto-delete timers | Built (1 day to 7 years, server purge, banner); legal hold built: Synapse refuses deletions and retention changes, archive purge skips held items; tested 6/6 (LABELS.md) |
 | Slash commands | Built |
 | Meeting templates with agenda timer | Built: shared timer, 80% warning, parking lot (MEETING_AGENDA.md) |
 | Browser join for guests | Built: /join page, lobby, call key wrapped to the guest's one-time key; a real Chromium decrypts real E2EE video locally (GUESTS.md) |

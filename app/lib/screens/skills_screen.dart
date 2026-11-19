@@ -1,3 +1,4 @@
+import '../services/labels.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -51,7 +52,7 @@ class _S extends State<SkillsScreen> {
       ]),
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Run'))]));
     if (ok != true || !mounted) return;
-    final label = widget.room?.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+    final label = widget.room == null ? null : labelOf(widget.room!);
     try {
       final res = await context.read<ApiService>().postMap('/v1/skills/${s['id']}/run', {'values': {for (final e in ctrls.entries) e.key: e.value.text}, 'context': widget.context ?? '',
         'labels': [if (label != null) label], 'encrypted': widget.room?.encrypted ?? false});

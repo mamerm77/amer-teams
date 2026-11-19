@@ -1,3 +1,4 @@
+import '../services/labels.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -47,7 +48,7 @@ class _S extends State<InPersonScreen> {
     if (lines.isEmpty) { _snack('Nothing was transcribed'); return; }
     final g = aiFor(r); if (!g.allowed) { _snack(g.where); return; }
     setState(() => busy = true);
-    final api = context.read<ApiService>(); final label = r.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+    final api = context.read<ApiService>(); final label = labelOf(r);
     try {
       final outline = agenda.text.trim().isEmpty ? '' : 'Agenda (use it as the outline): ${agenda.text.trim()}\n';
       final m = await api.ask('Write minutes for this in-person meeting. Speakers are labelled as the note-taker marked them.', context: '$outline$transcript', agent: 'minutes', labels: [if (label != null) label], encrypted: r.encrypted);

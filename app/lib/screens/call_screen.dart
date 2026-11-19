@@ -1,3 +1,4 @@
+import '../services/labels.dart';
 import 'dart:math' show min, Random;
 import '../services/accessibility.dart';
 import 'package:flutter/semantics.dart';
@@ -387,7 +388,7 @@ class _S extends State<CallScreen> {
     try {
       final people = room.getParticipants().where((u) => u.membership == mx.Membership.join).toList();
       final r = await api.ask('From this meeting, reply ONLY with JSON {"decisions":[{"text":str,"owner":name}],"actions":[{"title":str,"owner":name,"due_days":int}]}. Use only what was said. Names must be from: ${people.map((u) => u.calcDisplayname()).join(', ')}.',
-          context: transcript, agent: 'assist', labels: [if (room.getState('com.amerteams.sensitivity')?.content['label'] != null) '${room.getState('com.amerteams.sensitivity')!.content['label']}'], encrypted: room.encrypted);
+          context: transcript, agent: 'assist', labels: [if (labelOf(room) != null) labelOf(room)!], encrypted: room.encrypted);
       final m = RegExp(r'\{.*\}', dotAll: true).firstMatch('${r['answer']}'); if (m == null) return;
       final j = jsonDecode(m.group(0)!) as Map;
       String? who(Object? n) => people.where((u) => u.calcDisplayname().toLowerCase() == '$n'.toLowerCase()).firstOrNull?.id;
@@ -420,7 +421,7 @@ class _S extends State<CallScreen> {
       final ag = agenda; final outline = ag == null ? '' : 'Agenda (use it as the outline): ${(ag['items'] as List).map((x) => x['t']).join('; ')}\nParking lot: ${parking.join('; ')}\n';
       final api = context.read<ApiService>();
       if (!aiFor(room).allowed) { if (mounted) Navigator.pop(context); return; }
-      final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+      final label = labelOf(room);
       final r = await api.ask('Write minutes', context: '$outline$full', agent: 'minutes', labels: [if (label != null) label], encrypted: room.encrypted);
       await room.sendTextEvent('📝 Minutes by Amer\n\n${r['answer']}');
       if (r['error'] != true && r['blocked'] != true) await _followUp(api, '$outline$full');
@@ -540,7 +541,7 @@ class _S extends State<CallScreen> {
     try {
       while (_tq.isNotEmpty && capLang != null && mounted) {
         final (who, text) = _tq.removeAt(0);
-        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final label = labelOf(room);
         final r = await context.read<ApiService>().ask('Translate this meeting caption to $capLang. Reply with the translation only.', context: text, agent: 'trans', labels: [if (label != null) label], encrypted: room.encrypted);
         if (!mounted) return;
         if (r['blocked'] == true) { setState(() { capLang = null; }); _snack('${r['answer']}'); return; }
@@ -696,7 +697,7 @@ class _S extends State<CallScreen> {
     String at(int ts) { final s = (ts - recStart.millisecondsSinceEpoch) ~/ 1000; return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}'; }
     final text = span.map((l) => '[${at(l['ts'] as int)}] ${l['speaker']}: ${l['text']}').join('\n');
     try {
-      final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+      final label = labelOf(room);
       final r = await context.read<ApiService>().ask('Make a video recap of this recorded meeting. Reply ONLY with JSON {"summary": str (3 sentences), "chapters": [{"at": "mm:ss", "title": str}]}. 3 to 10 chapters, at topic changes, using the [mm:ss] times given. British English.',
           context: text, agent: 'summ', labels: [if (label != null) label], encrypted: room.encrypted);
       final m = RegExp(r'\{.*\}', dotAll: true).firstMatch('${r['answer']}'); if (m == null) return;

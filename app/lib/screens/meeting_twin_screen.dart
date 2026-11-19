@@ -1,3 +1,4 @@
+import '../services/labels.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -37,7 +38,7 @@ class _S extends State<MeetingTwinScreen> {
     final ctx = [for (final m in minutes.reversed) '=== ${m.originServerTs.toIso8601String().substring(0, 10)} ===\n${m.body}',
       '=== Decisions ===', for (final d in decisions) '${d.originServerTs.toIso8601String().substring(0, 10)}: ${d.content['text']}',
       '=== Actions ===', for (final t in tasks) '${t.title} · ${t.status}${t.due != null ? ' · due ${t.due!.toIso8601String().substring(0, 10)}' : ''}'].join('\n');
-    final label = widget.room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+    final label = labelOf(widget.room);
     try {
       final r = await context.read<ApiService>().ask('${q.text}\nAnswer from this meeting series\' history only, and cite the meeting date for each point. Say so if the history does not say.',
           context: ctx.length > 50000 ? ctx.substring(ctx.length - 50000) : ctx, agent: 'assist', labels: [if (label != null) label], encrypted: widget.room.encrypted);

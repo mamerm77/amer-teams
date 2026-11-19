@@ -1,3 +1,4 @@
+import '../services/labels.dart';
 import 'files_screen.dart';
 import '../services/private_notes.dart';
 import 'meeting_twin_screen.dart';
@@ -196,7 +197,7 @@ class _S extends State<ChatScreen> {
       case '/ask':
         if (arg.isEmpty) { _snack('Write a question after /ask'); return true; }
         final g = aiFor(room); if (!g.allowed) { _snack(g.where); return true; }
-        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final label = labelOf(room);
         final ctx = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(30).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
         try {
           final r = await context.read<ApiService>().ask(arg, context: 'Recent messages in this chat:\n$ctx', labels: [if (label != null) label], encrypted: room.encrypted);
@@ -213,7 +214,7 @@ class _S extends State<ChatScreen> {
   /// Pre-mortem agent (docs/PREMORTEM.md): risks only you see first; share them or turn mitigations into tasks.
   Future<void> _premortem(String plan) async {
     final g = aiFor(room); if (!g.allowed) { _snack(g.where); return; }
-    final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+    final label = labelOf(room);
     final ctx = plan.isNotEmpty ? plan : (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(40).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
     if (ctx.trim().isEmpty) { _snack('Write the plan after /premortem'); return; }
     _snack('Amer is imagining how this could fail…');
@@ -271,6 +272,14 @@ class _S extends State<ChatScreen> {
           content: Text('This channel is shared with another organisation, and your message contains a ${hits.map((h) => h.kind).toSet().join(' and a ')}. Remove it, or share it another way.'),
           actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Edit message'))]));
         return;                                                    // the text stays in the box
+      }
+    } else {
+      final hits = dlpScan(t); final l = labelOf(room);
+      if (hits.isNotEmpty && l?.toLowerCase() != 'restricted') {                  // docs/LABELS.md: personal and payment data belong in Restricted chats
+        final go = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Sensitive data'),
+          content: Text('Your message contains a ${hits.map((h) => h.kind).toSet().join(' and a ')}. This chat is ${l == null ? 'not labelled' : 'labelled $l'}. Such data should go only in a Restricted chat.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Edit message')), TextButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send anyway'))]));
+        if (go != true) return;
       }
     }
     input.clear();
@@ -425,7 +434,7 @@ class _S extends State<ChatScreen> {
     final text = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(80).toList().reversed
         .map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${e.body}').join('\n');
     final g = aiFor(room); if (!g.allowed) { _snack(g.where); return; }
-    final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;    // Guardian blocks Confidential/Restricted
+    final label = labelOf(room);    // Guardian blocks Confidential/Restricted
     final r = await context.read<ApiService>().ask('Summarise this thread', context: text, agent: 'summ', labels: [if (label != null) label], encrypted: room.encrypted);
     if (!mounted) return;
     showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -480,14 +489,17 @@ class _S extends State<ChatScreen> {
       final to = await showDialog<Room>(context: context, builder: (d) => SimpleDialog(title: const Text('Forward to'), children: [
         for (final r in rooms) SimpleDialogOption(onPressed: () => Navigator.pop(d, r), child: Text(r.getLocalizedDisplayname()))]));
       if (to != null) {
+        final block = forwardBlock(e, to);
+        if (block != null) { _snack(block); return; }
         final content = Map<String, Object?>.from(e.content)..remove('m.relates_to')..remove('m.new_content');
+        final l = labelOfEvent(e); if (l != null) content[kLabelKey] = l;          // the label travels with it
         await to.sendEvent(content, type: e.type == EventTypes.Encrypted ? EventTypes.Message : e.type);   // file keys travel inside, re-encrypted
         _snack('Forwarded to ${to.getLocalizedDisplayname()}');
       }
     }
     if ((a == 'translate' || a == 'suggest') && mounted) {
       try {
-        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final label = labelOf(room);
         final gate = aiFor(room, small: true);
         if (!gate.allowed) { _snack(gate.where); return; }
         final r = a == 'translate' && _translated.containsKey(e.eventId) ? {'answer': _translated[e.eventId]}

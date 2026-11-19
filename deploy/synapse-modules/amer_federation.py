@@ -26,6 +26,7 @@ class AmerFederation:
             api.register_spam_checker_callbacks(check_event_for_spam=self.check_event_for_spam,
                 user_may_create_room=self.user_may_create_room, user_may_invite=self.user_may_invite, user_may_join_room=self.user_may_join_room)
         self._guests: set[str] = set(); self._gat = 0.0
+        self._holds: dict = {"rooms": set(), "users": set()}; self._hat = 0.0
 
     @staticmethod
     def parse_config(config): return config
@@ -69,7 +70,24 @@ class AmerFederation:
     async def user_may_join_room(self, user_id: str, room_id: str, is_invited: bool):
         return self._no() if (user_id in await self.guests() and not is_invited) else self._ok()
 
+    # ---- legal hold (docs/LEGAL_HOLD.md): no redactions and no retention changes in held rooms or by held people ----
+    async def holds(self) -> dict:
+        if time.time() - self._hat < self.ttl: return self._holds
+        try:
+            j = await self.api.http_client.get_json(f"{self.url}/v1/federation/holds", headers={"X-Amer-Federation": [self.secret]})
+            self._holds = {"rooms": set(j.get("rooms", [])), "users": set(j.get("users", []))}; self._hat = time.time()
+        except Exception:
+            self._hat = time.time() - self.ttl + 2
+        return self._holds
+
+    async def _held(self, event) -> bool:
+        t = getattr(event, "type", "")
+        if t not in ("m.room.redaction", "m.room.retention"): return False
+        h = await self.holds()
+        return getattr(event, "room_id", "") in h["rooms"] or (getattr(event, "sender", "") in h["users"] and t == "m.room.redaction")
+
     async def check_event_allowed(self, event, state_events):
+        if await self._held(event): return False, None
         sender = getattr(event, "sender", "") or ""
         origin = sender.split(":", 1)[1] if ":" in sender else ""
         if not origin or origin == self.server: return True, None

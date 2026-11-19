@@ -73,5 +73,46 @@ async def purge_once() -> int:
         async with c.transaction():
             await c.execute("SET LOCAL amer.purge = 'on'")
             cur = await c.execute("""DELETE FROM compliance_archive a USING tenants t
-                                     WHERE a.tenant = t.tenant AND a.ts < now() - make_interval(days => t.retention_days)""")
+                                     WHERE a.tenant = t.tenant AND a.ts < now() - make_interval(days => t.retention_days)
+                                       AND NOT EXISTS (SELECT 1 FROM legal_holds h WHERE h.released_at IS NULL
+                                                       AND ((h.scope = 'room' AND h.target = a.room_id) OR (h.scope = 'user' AND h.target = a.sender)))""")
             return cur.rowcount
+
+
+# ---------- legal hold (docs/LEGAL_HOLD.md) ----------
+import secrets, hmac
+from fastapi import Header
+from pydantic import BaseModel, Field
+from .partners import MODULE_SECRET
+
+class Hold(BaseModel):
+    scope: str = Field(pattern="^(room|user)$")
+    target: str = Field(min_length=3, max_length=255)
+    matter: str = Field(min_length=3, max_length=120)
+
+@router.post("/v1/admin/legal-holds")
+async def place_hold(req: Hold, admin=Depends(require_admin)):
+    hid = f"lh_{secrets.token_hex(5)}"
+    async with db.pool.connection() as c:
+        await c.execute("INSERT INTO legal_holds (id, scope, target, matter, placed_by) VALUES (%s,%s,%s,%s,%s)", (hid, req.scope, req.target, req.matter, admin["user_id"]))
+    await db.audit(admin["user_id"], "legal_hold.place", f"{hid}|{req.scope}|{req.target}|{req.matter}")
+    return {"id": hid}
+
+@router.post("/v1/admin/legal-holds/{hid}/release")
+async def release_hold(hid: str, admin=Depends(require_admin)):
+    async with db.pool.connection() as c:
+        r = await c.execute("UPDATE legal_holds SET released_by=%s, released_at=now() WHERE id=%s AND released_at IS NULL", (admin["user_id"], hid))
+    if not r.rowcount: raise HTTPException(404, "No active hold with that id")
+    await db.audit(admin["user_id"], "legal_hold.release", hid); return {"released": True}
+
+@router.get("/v1/admin/legal-holds")
+async def list_holds(admin=Depends(require_admin)):
+    rows = await _rows("SELECT id, scope, target, matter, placed_by, extract(epoch from placed_at)::bigint, released_by, extract(epoch from released_at)::bigint FROM legal_holds ORDER BY placed_at DESC")
+    return [dict(zip(("id", "scope", "target", "matter", "placed_by", "placed_at", "released_by", "released_at"), r)) for r in rows]
+
+@router.get("/v1/federation/holds")
+async def holds_for_module(x_amer_federation: str = Header("")):
+    """For the Synapse module: active holds, so it refuses deletions and retention changes there."""
+    if not MODULE_SECRET or not hmac.compare_digest(x_amer_federation, MODULE_SECRET): raise HTTPException(401, "Not the Synapse module")
+    rows = await _rows("SELECT scope, target FROM legal_holds WHERE released_at IS NULL")
+    return {"rooms": [t for s, t in rows if s == "room"], "users": [t for s, t in rows if s == "user"]}

@@ -1,3 +1,4 @@
+import 'labels.dart';
 import 'package:matrix/matrix.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -39,7 +40,7 @@ class CatchUp {
   Future<List<Map<String, Object?>>> collect() async {
     final out = <Map<String, Object?>>[];
     for (final r in client.rooms.where((r) => r.membership == Membership.join && (r.notificationCount > 0 || r.markedUnread))) {
-      final label = r.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+      final label = labelOf(r);
       final withheld = label != null && _withheld.contains(label.toLowerCase());
       final msgs = <Map<String, Object?>>[];
       if (!withheld) {
