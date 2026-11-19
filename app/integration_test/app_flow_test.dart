@@ -292,6 +292,15 @@ void main() {
       expectFound(await waitFor(find.text('Ring ready for traffic'), secs: 30), 'merged text from both editors');
       await t.pageBack(); await wait(1); await t.pageBack(); await wait(1);
     });
+    await step('Glass box: an agent\'s message waits for approval, then the app sends exactly that', () async {
+      await home(); await openChat(); await sendText('bob: agent asks to send');
+      await home(); await tap(find.text('Amer'), 'Amer tab'); await tap(find.text('My agents'), 'My agents');
+      expectFound(await waitFor(find.textContaining('wants to send a message'), secs: 40), 'approval card');
+      expectFound(find.text('Hello from your agent team').evaluate().isNotEmpty, 'preview of the exact text');
+      await tap(find.text('Approve'), 'Approve');
+      await home(); await openChat();
+      expectFound(await waitFor(find.text('Hello from your agent team'), secs: 60), 'message sent by the app after approval');
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

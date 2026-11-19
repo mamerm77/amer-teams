@@ -74,9 +74,9 @@ class PgStore:
     async def create_project(self, p: dict) -> None:
         async with self.pool.connection() as c:
             await c.execute(
-                "INSERT INTO agentops_projects (project_id, name, prompt, workdir, replay, created_by) "
-                "VALUES (%s,%s,%s,%s,%s,%s)",
-                (p["project_id"], p["name"], p["prompt"], p.get("workdir"), p.get("replay", False), p["created_by"]))
+                "INSERT INTO agentops_projects (project_id, name, prompt, workdir, replay, created_by, scope) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s)",
+                (p["project_id"], p["name"], p["prompt"], p.get("workdir"), p.get("replay", False), p["created_by"], p.get("scope", "org")))
 
     async def finish_project(self, pid: str, status: str, cost: float | None) -> None:
         async with self.pool.connection() as c:
@@ -110,10 +110,10 @@ class PgStore:
         async with self.pool.connection() as c:
             rows = await (await c.execute(
                 "SELECT project_id, name, prompt, workdir, status, replay, created_by, cost_usd, "
-                "extract(epoch from started_at), extract(epoch from finished_at) "
+                "extract(epoch from started_at), extract(epoch from finished_at), scope "
                 "FROM agentops_projects ORDER BY started_at DESC LIMIT %s", (limit,))).fetchall()
         keys = ["project_id", "name", "prompt", "workdir", "status", "replay", "created_by",
-                "cost_usd", "started_at", "finished_at"]
+                "cost_usd", "started_at", "finished_at", "scope"]
         return [dict(zip(keys, r)) for r in rows]
 
     async def mark_interrupted(self) -> None:

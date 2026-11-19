@@ -5,6 +5,7 @@ Behaviour (driven by what the app's user 'moh' does, or by text commands moh sen
 - replies "pong from Bob" to "ping"; sends read receipts for everything
 - calls (protocol v2): sends ringing, then answers, publishes a 440 Hz tone, stays until hang-up
 - "bob: decline next" / "bob: busy next" / "bob: ignore next" change how the next call is handled
+- "bob: agent asks to send": a personal agent asks (through the real glass box) to send a message as moh
 - "bob: in 8s post updates": three unread messages (one mentions moh) for the catch-up digest
 - "bob: call me" / "bob: video call me": bob calls moh
 Writes a log of everything it saw to $PEER_LOG for the test report.
@@ -88,6 +89,22 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: agent asks to send"):          # the real glass_box() in the orchestrator, no LLM
+            script = (
+                "import asyncio\nfrom app import db\nfrom app.agentops import personal as P\n"
+                "class R:\n    id='pp-ci'; created_by='@moh:amer.test'\n    async def emit(self, *a, **k): pass\n"
+                "async def main():\n    await db.connect()\n"
+                f"    print('GLASSBOX', await P.glass_box(R(), 'scheduler', 'send_message', {{'room_id': '{self.room}', 'text': 'Hello from your agent team'}}, "
+                "{'kind': 'message', 'plan': 'CI check of the glass box', 'target': 'Bob Tester', 'text': 'Hello from your agent team'}), flush=True)\n"
+                "asyncio.run(main())\n")
+            async def run_box():
+                cid = (await (await asyncio.create_subprocess_exec("docker", "ps", "-q", "--filter", "name=orchestrator", stdout=asyncio.subprocess.PIPE)).communicate())[0].decode().split()
+                if not cid: log("glassbox: orchestrator container not found"); return
+                p = await asyncio.create_subprocess_exec("docker", "exec", "-i", cid[0], "python", "-", stdin=asyncio.subprocess.PIPE,
+                                                         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+                out = (await p.communicate(script.encode()))[0].decode()
+                log("glassbox", out.strip()[-400:])
+            asyncio.create_task(run_box())
         elif b.startswith("bob: canvas add "):                 # edit the latest canvas with the Python CRDT
             d = self.canvases.get(self.last_canvas)
             texts = [e for e in (d.visible("blocks") if d else []) if e["val"] in ("p", "h")]

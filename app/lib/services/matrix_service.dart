@@ -161,9 +161,9 @@ class MatrixService extends ChangeNotifier {
   }
 
   // ---------- Meetings: encrypted timeline events, aggregated into the calendar ----------
-  Future<void> sendMeeting(Room room, {required String title, required DateTime start, required int minutes}) =>
-      room.sendEvent({'meeting_id': DateTime.now().microsecondsSinceEpoch.toRadixString(36), 'title': title,
-          'start': start.toUtc().toIso8601String(), 'duration_min': minutes, 'body': '📅 $title'}, type: 'com.amerteams.meeting');
+  Future<void> sendMeeting(Room room, {required String title, required DateTime start, required int minutes, String? txid}) =>
+      room.sendEvent({'meeting_id': txid ?? DateTime.now().microsecondsSinceEpoch.toRadixString(36), 'title': title,
+          'start': start.toUtc().toIso8601String(), 'duration_min': minutes, 'body': '📅 $title'}, type: 'com.amerteams.meeting', txid: txid);
 
   Future<List<Meeting>> meetings() async {
     final out = <Meeting>[];

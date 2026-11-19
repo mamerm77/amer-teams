@@ -7,6 +7,7 @@ import asyncio
 from . import auth, livekit_token, agents, config, ops, db, admin, sip, meetings, calltrace, compliance, digest, meeting_ai, workflows
 from .admin import require_admin
 from .agentops.router import router as agentops_router
+from .agentops.personal import router as personal_router, store as approvals_store
 from .agentops import store as agentops_store
 
 app = FastAPI(title="Amer Teams Orchestrator", version="0.5.0")
@@ -20,6 +21,7 @@ app.include_router(digest.router)
 app.include_router(meeting_ai.router)
 app.include_router(workflows.router)
 app.include_router(agentops_router)
+app.include_router(personal_router)
 
 @app.on_event("startup")
 async def _start():
@@ -30,6 +32,8 @@ async def _start():
     asyncio.create_task(calltrace.retention_loop())
     s = agentops_store.store()
     if hasattr(s, "mark_interrupted"): await s.mark_interrupted()
+    try: await approvals_store().cancel_waiting()          # a restart ends waiting sessions: their approvals are cancelled
+    except Exception: pass
 REQ = Counter("amer_agent_requests_total", "Agent requests", ["agent"])
 LAT = Histogram("amer_agent_latency_seconds", "Agent latency", ["agent"])
 ERR = Counter("amer_agent_errors_total", "Agent requests that failed", ["agent"])

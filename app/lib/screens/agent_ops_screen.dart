@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import 'personal_agents_screen.dart';
 
 /// Agent Ops: a team of AI agents delivering a project, shown live.
 /// Everything on this screen is drawn from events the orchestrator streams from the
@@ -135,6 +136,7 @@ class _S extends State<AgentOpsScreen> with SingleTickerProviderStateMixin {
     final p = _cur; final wide = MediaQuery.sizeOf(c).width > 900;
     return Scaffold(
       appBar: AppBar(title: const Text('Agent Ops'), actions: [
+        TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('My agents'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
         if (order.isNotEmpty) SizedBox(width: wide ? 260 : 130, child: DropdownButton<String>(isExpanded: true, value: selected, underline: const SizedBox(), hint: const Text('Project'),
           items: [for (final id in order) DropdownMenuItem(value: id, child: Text(projects[id]!.name.isEmpty ? id : projects[id]!.name, overflow: TextOverflow.ellipsis))],
           onChanged: (v) => setState(() { selected = v; follow = false; }))),

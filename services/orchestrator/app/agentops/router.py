@@ -50,9 +50,16 @@ async def team(user=Depends(auth.matrix_user)):
            [{"id": k, "name": k.capitalize(), "description": a.description, "model": a.model} for k, a in TEAM.items()]
 
 
+async def hidden(user) -> set[str]:
+    """Personal projects are visible only to their owner (goal, messages and deliverables are theirs)."""
+    return {p["project_id"] for p in await S.store().list_projects(500)
+            if p.get("scope") == "personal" and p["created_by"] != user["user_id"]}
+
+
 @router.get("/projects")
 async def projects(user=Depends(auth.matrix_user)):
-    out = await S.store().list_projects()
+    h = await hidden(user)
+    out = [p for p in await S.store().list_projects() if p["project_id"] not in h]
     for p in out:
         p["running_here"] = p["project_id"] in RUNS and not RUNS[p["project_id"]].done()
     return out
@@ -114,20 +121,29 @@ async def replay(req: ReplayReq, user=Depends(require_admin)):
 
 @router.get("/events")
 async def events(after: int = 0, project_id: str | None = None, user=Depends(auth.matrix_user)):
-    return await S.store().since(after, project_id)
+    h = await hidden(user)
+    if project_id in h: raise HTTPException(404, "No such project")
+    return [e for e in await S.store().since(after, project_id) if e["project_id"] not in h]
 
 
 @router.get("/stream")
 async def stream(request: Request, after: int = 0, project_id: str | None = None,
                  user=Depends(auth.matrix_user)):
     """Server-Sent Events. Reads the shared event table, so it works behind any replica."""
+    h = await hidden(user)
+    if project_id in h: raise HTTPException(404, "No such project")
+
     async def gen():
-        last, idle = after, 0.0
+        nonlocal h
+        last, idle, n = after, 0.0, 0
         yield "retry: 2000\n\n"
         while not await request.is_disconnected():
             batch = await S.store().since(last, project_id, limit=500)
+            n += 1
+            if n % 20 == 0: h = await hidden(user)             # projects started since the stream opened
             for e in batch:
                 last = e["seq"]
+                if e["project_id"] in h: continue
                 yield f"id: {last}\nevent: agentops\ndata: {json.dumps(e, ensure_ascii=False, default=str)}\n\n"
             if batch:
                 idle = 0.0

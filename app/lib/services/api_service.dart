@@ -37,6 +37,17 @@ class ApiService {
   /// Ask-the-meeting agent: question plus the last 20 minutes of the meeting's on-device transcript (docs/MEETING_AGENT.md).
   Future<Map<String, dynamic>> askMeeting(String callId, String roomId, String question, List<Map<String, Object?>> transcript) =>
       _post('/v1/meetings/${Uri.encodeComponent(callId)}/ask', {'room_id': roomId, 'question': question, 'transcript': transcript});
+  // ---------- Personal agents and the glass box (docs/PERSONAL_AGENTS.md) ----------
+  Future<Map<String, dynamic>> personalStart(String goal, List<Map<String, Object?>> attachments) => _post('/v1/agentops/personal', {'goal': goal, 'attachments': attachments});
+  Future<void> personalStop(String id) => _post('/v1/agentops/personal/${Uri.encodeComponent(id)}/stop', {});
+  Future<List<dynamic>> approvals() => _get('/v1/agentops/approvals');
+  Future<void> decideApproval(String id, String decision, {Map<String, Object?>? edited, String reason = ''}) =>
+      _post('/v1/agentops/approvals/${Uri.encodeComponent(id)}', {'decision': decision, 'edited_payload': edited, 'reason': reason});
+  Future<void> approvalDone(String id, String hash, {bool ok = true, String result = ''}) =>
+      _post('/v1/agentops/approvals/${Uri.encodeComponent(id)}/done', {'payload_hash': hash, 'ok': ok, 'result': result});
+  Future<Map<String, dynamic>> agentBudget() async => jsonDecode((await http.get(_u('/v1/agentops/budget'), headers: _h)).body);
+  Future<List<dynamic>> deliverables(String id) => _get('/v1/agentops/personal/${Uri.encodeComponent(id)}/deliverables');
+
   // ---------- Workflows (docs/WORKFLOWS.md) ----------
   Future<List<dynamic>> workflows() => _get('/v1/workflows');
   Future<Map<String, dynamic>> workflowDraft(String text, List<Map<String, String>> rooms) => _post('/v1/workflows/draft', {'text': text, 'rooms': rooms});
