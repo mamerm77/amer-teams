@@ -1,4 +1,4 @@
-import 'dart:math' show min;
+import 'dart:math' show min, Random;
 import '../services/accessibility.dart';
 import 'package:flutter/semantics.dart';
 import 'dart:async';
@@ -428,6 +428,39 @@ class _S extends State<CallScreen> {
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
 
+  // ---------- impersonation protection (docs/IDENTITY_CHECK.md) ----------
+  /// Media identities are Matrix user ids, admitted only with a token for a member of this encrypted chat. Whether
+  /// that account's devices are verified tells you how sure you can be the account is really theirs.
+  (IconData, Color, String) _idBadge(Participant p) {
+    final id = p.identity;
+    if (id.startsWith('guest-')) return (Icons.public, Colors.orange, 'Browser guest: not an Amer Teams account');
+    final keys = room.client.userDeviceKeys[id]?.deviceKeys.values.toList() ?? const <mx.DeviceKeys>[];
+    if (keys.isEmpty) return (Icons.help_outline, Colors.grey, 'Identity not checked: no device keys seen');
+    final v = keys.where((d) => d.verified).length;
+    return v == keys.length ? (Icons.verified_user, Colors.green, 'Verified: all of this person\'s devices are verified')
+        : v > 0 ? (Icons.gpp_maybe, Colors.amber, 'Partly verified: $v of ${keys.length} devices verified')
+        : (Icons.gpp_maybe, Colors.orange, 'Not verified: compare safety codes in their profile to verify');
+  }
+  static const _words = ['falcon', 'harbour', 'copper', 'saffron', 'meadow', 'lantern', 'orbit', 'pebble', 'cedar', 'violet', 'anchor', 'ember', 'glacier', 'marble', 'oasis', 'quartz',
+    'ripple', 'sparrow', 'timber', 'walnut', 'zephyr', 'basalt', 'canyon', 'dune', 'fjord', 'garnet', 'ivory', 'juniper', 'kestrel', 'lagoon', 'nectar', 'opal'];
+  /// Live check: a code sent end-to-end encrypted to the person's own account (their direct chat). Someone faking
+  /// their face or voice in this call cannot see it, so cannot read it out.
+  Future<void> _liveCheck(Participant p) async {
+    final r = Random.secure(); final code = List.generate(3, (_) => _words[r.nextInt(_words.length)]).join(' ');
+    try {
+      final dm = await room.client.startDirectChat(p.identity, enableEncryption: true);
+      final dmRoom = room.client.getRoomById(dm);
+      if (dmRoom == null || !dmRoom.encrypted) { _snack('No encrypted direct chat with ${p.name}'); return; }
+      await dmRoom.sendTextEvent('🛡️ Identity check from the meeting: please read these three words aloud in the call: "$code". If you are not in a meeting right now, someone may be impersonating you; tell your security team.');
+      if (!mounted) return;
+      await showDialog(context: context, builder: (d) => AlertDialog(title: Text('Live check: ${p.name}'),
+        content: Text('A code was sent, end-to-end encrypted, to ${p.name}\'s own account. Ask them to read it aloud.\n\nThey should say:\n\n"$code"\n\nIf they cannot, the person in the video may not be who they appear to be. Synthetic video and voice cannot be ruled out by looking alone.'),
+        actions: [TextButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': false}); _snack('Recorded: ${p.name} did not pass the check'); }, child: const Text('They could not')),
+                  FilledButton(onPressed: () { Navigator.pop(d); _send({'t': 'idcheck', 'who': p.identity, 'ok': true}); setState(() => idChecked.add(p.identity)); }, child: const Text('They read it correctly'))]));
+    } catch (e) { _snack('Could not send the check: $e'); }
+  }
+  final idChecked = <String>{};
+
   // ---------- network-aware calls (docs/NETWORK_AWARE.md) ----------
   String net = 'normal';                 // normal | saver | audio
   bool netAuto = true, netAutoSwitched = false; DateTime? _poorSince, _goodSince; bool _camBeforeAudio = false;
@@ -849,7 +882,9 @@ class _S extends State<CallScreen> {
         Positioned(left: 8, bottom: 8, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(color: cs.surface.withValues(alpha: .85), borderRadius: BorderRadius.circular(8)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            _qualityDot(p), const SizedBox(width: 4),
+            _qualityDot(p), const SizedBox(width: 2),
+            if (p is! LocalParticipant) () { final (ic, col, tip) = _idBadge(p); return Tooltip(message: idChecked.contains(p.identity) ? 'Passed a live check in this call' : tip, child: Icon(idChecked.contains(p.identity) ? Icons.how_to_reg : ic, size: 14, color: idChecked.contains(p.identity) ? Colors.green : col, semanticLabel: tip)); }(),
+            const SizedBox(width: 4),
             if (p.isMuted) const Icon(Icons.mic_off, size: 14), const SizedBox(width: 4),
             Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
           ]))),
@@ -881,7 +916,9 @@ class _S extends State<CallScreen> {
           trailing: FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: const Text('Admit')))],
         for (final p in people) ListTile(leading: CircleAvatar(child: Text(_initials(p.name.isEmpty ? p.identity : p.name))),
           title: Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
+          subtitle: p is LocalParticipant ? null : Text(idChecked.contains(p.identity) ? 'Passed a live check' : _idBadge(p).$3, style: const TextStyle(fontSize: 11)),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (p is! LocalParticipant && !p.identity.startsWith('guest-')) IconButton(tooltip: 'Live identity check', icon: const Icon(Icons.shield_outlined, size: 18), onPressed: () => _liveCheck(p)),
             if (hands.contains(p.name)) const Text('✋ '),
             Icon(p.isMuted ? Icons.mic_off : Icons.mic, size: 18), const SizedBox(width: 6),
             Icon(p.isCameraEnabled() ? Icons.videocam : Icons.videocam_off, size: 18),

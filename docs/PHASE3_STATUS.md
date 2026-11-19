@@ -38,7 +38,7 @@ Each built feature has a doc listing its open gaps.
 | Breakout rooms | Existing |
 | Live translated captions | Built: per-listener language, label-aware AI translation of shared captions, right-to-left lines; AI engine, not on device (TRANSLATED_CAPTIONS.md) |
 | Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
-| Deepfake detection | Not started |
+| Deepfake detection | Built as impersonation protection: per-tile identity badges from device verification, and a live challenge sent encrypted to the person's own account; no synthetic-media detector, by design (IDENTITY_CHECK.md) |
 | AI call handling for phone lines | Not started |
 | Room devices and booking | Built: booking with no double booking (database constraint), private titles, check-in and no-show release, paired room display; tested 12/12 (ROOMS.md) |
 | Frontline shifts and walkie-talkie | Built: manager-published shifts, no overlaps, clock in/out, approved swaps (tested 8/8); encrypted push-to-talk with floor control; no background PTT (FRONTLINE.md) |
