@@ -9,7 +9,7 @@ class _S extends State<OpsScreen> {
   Map<String, dynamic>? d; List alerts = []; String? err; Timer? t;
   @override void initState() { super.initState(); _load(); t = Timer.periodic(const Duration(seconds: 5), (_) => _load()); }
   @override void dispose() { t?.cancel(); super.dispose(); }
-  Future<void> _load() async { try { final api = context.read<ApiService>(); final r = await api.ops(); final a = await api.alerts(); setState(() { d = r; alerts = a; err = null; }); } catch (e) { setState(() => err = '$e'); } }
+  Future<void> _load() async { if (!mounted) return; final api = context.read<ApiService>(); try { final r = await api.ops(); final a = await api.alerts(); if (mounted) setState(() { d = r; alerts = a; err = null; }); } catch (e) { if (mounted) setState(() => err = '$e'); } }
 
   @override Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
