@@ -47,6 +47,7 @@ services:
       LIVEKIT_HTTP_URL: http://livekit:7880
       DATABASE_URL: postgresql://synapse:${POSTGRES_PASSWORD}@postgres:5432/amer
       ALERTMANAGER_URL: http://alertmanager:9093
+    volumes: [agentops:/data/agentops]     # Agent Ops project workspaces
     depends_on:
       postgres: {condition: service_healthy}
       synapse: {condition: service_started}
@@ -123,4 +124,4 @@ services:
     depends_on: [synapse, livekit, orchestrator, sygnal]
     restart: unless-stopped
 
-volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}}
+volumes: {pgdata: {}, redisdata: {}, caddydata: {}, promdata: {}, grafanadata: {}, agentops: {}}

@@ -11,16 +11,17 @@ import 'admin_screen.dart';
 import 'calls_screen.dart';
 import 'activity_screen.dart';
 import 'security_screen.dart';
+import 'agent_ops_screen.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> {
   int i = 0;
   static const _dest = [
     (Icons.notifications_none, 'Activity'), (Icons.chat_bubble_outline, 'Chat'), (Icons.call_outlined, 'Calls'), (Icons.groups_outlined, 'Teams'), (Icons.calendar_month, 'Calendar'),
-    (Icons.auto_awesome, 'Amer'), (Icons.tune, 'Control'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users'), (Icons.security, 'Security')];
+    (Icons.auto_awesome, 'Amer'), (Icons.hub_outlined, 'Agent Ops'), (Icons.tune, 'Control'), (Icons.monitor_heart_outlined, 'Health'), (Icons.manage_accounts_outlined, 'Users'), (Icons.security, 'Security')];
   @override
   Widget build(BuildContext c) {
-    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const ControlScreen(), const OpsScreen(), const AdminScreen(), const SecurityScreen()];
+    final pages = [const ActivityScreen(), const RoomsScreen(), const CallsScreen(), const TeamsScreen(), const CalendarScreen(), const CopilotScreen(), const AgentOpsScreen(), const ControlScreen(), const OpsScreen(), const AdminScreen(), const SecurityScreen()];
     final wide = MediaQuery.sizeOf(c).width > 720;
     final body = pages[i];
     if (wide) {

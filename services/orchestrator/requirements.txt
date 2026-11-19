@@ -8,3 +8,4 @@ psycopg-pool==3.3.3
 prometheus-client==0.26.0
 livekit-api==2.0.1
 pytest==9.2.0
+claude-agent-sdk==0.2.172

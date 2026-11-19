@@ -24,6 +24,7 @@ See **docs/TEST_REPORT.md** — 29/29 protocol, 26/26 registration and 14/14 fun
 | Teams | Teams with channels |
 | Phone | Calls to ordinary phone numbers through a company SIP trunk (admin enabled) |
 | AI | Amer co-pilot, thread summaries, translation, meeting minutes, scheduling |
+| Agent Ops | A team of AI agents (analyst, architect, developer, tester, reviewer, documenter) delivers a project while the **Agent Ops** tab shows each agent's real status live — see docs/AGENT_OPS.md |
 | Admin | Invite codes, create / reset / deactivate users, agent control, health and alerts |
 
 Everything except phone-network calls is end-to-end encrypted; call keys are post-quantum hybrid (ML-KEM-768).
