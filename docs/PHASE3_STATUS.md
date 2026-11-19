@@ -25,7 +25,7 @@ Each built feature has a doc listing its open gaps.
 |---|---|
 | Catch-up digest | Built (see top five) |
 | Agent inside a live meeting | Built (see top five) |
-| Video recap with chapters | Not started (needs recording) |
+| Video recap with chapters | Built: summary and timed chapters from captions, in the recording's thread; no seek-to-chapter (VIDEO_RECAP.md) |
 | Reusable AI skills and custom agents | Not started |
 | In-person meeting notes | Built: on-device transcription, speaker marking, AI minutes, decisions and tasks; no diarisation (IN_PERSON_NOTES.md) |
 | No-code workflows | Built |

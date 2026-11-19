@@ -629,10 +629,31 @@ class _S extends State<CallScreen> {
     final f = await recorder.stop(); rec.reset(); setState(() {});
     if (f == null) { _snack('The recording was empty'); return; }
     try {
-      await room.sendFileEvent(mx.MatrixVideoFile(bytes: await f.readAsBytes(), name: 'Meeting recording ${DateTime.now().toIso8601String().substring(0, 16)}.mp4', mimeType: 'video/mp4'));
+      final recStart = recorder.started ?? DateTime.now();
+      final evId = await room.sendFileEvent(mx.MatrixVideoFile(bytes: await f.readAsBytes(), name: 'Meeting recording ${DateTime.now().toIso8601String().substring(0, 16)}.mp4', mimeType: 'video/mp4'));
       await f.delete(); _snack('Recording shared in the chat, end-to-end encrypted ($why)');
+      if (evId != null) unawaited(_recap(evId, recStart));
     } catch (e) { _snack('Could not share the recording: $e'); }
   }
+  /// Video recap with chapters (docs/VIDEO_RECAP.md): from the meeting's captions during the recording, posted in the
+  /// recording's thread. Needs captions (Amer on, or your own captions); otherwise there is nothing to chapter.
+  Future<void> _recap(String recordingEvent, DateTime recStart) async {
+    final span = lines.where((l) => (l['ts'] as int) >= recStart.millisecondsSinceEpoch).toList();
+    if (span.length < 3 || !aiFor(room).allowed) return;
+    String at(int ts) { final s = (ts - recStart.millisecondsSinceEpoch) ~/ 1000; return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}'; }
+    final text = span.map((l) => '[${at(l['ts'] as int)}] ${l['speaker']}: ${l['text']}').join('\n');
+    try {
+      final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+      final r = await context.read<ApiService>().ask('Make a video recap of this recorded meeting. Reply ONLY with JSON {"summary": str (3 sentences), "chapters": [{"at": "mm:ss", "title": str}]}. 3 to 10 chapters, at topic changes, using the [mm:ss] times given. British English.',
+          context: text, agent: 'summ', labels: [if (label != null) label], encrypted: room.encrypted);
+      final m = RegExp(r'\{.*\}', dotAll: true).firstMatch('${r['answer']}'); if (m == null) return;
+      final j = jsonDecode(m.group(0)!) as Map;
+      final ch = [for (final c in (j['chapters'] as List? ?? const [])) if (RegExp(r'^\d{1,3}:\d{2}$').hasMatch('${c['at']}')) '${c['at']}  ${c['title']}'];
+      if (ch.isEmpty) return;
+      await room.sendTextEvent('🎬 Recap\n${j['summary'] ?? ''}\n\nChapters\n${ch.join('\n')}', threadRootEventId: recordingEvent, threadLastEventId: recordingEvent);
+    } catch (_) {}
+  }
+
   void _onRec(Map j, String from, String who) {
     final id = j['id'] as String?; final op = j['op'];
     if (op == 'ask' || op == 'ask-late') { if (!_recPrompt) _consentDialog(id!, who, op == 'ask-late'); return; }
