@@ -1,6 +1,6 @@
 import '../services/hijri.dart';
 import '../services/locale.dart';
-import 'rooms_screen.dart';
+import 'meeting_rooms_screen.dart';
 import 'in_person_screen.dart';
 import 'focus_screen.dart';
 import 'package:flutter/material.dart';
@@ -43,7 +43,7 @@ class _S extends State<CalendarScreen> {
   @override Widget build(BuildContext c) => Scaffold(
     appBar: AppBar(title: Text(L.t(context, 'Calendar')), actions: [
       if (Flags.instance.on('find_time')) TextButton.icon(icon: const Icon(Icons.manage_search), label: Text(L.t(context, 'Find a time')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
-      TextButton.icon(icon: const Icon(Icons.meeting_room_outlined), label: Text(L.t(context, 'Rooms')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const RoomsScreen()))),
+      TextButton.icon(icon: const Icon(Icons.meeting_room_outlined), label: Text(L.t(context, 'Rooms')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const MeetingRoomsScreen()))),
       TextButton.icon(icon: const Icon(Icons.record_voice_over), label: Text(L.t(context, 'In-person notes')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const InPersonScreen()))),
       TextButton.icon(icon: const Icon(Icons.headphones), label: Text(L.t(context, 'Focus')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FocusScreen()))),
       IconButton(tooltip: 'Out of office', icon: const Icon(Icons.beach_access_outlined), onPressed: () => showOutOfOffice(c)),

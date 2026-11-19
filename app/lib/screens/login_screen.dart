@@ -1,5 +1,5 @@
 import '../services/locale.dart';
-import 'rooms_screen.dart';
+import 'meeting_rooms_screen.dart';
 import 'package:matrix/matrix.dart' show MatrixException, MatrixError;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
