@@ -1,3 +1,4 @@
+import 'team_room_bar.dart';
 import 'frontline_screen.dart';
 import 'skills_screen.dart';
 import 'operator_screen.dart';
@@ -553,6 +554,7 @@ class _S extends State<ChatScreen> {
         ]),
       body: Column(children: [
         if (room.getState(kIncident) != null) IncidentBanner(room: room, onReview: _incidentReview),
+        if (!room.isDirectChat && room.encrypted && !widget.filesOnly) TeamRoomBar(room: room),
         if (lifetime != null) Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), color: Theme.of(c).colorScheme.surfaceContainerHigh,
           child: Row(children: [const Icon(Icons.timer_outlined, size: 14), const SizedBox(width: 6), Expanded(child: Text(
             'Disappearing messages: deleted after ${lifetime >= 31536000000 ? '${lifetime ~/ 31536000000} year${lifetime >= 63072000000 ? 's' : ''}' : lifetime >= 86400000 ? '${lifetime ~/ 86400000} day${lifetime >= 172800000 ? 's' : ''}' : '${lifetime ~/ 3600000} hours'}, on every device and on the server',

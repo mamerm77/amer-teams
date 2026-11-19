@@ -28,8 +28,10 @@ import 'whiteboard_screen.dart';
 /// Encrypted call or meeting: video grid, participants, in-meeting chat, raise hand, reactions,
 /// screen share, camera switch, on-device captions, waiting room for the host, Amer minutes.
 class CallScreen extends StatefulWidget {
-  const CallScreen({super.key, required this.roomId, this.callId, this.video = true, this.meeting = false, this.controller});
+  const CallScreen({super.key, required this.roomId, this.callId, this.video = true, this.meeting = false, this.controller, this.ambient = false});
   final String roomId; final String? callId; final bool video, meeting;
+  /// The team's always-open drop-in room (docs/AMBIENT.md): joins with microphone and camera off.
+  final bool ambient;
   /// 1:1 calls (protocol v2): the signalling controller. Null for meetings.
   final CallController? controller;
   @override State<CallScreen> createState() => _S();
@@ -111,7 +113,8 @@ class _S extends State<CallScreen> {
   String get me => room.client.userID!;
   bool get isHost => room.getPowerLevelByUserId(me).level >= 50;
   bool get attendee => call?.role == 'attendee';
-  String get callId => widget.meeting ? 'meet-${widget.roomId}' : (call?.callId ?? '');
+  String get callId => widget.meeting ? _meetId : (call?.callId ?? '');
+  String get _meetId => widget.ambient ? 'meet-ambient-${widget.roomId}' : 'meet-${widget.roomId}';
   Map<String, Object?> get meetingSettings => Map<String, Object?>.from(room.getState('com.amerteams.meeting.settings')?.content ?? {});
   bool get webinar => meetingSettings['mode'] == 'webinar';
   bool get locked => room.joinRules == mx.JoinRules.invite;
@@ -191,8 +194,8 @@ class _S extends State<CallScreen> {
 
   PreJoinChoice? _pre;
   @override void initState() {
-    super.initState(); cam = widget.video;
-    if (widget.meeting) {
+    super.initState(); cam = widget.video && !widget.ambient;
+    if (widget.meeting && !widget.ambient) {
       // meetings: pre-join first (preview, devices), as in Teams and Zoom
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final ch = await showPreJoin(context, title: 'Join ${room.getLocalizedDisplayname()}', video: widget.video);
@@ -214,7 +217,7 @@ class _S extends State<CallScreen> {
     }
     if (widget.meeting) cm!.inCall = true;
     try {
-      final id = widget.meeting ? 'meet-${widget.roomId}' : widget.callId;   // same on every device
+      final id = widget.meeting ? _meetId : widget.callId;   // same on every device
       call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: _pre?.cam ?? widget.video)
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
           : await SecureCall.join(api, room, widget.callId!, video: widget.video);
@@ -226,6 +229,7 @@ class _S extends State<CallScreen> {
       mic = call!.deviceWarnings.every((w) => !w.contains('microphone'));
       for (final w in call!.deviceWarnings) { _snack(w); }
       await _applyPreJoin();
+      if (widget.ambient) { mic = false; cam = false; await call!.lk.localParticipant?.setMicrophoneEnabled(false); await call!.lk.localParticipant?.setCameraEnabled(false); }
       if (A11y.instance.captionsByDefault && !captions) unawaited(_toggleCaptions());
       if (ctl == null) unawaited(Handoff.announce(room.client, roomId: widget.roomId, callId: widget.meeting ? null : call!.callId, meeting: widget.meeting));
       setState(() {});
