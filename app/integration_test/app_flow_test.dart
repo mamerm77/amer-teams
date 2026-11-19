@@ -419,7 +419,7 @@ void main() {
       final emoji = (moh2()['emoji'] as List? ?? const []).cast<String>();
       if (emoji.length != 7) throw StateError('second device did not compute 7 emoji: ${moh2()}');
       final missing = emoji.where((e) => find.text(e).evaluate().isEmpty).toList();
-      if (missing.isNotEmpty) throw StateError('emoji differ between devices; app is missing $missing of $emoji');
+      if (missing.isNotEmpty) throw StateError('emoji differ between devices; app is missing $missing of $emoji (${moh2()['names']}); second device: ${moh2()['diag']}');
       await shot('verification-emoji-match');
       await tap(find.text('They match'), 'They match');
       expectFound(await waitFor(find.textContaining('Verified.'), secs: 60), 'Verified');

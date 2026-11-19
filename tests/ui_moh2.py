@@ -51,7 +51,10 @@ async def main():
     async def on_key(ev):
         sas = c.key_verifications[ev.transaction_id]
         if sas.canceled: save(stage="error", error=f"nio cancelled: {sas.cancel_code} {sas.cancel_reason}"); return
-        save(stage="emoji", emoji=[e[1] for e in sas.get_emoji()])          # names, e.g. "Dog", "Pizza"
+        save(stage="emoji", emoji=[e[0] for e in sas.get_emoji()], names=[e[1] for e in sas.get_emoji()],   # the emoji themselves; names differ by library ("Wrench"/"Spanner")
+             diag={"txid": sas.transaction_id, "we_started": sas.we_started_it, "agreement": sas.chosen_key_agreement, "mac": sas.chosen_mac_method,
+                   "own": [sas.own_user, sas.own_device], "other": [sas.other_olm_device.user_id, sas.other_olm_device.device_id],
+                   "info_shape": sas._extra_info.replace(sas.pubkey, "<OUR_SAS_KEY>").replace(sas.their_sas_key or "-", "<THEIR_SAS_KEY>")})
         await asyncio.sleep(15)                                              # let the app show and the test compare them
         await c.confirm_short_auth_string(ev.transaction_id); save(stage="confirmed")
     async def on_mac(ev):
@@ -73,6 +76,7 @@ async def main():
     txid = uuid.uuid4().hex
     async def on_unknown(ev):
         t, cont = ev.source.get("type"), ev.source.get("content", {})
+        if str(t).startswith("m.key.verification."): state.setdefault("seen", []).append(t); save()
         if t == "m.key.verification.ready" and cont.get("transaction_id") == txid and txid not in c.key_verifications:
             sas = Sas(ME, c.device_id, c.olm.account.identity_keys["ed25519"], app_dev, transaction_id=txid)
             c.olm.key_verifications[txid] = sas
