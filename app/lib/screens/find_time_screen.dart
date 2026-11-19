@@ -162,5 +162,5 @@ Future<void> showOutOfOffice(BuildContext context) async {
     actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Save')))])));
   if (ok != true) return;
   await o.save(enabled: on, start: DateTime(from.year, from.month, from.day), end: DateTime(to.year, to.month, to.day), message: msg.text.trim(), delegate: del.text.trim().isEmpty ? null : del.text.trim());
-  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(on ? (o.active ? 'Out of office is on: ${o.statusText()}' : 'Out of office set for ${DateFormat('d MMM').format(from)}') : 'Out of office is off')));
+  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(on ? (!DateTime.now().isBefore(DateTime(from.year, from.month, from.day)) && DateTime.now().isBefore(DateTime(to.year, to.month, to.day).add(const Duration(days: 1))) ? 'Out of office is on until ${DateFormat('d MMM').format(to)}' : 'Out of office set for ${DateFormat('d MMM').format(from)}') : 'Out of office is off')));
 }

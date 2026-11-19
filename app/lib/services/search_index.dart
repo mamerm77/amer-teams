@@ -80,6 +80,14 @@ class SearchIndex {
 
   /// Full-text search with optional filters. Words are matched as prefixes ("vend" finds "vendor").
   Future<List<Map<String, Object?>>> search(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
+    var r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
+    // Messages that arrived still encrypted are indexed once decrypted: on a miss, catch up from the decrypted
+    // timelines and ask again (bounded: the recent history of each chat).
+    if (r.isEmpty && q.trim().isNotEmpty && !backfilling) { await _backfill(); r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since); }
+    return r;
+  }
+
+  Future<List<Map<String, Object?>>> _query(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
     final db = _db; if (db == null) return [];
     final words = q.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => '${w.replaceAll(RegExp(r'["*]'), '')}*').join(' ');
     final where = <String>[], args = <Object?>[];
