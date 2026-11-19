@@ -67,4 +67,6 @@ async def rooms(x_amer_connector: str = Header("")):
     """Rooms the connectors account may join (it refuses invites to any other)."""
     if not SERVICE_SECRET or not hmac.compare_digest(x_amer_connector, SERVICE_SECRET): raise HTTPException(401, "Not the connector service")
     async with db.pool.connection() as c:
-        return {"rooms": [r[0] for r in await (await c.execute("SELECT DISTINCT room_id FROM connectors WHERE enabled")).fetchall()]}
+        rooms = [r[0] for r in await (await c.execute("SELECT DISTINCT room_id FROM connectors WHERE enabled")).fetchall()]
+        vm = await (await c.execute("SELECT notify_room FROM phone_line WHERE id=1 AND notify_room IS NOT NULL")).fetchone()
+    return {"rooms": rooms + ([vm[0]] if vm else [])}            # plus the voicemail chat (docs/PHONE_DIALIN.md)

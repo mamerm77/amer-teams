@@ -66,13 +66,13 @@ async def join_bridge(room_id: str, user=Depends(auth.matrix_user)):
             "security": "Encrypted to the phone network (TLS + SRTP), not end-to-end"}
 
 # ---------- inbound: hunt group ----------
-class Line(BaseModel): hunt_group: list[str]; greeting: str = ""
+class Line(BaseModel): hunt_group: list[str]; greeting: str = ""; voicemail_room: str | None = None
 
 @router.put("/line")
 async def set_line(req: Line, user=Depends(require_admin)):
     import json
     async with db.pool.connection() as c:
-        await c.execute("INSERT INTO phone_line (id, hunt_group, greeting) VALUES (1,%s,%s) ON CONFLICT (id) DO UPDATE SET hunt_group=EXCLUDED.hunt_group, greeting=EXCLUDED.greeting", (json.dumps(req.hunt_group), req.greeting))
+        await c.execute("INSERT INTO phone_line (id, hunt_group, greeting, notify_room) VALUES (1,%s,%s,%s) ON CONFLICT (id) DO UPDATE SET hunt_group=EXCLUDED.hunt_group, greeting=EXCLUDED.greeting, notify_room=EXCLUDED.notify_room", (json.dumps(req.hunt_group), req.greeting, req.voicemail_room))
     return {"ok": True}
 
 async def _hunt():
@@ -105,3 +105,28 @@ async def answer(lkroom: str, user=Depends(auth.matrix_user)):
     await db.audit(user["user_id"], "phone.inbound.answer", r[0])
     return {"url": config.LIVEKIT_PUBLIC_URL, "token": livekit_token.sign(user["user_id"], user["user_id"], lkroom), "caller": r[0],
             "security": "Encrypted to the phone network (TLS + SRTP), not end-to-end"}
+
+
+# ---------- voicemail (docs/PHONE_DIALIN.md): the connector service records calls nobody answered ----------
+import hmac as _hmac, os as _os
+from fastapi import Header as _Header
+VM_AFTER_S = int(_os.getenv("VOICEMAIL_AFTER_S", "30"))
+
+def _svc(x: str):
+    s = _os.getenv("AMER_CONNECTOR_SECRET", "")
+    if not s or not _hmac.compare_digest(x, s): raise HTTPException(401, "Not the connector service")
+
+@router.post("/voicemail/claim")
+async def vm_claim(x_amer_connector: str = _Header("")):
+    """The oldest call unanswered for VM_AFTER_S seconds, claimed for voicemail (so nobody can answer it any more)."""
+    _svc(x_amer_connector)
+    async with db.pool.connection() as c:
+        line = await (await c.execute("SELECT notify_room FROM phone_line WHERE id=1")).fetchone()
+        if not line or not line[0]: return {"call": None}
+        r = await (await c.execute("UPDATE phone_inbound SET answered_by='@voicemail', answered_at=now() WHERE livekit_room = (SELECT livekit_room FROM phone_inbound "
+                                   "WHERE answered_by IS NULL AND arrived_at < now() - make_interval(secs => %s) ORDER BY arrived_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING livekit_room, caller_masked",
+                                   (VM_AFTER_S,))).fetchone()
+    if not r: return {"call": None}
+    await db.audit("@voicemail", "phone.voicemail", r[1])
+    return {"call": r[0], "caller": r[1], "room_id": line[0], "url": config.LIVEKIT_HTTP_URL.replace("http", "ws", 1),
+            "token": livekit_token.sign("voicemail", "Voicemail", r[0])}
