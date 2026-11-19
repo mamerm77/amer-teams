@@ -14,15 +14,35 @@ import 'security_screen.dart';
 import '../services/api_service.dart';
 import '../services/compliance_service.dart';
 import 'agent_ops_screen.dart';
+import 'catch_up_screen.dart';
+import '../services/catch_up.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
-class _S extends State<HomeScreen> {
+class _S extends State<HomeScreen> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     final m = context.read<MatrixService>();
     ComplianceService.instance.start(m.client, ApiService(m));     // business tenants with archiving: add the archiver to chats
+    WidgetsBinding.instance.addObserver(this);
+    _checkAway();
   }
-  @override void dispose() { ComplianceService.instance.stop(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); super.dispose(); }
+  @override void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
+  }
+  /// Back after 4+ hours away: offer the catch-up digest (as Teams and Slack do), never open it uninvited.
+  Future<void> _checkAway() async {
+    if (!await CatchUp.cameBackAfterAway() || !mounted) return;
+    final unread = context.read<MatrixService>().client.rooms.where((r) => r.notificationCount > 0).length;
+    if (unread == 0) return;
+    ScaffoldMessenger.of(context).showMaterialBanner(MaterialBanner(
+      leading: const Icon(Icons.auto_awesome), content: Text('Welcome back. $unread chats have new messages.'),
+      actions: [
+        TextButton(onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(), child: const Text('Later')),
+        FilledButton(onPressed: () { ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CatchUpScreen())); }, child: const Text('Catch me up')),
+      ]));
+  }
 
   int i = 0;
   static const _dest = [

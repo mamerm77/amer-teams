@@ -34,6 +34,8 @@ class ApiService {
 
   Future<List<dynamic>> alerts() async => jsonDecode((await http.get(_u('/v1/ops/alerts'), headers: _h)).body);
 
+  /// Catch-up digest of unread chats (docs/CATCH_UP.md).
+  Future<Map<String, dynamic>> digest(Map<String, Object?> body) => _post('/v1/ai/digest', body);
   Future<Map<String, dynamic>> schedule(String request) => _post('/v1/ai/schedule', {'request': request});
 
   // ---------- Meeting host controls ----------

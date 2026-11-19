@@ -5,6 +5,7 @@ Behaviour (driven by what the app's user 'moh' does, or by text commands moh sen
 - replies "pong from Bob" to "ping"; sends read receipts for everything
 - calls (protocol v2): sends ringing, then answers, publishes a 440 Hz tone, stays until hang-up
 - "bob: decline next" / "bob: busy next" / "bob: ignore next" change how the next call is handled
+- "bob: in 8s post updates": three unread messages (one mentions moh) for the catch-up digest
 - "bob: call me" / "bob: video call me": bob calls moh
 Writes a log of everything it saw to $PEER_LOG for the test report.
 """
@@ -85,6 +86,14 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: in 8s post updates"):        # unread messages for the catch-up digest
+            async def updates():
+                await asyncio.sleep(8)
+                for body, men in (("The OTN protection test passed on the Dubai ring.", False),
+                                  ("Decision: we ship the RFP response on Sunday.", False),
+                                  ("Moh Amer can you send the vendor comparison today?", True)):
+                    await self.send("m.room.message", {"msgtype": "m.text", "body": body, **({"m.mentions": {"user_ids": [MOH]}} if men else {})})
+            asyncio.create_task(updates())
         elif b.startswith("bob: in 20s say hi"):
             async def later():
                 await asyncio.sleep(20); await self.send("m.room.message", {"msgtype": "m.text", "body": "hello while blocked"})

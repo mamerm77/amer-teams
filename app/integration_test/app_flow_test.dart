@@ -249,6 +249,15 @@ void main() {
       await home(); await tap(find.text('Activity'), 'Activity tab');
       expectFound(await waitFor(find.textContaining('mentioned you'), secs: 20), 'mention in Activity');
     });
+    await step('Catch me up: unread chats ranked, mention counted', () async {
+      await home(); await openChat(); await sendText('bob: in 8s post updates');
+      await home(); await tap(find.text('Activity'), 'Activity tab'); await wait(15);     // messages arrive while the chat is closed
+      await tap(find.text('Catch me up'), 'Catch me up');
+      expectFound(await waitFor(find.textContaining(RegExp(r'new messages in \d+ chats')), secs: 40), 'digest totals');
+      expectFound(await waitFor(find.text('Bob Tester')), 'Bob chat card');
+      expectFound(await waitFor(find.byIcon(Icons.alternate_email)), 'mention count on the card');
+      await t.pageBack(); await wait(1);
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
