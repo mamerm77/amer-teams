@@ -74,12 +74,12 @@ Each built feature has a doc listing its open gaps.
 | Announcements with acknowledgement | Built |
 | Retention and auto-delete timers | Built (1 day to 7 years, server purge, banner); legal hold not started |
 | Slash commands | Built |
-| Meeting templates with agenda timer | Not started |
+| Meeting templates with agenda timer | Built: shared timer, 80% warning, parking lot (MEETING_AGENDA.md) |
 | Browser join for guests | Not started |
 | Phone dial-in | Not started (SIP dial-out exists) |
 | Recordings with consent | Not started |
-| Whiteboard templates | Not started |
-| Automatic follow-up | Partial: Amer minutes posted to the chat; decisions and tasks not extracted from minutes |
+| Whiteboard templates | Built: retro, SWOT, optical/IP network sketch, text labels |
+| Automatic follow-up | Built: minutes follow the agenda; decisions become proposals, actions become tasks. Email to external invitees not built |
 | Find-a-time | Built (FIND_A_TIME.md), with prayer times and Ramadan hours |
 | Out-of-office from calendar | Partial: set by hand (status, automatic reply, delegate); calendar-event trigger waits for connectors |
 | Message-to-task and task boards | Built (DECISIONS.md) |
