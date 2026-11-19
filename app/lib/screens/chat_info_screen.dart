@@ -78,7 +78,7 @@ class _S extends State<ChatInfoScreen> {
         enabled: room.canChangeStateEvent('m.room.retention'),
         onTap: () async {
           final v = await showDialog<int>(context: c, builder: (d) => SimpleDialog(title: const Text('Messages disappear after'), children: [
-            for (final (l, ms) in [('Off', 0), ('24 hours', 86400000), ('7 days', 604800000), ('90 days', 7776000000)])
+            for (final (l, ms) in [('Off', 0), ('24 hours', 86400000), ('7 days', 604800000), ('30 days', 2592000000), ('90 days', 7776000000), ('1 year', 31536000000), ('7 years', 220752000000)])
               SimpleDialogOption(onPressed: () => Navigator.pop(d, ms), child: Text(l))]));
           if (v != null) await _setRetention(v == 0 ? null : v);
         }),

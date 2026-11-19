@@ -1,3 +1,4 @@
+import 'dart:math' show min;
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:io';
@@ -23,6 +24,8 @@ import '../services/compliance_service.dart';
 import '../services/workflow_engine.dart';
 import 'canvas_screen.dart';
 
+const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
+
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
 /// [threadRootId]: show one thread. [filesOnly]: show only shared files, photos and voice.
@@ -33,6 +36,7 @@ class ChatScreen extends StatefulWidget {
 }
 class _S extends State<ChatScreen> {
   final _meetLive = <String, (Future<int>, DateTime)>{};
+  final _translated = <String, String>{};          // translation cache per message, this session
   Future<int> _live(String callId) {
     final c = _meetLive[callId];
     if (c != null && DateTime.now().difference(c.$2).inSeconds < 15) return c.$1;
@@ -140,8 +144,47 @@ class _S extends State<ChatScreen> {
     typingOff = Timer(const Duration(seconds: 4), () { typing = false; _safeTyping(false); });
   }
 
+  // ---------- slash commands (docs/CHAT_EXTRAS.md) ----------
+  static const slash = {
+    '/poll': 'Create a poll', '/meet': 'Start a meeting in this chat now', '/remind': '/remind 30 text: remind me in 30 minutes',
+    '/ask': '/ask question: ask Amer, answer only you see', '/announce': '/announce text: announcement everyone acknowledges',
+    '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases'};
+  Future<bool> _command(String t) async {
+    if (!t.startsWith('/')) return false;
+    final sp = t.indexOf(' '); final cmd = (sp < 0 ? t : t.substring(0, sp)).toLowerCase(); final arg = sp < 0 ? '' : t.substring(sp + 1).trim();
+    switch (cmd) {
+      case '/poll': await _newPoll();
+      case '/meet': Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: true)));
+      case '/canvas': Navigator.push(context, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)));
+      case '/later': input.text = arg; await _sendLater();
+      case '/announce':
+        if (arg.isEmpty) { _snack('Write the announcement after /announce'); return true; }
+        await room.sendEvent({'body': '📣 $arg', 'text': arg}, type: kAnnouncement);
+      case '/remind':
+        final m = RegExp(r'^(\d+)\s*(.*)$').firstMatch(arg);
+        if (m == null) { _snack('Use /remind 30 what to remember'); return true; }
+        Reminders.instance.add(room.id, '', m.group(2)!.isEmpty ? 'Reminder' : m.group(2)!, DateTime.now().add(Duration(minutes: int.parse(m.group(1)!))));
+        _snack('I will remind you in ${m.group(1)} minutes');
+      case '/ask':
+        if (arg.isEmpty) { _snack('Write a question after /ask'); return true; }
+        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final ctx = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(30).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
+        try {
+          final r = await context.read<ApiService>().ask(arg, context: 'Recent messages in this chat:\n$ctx', labels: [if (label != null) label]);
+          if (mounted) showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Amer · only you can see this', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 8), SelectableText('${r['answer']}')])));
+        } catch (e) { _snack('Amer could not answer: $e'); }
+      default:
+        final near = slash.keys.where((k) => k.startsWith(cmd.substring(0, min(3, cmd.length)))).join(', ');
+        _snack('Unknown command $cmd. Try ${near.isEmpty ? slash.keys.join(', ') : near}');
+    }
+    return true;
+  }
+
   Future<void> send() async {
-    final t = input.text.trim(); if (t.isEmpty) return; input.clear();
+    final t = input.text.trim(); if (t.isEmpty) return;
+    if (editing == null && t.startsWith('/') && !t.startsWith('//')) { input.clear(); setState(() {}); await _command(t); return; }   // '//' sends a literal slash
+    input.clear();
     typing = false; _safeTyping(false);
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
     var text = t;
@@ -205,7 +248,40 @@ class _S extends State<ChatScreen> {
     if (tm == null) return;
     final at = DateTime(d.year, d.month, d.day, tm.hour, tm.minute);
     ScheduledSender.instance.add(room, t, at); input.clear();
-    _snack('Will send at ${DateFormat('d MMM HH:mm').format(at)} (keep the app open)');
+    setState(() {}); _snack('Scheduled for ${DateFormat('d MMM HH:mm').format(at)}. Sent from this device; if the app is closed then, it is sent when you next open it.');
+  }
+
+  /// Scheduled messages for this chat: edit the text, change the time, send now, or cancel. Editable until sent.
+  Future<void> _scheduledList() async {
+    await showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => StatefulBuilder(builder: (s, set) {
+      final items = ScheduledSender.instance.forRoom(room.id);
+      return SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ListTile(title: Text('Scheduled messages'), subtitle: Text('Kept on this device and sent from it at the time; the server never holds the text')),
+        for (final i in items) ListTile(leading: const Icon(Icons.schedule_send), title: Text('${i['text']}', maxLines: 2, overflow: TextOverflow.ellipsis),
+          subtitle: Text(DateFormat('EEE d MMM HH:mm').format(DateTime.parse('${i['at']}'))),
+          trailing: PopupMenuButton<String>(onSelected: (v) async {
+            if (v == 'now') ScheduledSender.instance.edit('${i['id']}', at: DateTime.now());
+            if (v == 'cancel') ScheduledSender.instance.cancel('${i['id']}');
+            if (v == 'edit') {
+              final t = TextEditingController(text: '${i['text']}');
+              final nt = await showDialog<String>(context: s, builder: (d) => AlertDialog(title: const Text('Edit scheduled message'), content: TextField(controller: t, maxLines: 5),
+                actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, t.text), child: const Text('Save'))]));
+              if (nt != null && nt.trim().isNotEmpty) ScheduledSender.instance.edit('${i['id']}', text: nt.trim());
+            }
+            if (v == 'time' && s.mounted) {
+              final at = DateTime.parse('${i['at']}');
+              final d = await showDatePicker(context: s, initialDate: at, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 30)));
+              if (d == null || !s.mounted) return;
+              final tm = await showTimePicker(context: s, initialTime: TimeOfDay.fromDateTime(at));
+              if (tm != null) ScheduledSender.instance.edit('${i['id']}', at: DateTime(d.year, d.month, d.day, tm.hour, tm.minute));
+            }
+            set(() {}); if (mounted) setState(() {});
+          }, itemBuilder: (_) => const [PopupMenuItem(value: 'edit', child: Text('Edit text')), PopupMenuItem(value: 'time', child: Text('Change time')),
+            PopupMenuItem(value: 'now', child: Text('Send now')), PopupMenuItem(value: 'cancel', child: Text('Cancel'))])),
+        if (items.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Nothing scheduled')),
+      ]));
+    }));
+    if (mounted) setState(() {});
   }
 
   // ---------- checklist ----------
@@ -267,6 +343,7 @@ class _S extends State<ChatScreen> {
         title: Text(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? 'Remove from saved' : 'Save'), onTap: () => Navigator.pop(s, 'star')),
       if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
       if (!mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.auto_awesome), title: const Text('Suggest a reply (Amer)'), onTap: () => Navigator.pop(s, 'suggest')),
+      ListTile(leading: const Icon(Icons.alarm_add_outlined), title: const Text('Remind me'), onTap: () => Navigator.pop(s, 'remind')),
       ListTile(leading: const Icon(Icons.copy), title: const Text('Copy'), onTap: () => Navigator.pop(s, 'copy')),
       if (canEdit) ListTile(leading: const Icon(Icons.edit), title: const Text('Edit'), onTap: () => Navigator.pop(s, 'edit')),
       if (canDelete) ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: Text(mine ? 'Delete for everyone' : 'Delete for everyone (moderator)'), onTap: () => Navigator.pop(s, 'delete')),
@@ -276,6 +353,14 @@ class _S extends State<ChatScreen> {
     if (a.startsWith('react:')) await sendEncryptedReaction(room, e.eventId, a.substring(6));
     if (a == 'reply') setState(() { replyTo = e; editing = null; });
     if (a == 'copy') await Clipboard.setData(ClipboardData(text: _text(e)));
+    if (a == 'remind' && mounted) {
+      final now = DateTime.now(), tomorrow9 = DateTime(now.year, now.month, now.day + 1, 9);
+      final at = await showDialog<DateTime>(context: context, builder: (d) => SimpleDialog(title: const Text('Remind me'), children: [
+        for (final (l, t) in [('In 20 minutes', now.add(const Duration(minutes: 20))), ('In 1 hour', now.add(const Duration(hours: 1))),
+                              ('In 3 hours', now.add(const Duration(hours: 3))), ('Tomorrow at 09:00', tomorrow9)])
+          SimpleDialogOption(onPressed: () => Navigator.pop(d, t), child: Text(l))]));
+      if (at != null) { Reminders.instance.add(room.id, e.eventId, '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(_text(e))}', at); _snack('Reminder set for ${DateFormat('d MMM HH:mm').format(at)}'); }
+    }
     if (a == 'edit') setState(() { editing = e; replyTo = null; input.text = _text(e); });
     if (a == 'delete') await room.redactEvent(e.eventId);
     if (a == 'thread' && mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: e.eventId)));
@@ -292,8 +377,11 @@ class _S extends State<ChatScreen> {
     }
     if ((a == 'translate' || a == 'suggest') && mounted) {
       try {
-        final r = await context.read<ApiService>().ask(a == 'translate' ? 'Translate to ${Localizations.localeOf(context).languageCode == 'ar' ? 'English' : 'Arabic'}' : 'Suggest a short, polite reply to this message',
-            context: plainMentions(_text(e)), agent: a == 'translate' ? 'trans' : 'assist');
+        final label = room.getState('com.amerteams.sensitivity')?.content['label'] as String?;
+        final r = a == 'translate' && _translated.containsKey(e.eventId) ? {'answer': _translated[e.eventId]}
+            : await context.read<ApiService>().ask(a == 'translate' ? 'Translate to ${Localizations.localeOf(context).languageCode == 'ar' ? 'English' : 'Arabic'}' : 'Suggest a short, polite reply to this message',
+            context: plainMentions(_text(e)), agent: a == 'translate' ? 'trans' : 'assist', labels: [if (label != null) label]);
+        if (a == 'translate' && r['blocked'] != true) _translated[e.eventId] = '${r['answer']}';
         if (!mounted) return;
         if (a == 'suggest') { setState(() => input.text = r['answer'] as String); } else {
           showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: SelectableText(r['answer'] as String)));
@@ -311,7 +399,7 @@ class _S extends State<ChatScreen> {
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    const shownTypes = {'com.amerteams.canvas.create', EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
+    const shownTypes = {kAnnouncement, 'com.amerteams.canvas.create', EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
     final lifetime = (room.getState('m.room.retention')?.content['max_lifetime'] as num?)?.toInt();
     var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit
         && (lifetime == null || DateTime.now().difference(e.originServerTs).inMilliseconds < lifetime)).toList();
@@ -360,6 +448,10 @@ class _S extends State<ChatScreen> {
             PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
+        if (lifetime != null) Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), color: Theme.of(c).colorScheme.surfaceContainerHigh,
+          child: Row(children: [const Icon(Icons.timer_outlined, size: 14), const SizedBox(width: 6), Expanded(child: Text(
+            'Disappearing messages: deleted after ${lifetime >= 31536000000 ? '${lifetime ~/ 31536000000} year${lifetime >= 63072000000 ? 's' : ''}' : lifetime >= 86400000 ? '${lifetime ~/ 86400000} day${lifetime >= 172800000 ? 's' : ''}' : '${lifetime ~/ 3600000} hours'}, on every device and on the server',
+            style: const TextStyle(fontSize: 12)))])),
         ListenableBuilder(listenable: ComplianceService.instance, builder: (_, __) {
           final cp = ComplianceService.instance;
           if (!cp.enabled || !cp.archives(room)) return const SizedBox.shrink();
@@ -416,6 +508,13 @@ class _S extends State<ChatScreen> {
           IconButton(tooltip: 'Quote', icon: const Icon(Icons.format_quote), onPressed: () => _wrap('> ', '')),
           IconButton(tooltip: 'List', icon: const Icon(Icons.format_list_bulleted), onPressed: () => _wrap('- ', '')),
         ]),
+        if (!widget.filesOnly && input.text.startsWith('/') && !input.text.contains(' ')) Material(elevation: 2, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final k in slash.keys.where((k) => k.startsWith(input.text.toLowerCase()))) ListTile(dense: true, leading: const Icon(Icons.keyboard_command_key, size: 18),
+            title: Text(k), subtitle: Text(slash[k]!), onTap: () { input.text = '$k '; input.selection = TextSelection.collapsed(offset: input.text.length); setState(() {}); }),
+          if (slash.keys.every((k) => !k.startsWith(input.text.toLowerCase())) && input.text.length > 1) ListTile(dense: true, title: Text('No command ${input.text}'), subtitle: Text('Commands: ${slash.keys.join(' ')}')),
+        ])),
+        if (!widget.filesOnly && ScheduledSender.instance.forRoom(room.id).isNotEmpty) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(left: 8),
+          child: ActionChip(avatar: const Icon(Icons.schedule_send, size: 18), label: Text('${ScheduledSender.instance.forRoom(room.id).length} scheduled'), onPressed: _scheduledList))),
         if (widget.filesOnly) const SizedBox.shrink() else
         SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: _recStart != null
           ? Row(children: [
@@ -486,6 +585,51 @@ class _S extends State<ChatScreen> {
     ])));
   }
 
+  /// Text with ``` code blocks rendered monospace with a copy button (Markdown is also sent as formatted_body by the SDK).
+  Widget _rich(BuildContext c, String t) {
+    if (!t.contains('```')) return Text(t);
+    final parts = t.split('```'); final cs = Theme.of(c).colorScheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      for (var i = 0; i < parts.length; i++)
+        if (i.isOdd) () {
+          final nl = parts[i].indexOf('\n'); final lang = nl > 0 && !parts[i].substring(0, nl).contains(' ') ? parts[i].substring(0, nl).trim() : '';
+          final code = (lang.isNotEmpty ? parts[i].substring(nl + 1) : parts[i]).trimRight();
+          return Container(margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.fromLTRB(10, 4, 4, 8),
+            decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: cs.outlineVariant)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [Text(lang.isEmpty ? 'code' : lang, style: TextStyle(fontSize: 11, color: cs.outline)), const Spacer(),
+                IconButton(tooltip: 'Copy code', visualDensity: VisualDensity.compact, icon: const Icon(Icons.copy, size: 16), onPressed: () { Clipboard.setData(ClipboardData(text: code)); _snack('Code copied'); })]),
+              SingleChildScrollView(scrollDirection: Axis.horizontal, child: SelectableText(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 13))),
+            ]));
+        }()
+        else if (parts[i].trim().isNotEmpty) Text(parts[i].trim()),
+    ]);
+  }
+
+  /// Announcement with "I acknowledge"; the sender sees who has and has not, and can remind the rest.
+  Widget _announcement(BuildContext c, Event e) {
+    final cs = Theme.of(c).colorScheme;
+    final acks = {for (final x in (tl?.events ?? []).where((x) => x.type == kAck && x.content['announcement'] == e.eventId)) x.senderId};
+    final members = room.getParticipants().where((u) => u.membership == Membership.join && u.id != e.senderId && !u.id.startsWith('@amer')).toList();
+    final pending = members.where((u) => !acks.contains(u.id)).toList();
+    final mineAnn = e.senderId == me;
+    return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), color: cs.secondaryContainer, child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [const Icon(Icons.campaign), const SizedBox(width: 8), Expanded(child: Text('Announcement · ${e.senderFromMemoryOrFallback.calcDisplayname()}', style: Theme.of(c).textTheme.titleSmall)),
+        Text(DateFormat('d MMM HH:mm').format(e.originServerTs), style: Theme.of(c).textTheme.labelSmall)]),
+      const SizedBox(height: 8), Text('${e.content['text'] ?? e.body}', style: const TextStyle(fontSize: 16)),
+      const SizedBox(height: 8),
+      Text('${acks.length} of ${members.length} acknowledged', style: TextStyle(fontSize: 12, color: cs.outline)),
+      if (!mineAnn && !acks.contains(me)) Padding(padding: const EdgeInsets.only(top: 6), child: FilledButton.icon(icon: const Icon(Icons.check), label: const Text('I acknowledge'),
+          onPressed: () => room.sendEvent({'announcement': e.eventId, 'body': 'Acknowledged'}, type: kAck))),
+      if (!mineAnn && acks.contains(me)) const Padding(padding: EdgeInsets.only(top: 6), child: Text('✓ You acknowledged this')),
+      if (mineAnn) ExpansionTile(tilePadding: EdgeInsets.zero, title: Text(pending.isEmpty ? 'Everyone acknowledged' : '${pending.length} pending'), children: [
+        for (final u in members) ListTile(dense: true, leading: Icon(acks.contains(u.id) ? Icons.check_circle : Icons.schedule, color: acks.contains(u.id) ? Colors.green : cs.outline), title: Text(u.calcDisplayname())),
+        if (pending.isNotEmpty) Align(alignment: Alignment.centerLeft, child: TextButton.icon(icon: const Icon(Icons.notifications_active_outlined), label: const Text('Remind pending'),
+          onPressed: () => room.sendTextEvent('Reminder: please acknowledge the announcement. ${pending.map((u) => mentionMarkdown(u.calcDisplayname(), u.id)).join(' ')}'))),
+      ]),
+    ])));
+  }
+
   Widget _item(BuildContext c, Event e, {required bool isLastMine, bool read = false}) {
     final cs = Theme.of(c).colorScheme; final mine = e.senderId == me;
     if (e.type == kCallInviteEvent && e.content['version'] == 2) {
@@ -520,6 +664,7 @@ class _S extends State<ChatScreen> {
     if (e.type == kCallEndEvent) {
       return Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e.body, style: Theme.of(c).textTheme.labelSmall)));
     }
+    if (e.type == kAnnouncement) return _announcement(c, e);
     if (e.type == 'com.amerteams.canvas.create') {
       return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(leading: const Icon(Icons.description_outlined),
         title: Text('${e.content['title'] ?? 'Canvas'}'), subtitle: Text('Canvas by ${e.senderFromMemoryOrFallback.calcDisplayname()}'),
@@ -599,7 +744,7 @@ class _S extends State<ChatScreen> {
         Flexible(child: Text(e.body)), const SizedBox(width: 8), const Icon(Icons.download, size: 18)]));
     } else {
       final mentioned = mentionsMe(e, me);
-      body = Container(color: mentioned && !mine ? cs.tertiaryContainer : null, child: Text(_text(e)));
+      body = Container(color: mentioned && !mine ? cs.tertiaryContainer : null, child: _rich(c, _text(e)));
     }
     final replyId = e.relationshipType == null ? (e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String?) : null;
     final replied = replyId == null || tl == null ? null : tl!.events.where((x) => x.eventId == replyId).firstOrNull;
@@ -619,6 +764,7 @@ class _S extends State<ChatScreen> {
           const SizedBox(height: 2),
           Row(mainAxisSize: MainAxisSize.min, children: [
             if (edited) Text('edited · ', style: Theme.of(c).textTheme.labelSmall),
+            if (e.content['com.amerteams.scheduled'] is Map) Text((e.content['com.amerteams.scheduled'] as Map)['late'] == true ? 'scheduled · sent late · ' : 'scheduled · ', style: Theme.of(c).textTheme.labelSmall),
             Text(DateFormat('HH:mm').format(e.originServerTs), style: Theme.of(c).textTheme.labelSmall),
             if (mine) Padding(padding: const EdgeInsets.only(left: 4), child: _status(c, e, read)),
             const SizedBox(width: 6),

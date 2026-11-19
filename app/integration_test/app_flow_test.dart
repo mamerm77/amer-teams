@@ -301,6 +301,24 @@ void main() {
       await home(); await openChat();
       expectFound(await waitFor(find.text('Hello from your agent team'), secs: 60), 'message sent by the app after approval');
     });
+    await step('Slash command /announce, Bob acknowledges, sender sees the count', () async {
+      await home(); await openChat();
+      await sendText('/announce Maintenance window tonight at 01:00');
+      expectFound(await waitFor(find.textContaining('Maintenance window tonight'), secs: 20), 'announcement card');
+      expectFound(await waitFor(find.text('0 of 1 acknowledged'), secs: 20), 'pending count');
+      await sendText('bob: ack');
+      expectFound(await waitFor(find.text('1 of 1 acknowledged'), secs: 30), 'acknowledged by Bob');
+    });
+    await step('Scheduled message is listed and can be sent now', () async {
+      await home(); await openChat();
+      await sendText('/later Weekly report attached'); await wait(2);
+      // date picker then time picker: accept the defaults
+      await tap(find.text('OK'), 'date OK'); await tap(find.text('OK'), 'time OK');
+      await tap(find.textContaining('1 scheduled'), 'scheduled chip');
+      await tap(find.byType(PopupMenuButton<String>).last, 'scheduled item menu'); await tap(find.text('Send now'), 'Send now');
+      await t.pageBack(); await wait(1);
+      expectFound(await waitFor(find.text('Weekly report attached'), secs: 40), 'scheduled message sent');
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

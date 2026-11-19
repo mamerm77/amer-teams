@@ -18,6 +18,8 @@ import 'catch_up_screen.dart';
 import '../services/catch_up.dart';
 import '../services/workflow_runner.dart';
 import '../services/glass_box.dart';
+import '../services/later.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -28,12 +30,25 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     WorkflowRunner.instance.start(m.client, ApiService(m));        // the owner's workflows run on this device
     GlassBox.instance.start(m, ApiService(m));                     // personal agents' approvals; approved actions run here
+    ScheduledSender.instance.start(m.client); Reminders.instance.start();
+    Reminders.instance.due.addListener(_reminder);
     _checkAway();
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); super.dispose(); }
+  @override void dispose() { Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }
+  void _reminder() {
+    final r = Reminders.instance.due.value; if (r == null || !mounted) return;
+    final sm = ScaffoldMessenger.of(context);
+    sm.showMaterialBanner(MaterialBanner(leading: const Icon(Icons.alarm), content: Text('Reminder: ${r['preview']}'), actions: [
+      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.snooze('${r['id']}', const Duration(hours: 1)); }, child: const Text('In 1 hour')),
+      TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.dismiss('${r['id']}'); }, child: const Text('Done')),
+      FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Reminders.instance.dismiss('${r['id']}');
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: '${r['room']}'))); }, child: const Text('Open')),
+    ]));
+  }
+
   /// Back after 4+ hours away: offer the catch-up digest (as Teams and Slack do), never open it uninvited.
   Future<void> _checkAway() async {
     if (!await CatchUp.cameBackAfterAway() || !mounted) return;

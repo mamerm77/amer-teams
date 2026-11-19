@@ -3,6 +3,7 @@ import 'package:matrix/matrix.dart';
 import 'call_manager.dart';
 import 'matrix_service.dart';
 import '../config.dart';
+export 'later.dart' show ScheduledSender, Reminders;
 
 const kStarredType = 'com.amerteams.starred';
 const kChecklistEvent = 'com.amerteams.checklist';
@@ -116,18 +117,3 @@ class ActivityService {
   }
 }
 
-/// Send later: queued messages go out at their time while the app is open (checked every 15 s).
-class ScheduledSender {
-  ScheduledSender._();
-  static final instance = ScheduledSender._();
-  final queue = <(Room, String, DateTime)>[];
-  Timer? _t;
-  void add(Room r, String text, DateTime at) {
-    queue.add((r, text, at));
-    _t ??= Timer.periodic(const Duration(seconds: 15), (_) => _flush());
-  }
-  void _flush() {
-    final now = DateTime.now();
-    for (final q in queue.where((q) => !q.$3.isAfter(now)).toList()) { q.$1.sendTextEvent(q.$2); queue.remove(q); }
-  }
-}

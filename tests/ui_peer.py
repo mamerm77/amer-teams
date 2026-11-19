@@ -32,7 +32,7 @@ class Peer:
     def __init__(self):
         self.c = AsyncClient(HS, BOB, store_path=tempfile.mkdtemp(), config=AsyncClientConfig(store_sync_tokens=True, encryption_enabled=True))
         self.mode = "answer"; self.room = None; self.pk, self.sk = pq.keygen()
-        self.canvases = {}; self.last_canvas = None
+        self.canvases = {}; self.last_canvas = None; self.last_announcement = None
         self.calls = {}; self.pq_devs = {}; self.lk = None; self.src = None; self.tone_task = None
 
     async def send(self, typ, content):
@@ -89,6 +89,8 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: ack"):                          # acknowledge the latest announcement
+            if self.last_announcement: await self.send("com.amerteams.ack", {"announcement": self.last_announcement, "body": "Acknowledged"})
         elif b.startswith("bob: agent asks to send"):          # the real glass_box() in the orchestrator, no LLM
             script = (
                 "import asyncio\nfrom app import db\nfrom app.agentops import personal as P\n"
@@ -133,6 +135,7 @@ class Peer:
     async def on_unknown(self, room, ev):
         t, c = ev.type, ev.source.get("content", {})
         if ev.sender == BOB or not t.startswith("com.amerteams."): return
+        if t == "com.amerteams.announcement": self.last_announcement = ev.event_id; log("announcement", ev.event_id); return
         if t in ("com.amerteams.canvas.create", "com.amerteams.canvas.update"):
             cid = c.get("canvas_id"); self.last_canvas = cid
             d = self.canvases.setdefault(cid, CanvasDoc(self.c.device_id))
