@@ -17,7 +17,7 @@ Each built feature has a doc listing its open gaps.
 | 1 | Catch-up digest + ask-the-meeting agent | Built, not yet seen passing in use. Gap: AI runs on the server's AI engine, not an on-device model or enclave | CATCH_UP.md, MEETING_AGENT.md |
 | 2 | Workflows from plain language | Built, not yet seen passing in use. Gaps: webhook, alarm and calendar triggers; drag-and-drop editor | WORKFLOWS.md |
 | 3 | Canvases | Built, not yet seen passing in use. Own CRDT instead of Yjs; presence and images not yet | CANVAS.md |
-| 4 | Secure external collaboration (shared channels) | Not started: needs two federated test servers in CI | — |
+| 4 | Secure external collaboration (shared channels) | Built: partner states, Synapse-enforced allow-list, local-by-default rooms, on-device DLP; 8/8 over two real federated servers locally | PARTNERS.md |
 | 5 | Agent Ops for everyone (personal team + glass box) | Built, not yet seen passing in use. Gaps: push reminders; resume after restart | PERSONAL_AGENTS.md |
 
 ## Competitor parity (20)
@@ -33,7 +33,7 @@ Each built feature has a doc listing its open gaps.
 | Canvases / Loop | Built |
 | Shared files tab with versions | Existing files view; versions and grouping not started |
 | Drafts, mentions, followed quick views | Built |
-| Shared channels across organisations | Not started |
+| Shared channels across organisations | Built (see top five) |
 | Webinars and town halls | Existing webinar mode (attendees cannot publish); registration, Q&A and HLS not started |
 | Breakout rooms | Existing |
 | Live translated captions | Partial: on-device captions exist; translation not started |

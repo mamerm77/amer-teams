@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
   sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
   sed -i "s/^LIVEKIT_API_SECRET=.*/LIVEKIT_API_SECRET=$(openssl rand -hex 32)/" .env
   echo "Created .env — edit DOMAIN, SERVER_NAME and ANTHROPIC_API_KEY, then re-run."; exit 0; }
+grep -q '^AMER_FEDERATION_SECRET=' .env || echo "AMER_FEDERATION_SECRET=$(openssl rand -hex 24)" >> .env   # Synapse module <-> orchestrator
 set -a; . ./.env; set +a
 python3 - <<PY2
 import re;p="livekit.yaml";s=open(p).read()
@@ -44,6 +45,19 @@ room_list_publication_rules: [{action: allow}]
 """ % __import__("os").environ.get("DOMAIN","localhost")
 open(p,"w").write(s)
 PY
+  docker run --rm -v "$PWD/synapse:/data" alpine:3.20 chown -R 991:991 /data
+fi
+# partner policy (docs/PARTNERS.md): only active partner servers may federate; rooms are local unless shared.
+# Added to existing installs too, so re-running setup.sh upgrades them.
+if ! grep -q "amer_federation.AmerFederation" synapse/homeserver.yaml; then
+  docker run --rm -v "$PWD/synapse:/data" alpine:3.20 chown -R "$(id -u):$(id -g)" /data
+  cat >> synapse/homeserver.yaml <<YAML
+
+# --- Amer Teams partner policy (docs/PARTNERS.md) ---
+modules:
+  - module: amer_federation.AmerFederation
+    config: {orchestrator: "http://orchestrator:8080", secret: "${AMER_FEDERATION_SECRET}"}
+YAML
   docker run --rm -v "$PWD/synapse:/data" alpine:3.20 chown -R 991:991 /data
 fi
 echo "Setup complete. Next:"

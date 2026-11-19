@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/api_service.dart';
 import 'call_trace_screen.dart';
 import 'flags_screen.dart';
+import 'partners_screen.dart';
 
 /// User administration for server admins: invite codes and accounts.
 class AdminScreen extends StatefulWidget { const AdminScreen({super.key}); @override State<AdminScreen> createState() => _S(); }
@@ -51,7 +52,8 @@ class _S extends State<AdminScreen> {
           FilledButton.icon(onPressed: _invite, icon: const Icon(Icons.vpn_key), label: const Text('New invite code')),
           OutlinedButton.icon(onPressed: _newUser, icon: const Icon(Icons.person_add), label: const Text('Create user')),
           OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const CallTraceScreen())), icon: const Icon(Icons.timeline), label: const Text('Call trace')),
-          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FlagsScreen())), icon: const Icon(Icons.flag_outlined), label: const Text('Feature flags'))]),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FlagsScreen())), icon: const Icon(Icons.flag_outlined), label: const Text('Feature flags')),
+          OutlinedButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PartnersScreen())), icon: const Icon(Icons.handshake_outlined), label: const Text('Partners'))]),
         const SizedBox(height: 16), Text('Accounts (${users.length})', style: Theme.of(c).textTheme.titleMedium),
         for (final u in users) ListTile(
           leading: Icon(u['deactivated'] ? Icons.person_off : u['admin'] ? Icons.admin_panel_settings : Icons.person),

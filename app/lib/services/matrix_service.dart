@@ -99,6 +99,13 @@ class MatrixService extends ChangeNotifier {
       .map((c) => c.roomId == null ? null : client.getRoomById(c.roomId!)).whereType<Room>().toList();
   List<Room> get chats => rooms.where((r) => !r.isSpace).toList();
 
+  /// A channel shared with partner organisations (docs/PARTNERS.md): marked com.amerteams.shared, which is the only
+  /// way a room is created federatable; end-to-end encrypted; private (invite only).
+  Future<String> createSharedChannel(String name, List<String> partners, List<String> invite) => client.createRoom(
+      name: name, invite: invite, preset: CreateRoomPreset.privateChat,
+      initialState: [StateEvent(type: EventTypes.Encryption, stateKey: '', content: {'algorithm': 'm.megolm.v1.aes-sha2'}),
+                     StateEvent(type: 'com.amerteams.shared', stateKey: '', content: {'partners': partners})]);
+
   /// Teams (Matrix spaces), as in Microsoft Teams:
   /// - Private team: invite only. Public team: listed in the directory; anyone on this server can join.
   /// - Channels use the `restricted` join rule, so every team member can open every channel, including people

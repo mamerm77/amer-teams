@@ -23,6 +23,8 @@ GUARDIAN_BLOCK_LABELS=Confidential,Restricted
 if (-not (Select-String -Path .env -Pattern "^AMER_BOT_SECRET=" -Quiet)) {
   Add-Content -Encoding ascii .env "AMER_BOT_USER=amer`nAMER_BOT_PASSWORD=Am$(Rand 20)!Q`nAMER_BOT_SECRET=$(Rand 48)"
 }
+# partner policy secret, shared by the Synapse module and the orchestrator (docs/PARTNERS.md)
+if (-not (Select-String -Path .env -Pattern "^AMER_FEDERATION_SECRET=" -Quiet)) { Add-Content -Encoding ascii .env "AMER_FEDERATION_SECRET=$(Rand 48)" }
 $envs = @{}; Get-Content .env | ForEach-Object { if ($_ -match "^(\w+)=(.*)$") { $envs[$matches[1]] = $matches[2] } }
 (Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" -replace "api_key: LK_API_KEY", "api_key: $($envs.LIVEKIT_API_KEY)" | Set-Content -Encoding ascii livekit.yaml
 if (-not (Test-Path synapse/homeserver.yaml)) {
@@ -54,6 +56,10 @@ if ((Get-Content $hsPath -Raw) -notmatch "(?m)^rc_message") {
 if ((Get-Content $hsPath -Raw) -notmatch "(?m)^retention") {
   Add-Content -Encoding ascii $hsPath "`nretention: {enabled: true, purge_jobs: [{interval: 1h}]}"
   Write-Host "Enabled disappearing messages."
+}
+if ((Get-Content $hsPath -Raw) -notmatch "amer_federation.AmerFederation") {
+  Add-Content -Encoding ascii $hsPath "`n# Amer Teams partner policy (docs/PARTNERS.md)`nmodules:`n  - module: amer_federation.AmerFederation`n    config: {orchestrator: `"http://orchestrator:8080`", secret: `"$($envs.AMER_FEDERATION_SECRET)`"}"
+  Write-Host "Enabled the partner policy: only approved partner servers can connect."
 }
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.local.yml restart synapse | Out-Null

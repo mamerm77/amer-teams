@@ -8,6 +8,7 @@ import '../services/call_manager.dart' show peerName;
 import 'copilot_screen.dart' show openAmerChat;
 import 'people_picker.dart';
 import 'notifications_screen.dart';
+import 'partners_screen.dart';
 import 'followed_threads_screen.dart';
 import '../services/quick_views.dart';
 
@@ -54,6 +55,7 @@ class _RS extends State<RoomsScreen> {
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FollowedThreadsScreen()))))]))),
         actions: [
         IconButton(icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; q.clear(); })),
+        IconButton(tooltip: 'New shared channel (partner organisation)', icon: const Icon(Icons.handshake_outlined), onPressed: () => newSharedChannel(c)),
         IconButton(tooltip: 'Notifications', icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
         IconButton(tooltip: 'Set your status', icon: const Icon(Icons.emoji_emotions_outlined), onPressed: () async {
           final ctl = TextEditingController();

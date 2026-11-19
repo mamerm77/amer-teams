@@ -20,6 +20,10 @@ class AmerFederation:
         self.server = api.server_name
         self._partners: set[str] = set(); self._at = 0.0
         api.register_third_party_rules_callbacks(check_event_allowed=self.check_event_allowed, on_create_room=self.on_create_room)
+        # check_event_allowed covers joins and invites; the spam checker also runs on every event arriving over
+        # federation, so messages from a server that is no longer a partner are refused (their content removed).
+        if hasattr(api, "register_spam_checker_callbacks"):
+            api.register_spam_checker_callbacks(check_event_for_spam=self.check_event_for_spam)
 
     @staticmethod
     def parse_config(config): return config
@@ -38,6 +42,18 @@ class AmerFederation:
         origin = sender.split(":", 1)[1] if ":" in sender else ""
         if not origin or origin == self.server: return True, None
         return (origin in await self.partners()), None
+
+    async def check_event_for_spam(self, event):
+        ok, _ = await self.check_event_allowed(event, {})
+        if ok:
+            try:
+                from synapse.module_api import NOT_SPAM
+                return NOT_SPAM
+            except ImportError: return "NOT_SPAM"
+        try:
+            from synapse.api.errors import Codes
+            return Codes.FORBIDDEN
+        except ImportError: return "M_FORBIDDEN"
 
     async def on_create_room(self, requester, request_content: dict, is_requester_admin: bool):
         shared = any(isinstance(e, dict) and e.get("type") == "com.amerteams.shared" for e in request_content.get("initial_state", []))

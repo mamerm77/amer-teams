@@ -49,6 +49,12 @@ class ApiService {
   Future<Map<String, dynamic>> agentBudget() async => jsonDecode((await http.get(_u('/v1/agentops/budget'), headers: _h)).body);
   Future<List<dynamic>> deliverables(String id) => _get('/v1/agentops/personal/${Uri.encodeComponent(id)}/deliverables');
 
+  // ---------- Partner organisations (docs/PARTNERS.md) ----------
+  Future<List<dynamic>> activePartners() => _get('/v1/federation/partners');
+  Future<List<dynamic>> adminPartners() => _get('/v1/admin/partners');
+  Future<Map<String, dynamic>> addPartner(String server, String note) => _post('/v1/admin/partners', {'server': server, 'note': note});
+  Future<Map<String, dynamic>> partnerAction(String server, String action) => _post('/v1/admin/partners/${Uri.encodeComponent(server)}', {'action': action});
+
   // ---------- Feature flags (docs/FEATURE_FLAGS.md) ----------
   Future<Map<String, dynamic>> flags() async => jsonDecode(utf8.decode((await http.get(_u('/v1/flags'), headers: _h)).bodyBytes));
   Future<Map<String, dynamic>> adminFlags() async => jsonDecode(utf8.decode((await http.get(_u('/v1/admin/flags'), headers: _h)).bodyBytes));

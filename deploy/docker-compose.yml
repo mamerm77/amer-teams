@@ -24,8 +24,8 @@ services:
   synapse:
     image: matrixdotorg/synapse:v1.120.0
     depends_on: {postgres: {condition: service_healthy}}
-    environment: {SYNAPSE_CONFIG_PATH: /data/homeserver.yaml}
-    volumes: [./synapse:/data]
+    environment: {SYNAPSE_CONFIG_PATH: /data/homeserver.yaml, PYTHONPATH: /modules}
+    volumes: [./synapse:/data, ./synapse-modules:/modules:ro]   # partner policy module (docs/PARTNERS.md)
     restart: unless-stopped
 
   livekit:

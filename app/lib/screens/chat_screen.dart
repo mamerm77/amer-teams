@@ -29,6 +29,7 @@ import 'security_badge.dart';
 import '../services/quick_views.dart';
 import '../services/feature_flags.dart';
 import '../services/ai_gate.dart';
+import '../services/dlp.dart';
 import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
@@ -196,6 +197,15 @@ class _S extends State<ChatScreen> {
   Future<void> send() async {
     final t = input.text.trim(); if (t.isEmpty) return;
     if (editing == null && t.startsWith('/') && !t.startsWith('//')) { input.clear(); setState(() {}); await _command(t); return; }   // '//' sends a literal slash
+    if (room.getState('com.amerteams.shared') != null) {          // data-loss check before it leaves for another organisation
+      final hits = dlpScan(t);
+      if (hits.isNotEmpty) {
+        await showDialog(context: context, builder: (d) => AlertDialog(title: const Text('Not sent'),
+          content: Text('This channel is shared with another organisation, and your message contains a ${hits.map((h) => h.kind).toSet().join(' and a ')}. Remove it, or share it another way.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Edit message'))]));
+        return;                                                    // the text stays in the box
+      }
+    }
     input.clear();
     typing = false; _safeTyping(false);
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
