@@ -91,6 +91,6 @@ class _S extends State<SkillsScreen> {
     body: err != null ? Center(child: Text(err!)) : mine == null ? const Center(child: CircularProgressIndicator()) : TabBarView(children: [
       ListView(children: [if (mine!.isEmpty) const ListTile(title: Text('No skills yet'), subtitle: Text('Make one for a task you repeat, or install one from the marketplace.')), for (final s in mine!) _tile(s, market: s['owner'] != context.read<ApiService>().me)]),
       ListView(children: [if (market!.isEmpty) const ListTile(title: Text('Nothing published in your organisation yet')), for (final s in market!) _tile(s, market: true)]),
-      if (queue != null) ListView(children: [if (queue!.isEmpty) const ListTile(title: Text('Nothing to review')), for (final s in queue!) ListTile(title: Text('${s['name']} (${s['kind']}, v${s['version']}) by ${s['owner']}'), subtitle: Text('${s['instructions']}'), trailing: SizedBox(width: 100, child: _tile(s, review: true).trailing))]),
+      if (queue != null) ListView(children: [if (queue!.isEmpty) const ListTile(title: Text('Nothing to review')), for (final s in queue!) _tile(s, review: true)]),
     ])));
 }
