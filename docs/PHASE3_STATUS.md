@@ -37,7 +37,7 @@ Each built feature has a doc listing its open gaps.
 | Webinars and town halls | Existing webinar mode (attendees cannot publish); registration, Q&A and HLS not started |
 | Breakout rooms | Existing |
 | Live translated captions | Partial: on-device captions exist; translation not started |
-| Noise suppression, blur, low light | Partial: WebRTC noise suppression, echo cancellation, gain control on every call; blur and low light need a native video plugin (segmentation on each platform) |
+| Noise suppression, blur, low light | Built, not tested on a real camera: native plugin (ML Kit on Android, Vision on iOS) blurs and brightens before encryption; desktop not available (BACKGROUND_EFFECTS.md) |
 | Deepfake detection | Not started |
 | AI call handling for phone lines | Not started |
 | Room devices and booking | Not started |

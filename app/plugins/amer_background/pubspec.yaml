@@ -1,0 +1,15 @@
+name: amer_background
+description: Background blur and low-light correction for Amer Teams calls, on the sender's device before encryption.
+version: 0.1.0
+publish_to: none
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+dependencies:
+  flutter: {sdk: flutter}
+  flutter_webrtc: any            # the camera frames come from its local video track
+flutter:
+  plugin:
+    platforms:
+      android: {package: com.amerteams.background, pluginClass: AmerBackgroundPlugin}
+      ios: {pluginClass: AmerBackgroundPlugin}

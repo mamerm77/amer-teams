@@ -11,6 +11,7 @@ dependencies:
   sqflite: ^2.4.0
   sqflite_common_ffi: ^2.4.2      # desktop SQLite
   path_provider: ^2.1.4
+  amer_background: {path: plugins/amer_background}   # blur + low light, on device (docs/BACKGROUND_EFFECTS.md)
   livekit_client: ^2.3.0          # WebRTC + E2EE frame encryption
   http: ^1.2.2
   provider: ^6.1.2

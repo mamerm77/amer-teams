@@ -5,6 +5,7 @@ import '../services/decisions_tasks.dart';
 import '../services/ai_gate.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
+import 'package:amer_background/amer_background.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -410,6 +411,18 @@ class _S extends State<CallScreen> {
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
 
   // ---------- UI ----------
+  bool bgBlur = false, lowLight = false;
+  /// Background effects run on this device before encoding and encryption (docs/BACKGROUND_EFFECTS.md).
+  Future<void> _effects({bool? blur, bool? low}) async {
+    final pub = call?.lk.localParticipant?.videoTrackPublications.where((p) => p.source == TrackSource.camera).firstOrNull;
+    final id = pub?.track?.mediaStreamTrack.id; if (id == null) return;
+    final b = blur ?? bgBlur, l = low ?? lowLight;
+    final ok = await AmerBackground.apply(id, blur: b ? 12 : 0, lowLight: l);
+    if (!mounted) return;
+    if (ok) { setState(() { bgBlur = b; lowLight = l; }); }
+    else { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Background effects are not available on this device'))); }
+  }
+
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
@@ -506,6 +519,8 @@ class _S extends State<CallScreen> {
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
           if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
           if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
+          if (!attendee && cam && AmerBackground.supported) _btn(bgBlur ? Icons.blur_on : Icons.blur_off, bgBlur ? 'Stop blur' : 'Blur background', () => _effects(blur: !bgBlur)),
+          if (!attendee && cam && AmerBackground.supported) _btn(Icons.wb_sunny_outlined, lowLight ? 'Normal light' : 'Low light', () => _effects(low: !lowLight), off: !lowLight),
           if (cam && !attendee) _btn(Icons.cameraswitch, 'Switch camera', _switchCamera),
           if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
           _btn(Icons.back_hand, myHand ? 'Lower hand' : 'Raise hand', _toggleHand, off: myHand),
