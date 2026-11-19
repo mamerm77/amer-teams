@@ -47,7 +47,7 @@ Each built feature has a doc listing its open gaps.
 ## Creative (15)
 | # | Feature | Status |
 |---|---|---|
-| 1 | Personal agent team | Built |
+| 1 | Personal agent team | Built, plus My agent office: a Chief of Staff and nine specialists in a 3D/2D virtual office, planning, delegating in parallel and merging; team room of hand-overs; approvals (VIRTUAL_OFFICE.md, tested 7/7 without an AI key) |
 | 2 | Agent glass box | Built |
 | 3 | Encrypted AI (on device or enclave) | Partial: routing with no silent fallback, server-enforced policy, where-it-ran labels, and an enclave proxy (sealed X25519 + AES-GCM requests, measurement pinned) used when policy allows; no hardware attestation (needs a confidential VM) and no on-device model (ENCRYPTED_AI.md) |
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |

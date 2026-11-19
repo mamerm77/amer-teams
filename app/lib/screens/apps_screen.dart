@@ -16,6 +16,7 @@ import 'guest_accounts_screen.dart';
 import 'in_person_screen.dart';
 import 'meeting_rooms_screen.dart';
 import 'notifications_screen.dart';
+import 'office_screen.dart';
 import 'operator_screen.dart';
 import 'ops_screen.dart';
 import 'partners_screen.dart';
@@ -52,6 +53,7 @@ const _sections = <(String, List<AppItem>)>[
     AppItem(Icons.videocam_outlined, 'In a meeting', 'Record with consent, translated captions, Q&A, guest link, phone dial-in, blur, live identity check', where: 'Meeting → More (…)'),
   ]),
   ('Amer and agents', [
+    AppItem(Icons.apartment, 'My agent office', 'Your own team of AI agents at their desks: ask your Chief of Staff, watch them hand work to each other', open: _office),
     AppItem(Icons.groups_2_outlined, 'My agents', 'Your personal agent team, with the glass box of what they did', open: _agents),
     AppItem(Icons.storefront_outlined, 'Skills and marketplace', 'Reusable AI skills and custom agents; your organisation\'s marketplace', open: _skills),
     AppItem(Icons.account_tree_outlined, 'Workflows', 'Automations described in plain language', open: _workflows),
@@ -82,7 +84,7 @@ Widget _rooms() => const MeetingRoomsScreen(); Widget _inPerson() => const InPer
 Widget _skills() => const SkillsScreen(); Widget _workflows() => const WorkflowsScreen(); Widget _agentOps() => const AgentOpsScreen(); Widget _operator() => const OperatorScreen();
 Widget _health() => const OpsScreen(); Widget _control() => const ControlScreen(); Widget _trace() => const CallTraceScreen(); Widget _users() => const AdminScreen();
 Widget _analytics() => const AnalyticsScreen(); Widget _guests() => const GuestAccountsScreen(); Widget _partners() => const PartnersScreen(); Widget _flags() => const FlagsScreen();
-Widget _security() => const SecurityScreen(); Widget _a11y() => const A11yScreen();
+Widget _office() => const OfficeScreen(); Widget _security() => const SecurityScreen(); Widget _a11y() => const A11yScreen();
 
 class AppsScreen extends StatefulWidget {
   const AppsScreen({super.key});
