@@ -54,7 +54,7 @@ class _S extends State<CalendarScreen> {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
       final up = s.data!.where((m) => m.start.add(Duration(minutes: m.minutes)).isAfter(DateTime.now())).toList();
       final ar = Localizations.localeOf(c).languageCode == 'ar';
-      final today = ListTile(dense: true, leading: const Icon(Icons.nights_stay_outlined), title: Text(Hijri.of(DateTime.now()).format(arabic: ar)), subtitle: Text(DateFormat.yMMMMEEEEd(ar ? 'ar' : 'en').format(DateTime.now())));
+      final today = ListTile(dense: true, leading: const Icon(Icons.nights_stay_outlined), title: Text(Hijri.of(DateTime.now()).format(arabic: ar)), subtitle: Text(DateFormat('EEEE d MMMM y').format(DateTime.now())));
       if (up.isEmpty) return ListView(children: [today, const Center(child: Text('No upcoming meetings.'))]);
       return ListView(children: [today, for (final m in up) ListTile(
         leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(DateFormat('EEE').format(m.start)), Text(DateFormat('d MMM').format(m.start), style: Theme.of(c).textTheme.labelSmall), Text('${Hijri.of(m.start).day} ${(ar ? Hijri.monthsAr : Hijri.monthsEn)[Hijri.of(m.start).month - 1]}', style: const TextStyle(fontSize: 9))]),
