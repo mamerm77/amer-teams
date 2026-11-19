@@ -16,7 +16,7 @@ class ShiftsScreen extends StatefulWidget {
 }
 class _Shifts extends State<ShiftsScreen> {
   List<dynamic>? rows; String? err;
-  bool get manager => widget.room.ownPowerLevel >= 50;
+  bool get manager => widget.room.getPowerLevelByUserId(widget.room.client.userID!).level >= 50;
   String get me => widget.room.client.userID!;
   @override void initState() { super.initState(); _load(); }
   Future<void> _load() async {
