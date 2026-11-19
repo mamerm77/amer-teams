@@ -328,6 +328,24 @@ void main() {
       await tap(find.text('Book'), 'Book');
       expectFound(await waitFor(find.textContaining('Booked '), secs: 20), 'meeting booked');
     });
+    await step('Decision: detected, proposed, quorum of owner + Bob, enters the ledger', () async {
+      await home(); await openChat();
+      await sendText('We agreed to go with Ciena for the Dubai ring');
+      await tap(find.text('Looks like a decision · propose it'), 'decision hint');
+      await tap(find.text('Propose'), 'Propose');
+      await tap(find.text('Confirm'), 'Confirm (owner)');
+      expectFound(await waitFor(find.textContaining('Still needs'), secs: 20), 'quorum not yet reached');
+      await sendText('bob: confirm decision');
+      expectFound(await waitFor(find.textContaining('in the ledger'), secs: 45), 'decision in the ledger');
+    });
+    await step('Task from a message, then marked done', () async {
+      await home(); await openChat(); await sendText('Send the vendor comparison');
+      await tap(find.byTooltip('Reply, react, forward, edit, delete…').first, 'options');
+      await tap(find.text('Create task'), 'Create task'); await tap(find.text('Save'), 'Save');
+      expectFound(await waitFor(find.byTooltip('Task options'), secs: 20), 'task card');
+      await tap(find.byTooltip('Task options').first, 'task options'); await tap(find.text('Mark done'), 'Mark done');
+      expectFound(await waitFor(find.byIcon(Icons.check_circle), secs: 20), 'task done');
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

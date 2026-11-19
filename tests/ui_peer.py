@@ -32,7 +32,7 @@ class Peer:
     def __init__(self):
         self.c = AsyncClient(HS, BOB, store_path=tempfile.mkdtemp(), config=AsyncClientConfig(store_sync_tokens=True, encryption_enabled=True))
         self.mode = "answer"; self.room = None; self.pk, self.sk = pq.keygen()
-        self.canvases = {}; self.last_canvas = None; self.last_announcement = None
+        self.canvases = {}; self.last_canvas = None; self.last_announcement = None; self.last_proposal = None
         self.calls = {}; self.pq_devs = {}; self.lk = None; self.src = None; self.tone_task = None
 
     async def send(self, typ, content):
@@ -93,6 +93,15 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: confirm decision") and self.last_proposal:   # Bob confirms with his own sign-in
+            eid, c, ts = self.last_proposal
+            await self.send("com.amerteams.decision.confirm", {"decision_id": c["decision_id"], "version": c["version"], "body": "Confirmed the decision"})
+            import hashlib
+            async with httpx.AsyncClient(timeout=15) as h:
+                r = await h.post(f"{API}/v1/decisions/confirm", headers={"Authorization": f"Bearer {self.c.access_token}"}, json={
+                    "room_id": self.room, "decision_id": c["decision_id"], "version": c["version"], "event_id": eid, "owner": c["owner"], "due": c.get("due"),
+                    "text_hash": hashlib.sha256(c["text"].encode()).hexdigest(), "supersedes": c.get("supersedes"), "proposed_at": ts})
+            log("decision confirm", r.status_code, r.text[:200])
         elif b.startswith("bob: ack"):                          # acknowledge the latest announcement
             if self.last_announcement: await self.send("com.amerteams.ack", {"announcement": self.last_announcement, "body": "Acknowledged"})
         elif b.startswith("bob: agent asks to send"):          # the real glass_box() in the orchestrator, no LLM
@@ -139,6 +148,7 @@ class Peer:
     async def on_unknown(self, room, ev):
         t, c = ev.type, ev.source.get("content", {})
         if ev.sender == BOB or not t.startswith("com.amerteams."): return
+        if t == "com.amerteams.decision.proposal": self.last_proposal = (ev.event_id, c, ev.server_timestamp); log("proposal", c.get("decision_id")); return
         if t == "com.amerteams.announcement": self.last_announcement = ev.event_id; log("announcement", ev.event_id); return
         if t in ("com.amerteams.canvas.create", "com.amerteams.canvas.update"):
             cid = c.get("canvas_id"); self.last_canvas = cid

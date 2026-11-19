@@ -111,8 +111,10 @@ def test_conditions_and_templates():
     assert W.render("From {{s1.vendor}} by {{trigger.sender}}", ctx) == "From Ciena by @sara"
 
 def test_not_yet_available_steps_are_refused():
-    e = W.validate({"name": "n", "trigger": {"type": "manual"}, "steps": [{"id": "t", "type": "create_task", "title": "x"}]})
+    e = W.validate({"name": "n", "trigger": {"type": "manual"}, "steps": [{"id": "t", "type": "call_connector", "connector": "jira"}]})
     assert any("not available yet" in x for x in e)
+    assert W.validate({"name": "n", "trigger": {"type": "manual"}, "steps": [{"id": "t", "type": "create_task", "title": "Review the quote"}]}) == []
+    assert any("needs a title" in x for x in W.validate({"name": "n", "trigger": {"type": "manual"}, "steps": [{"id": "t", "type": "create_task"}]}))
 
 def test_only_owner(monkeypatch):
     c = client(monkeypatch)

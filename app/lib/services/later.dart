@@ -72,8 +72,9 @@ class Reminders extends ChangeNotifier {
     _check();
   }
   Future<void> _save() async { try { await (await _f()).writeAsString(jsonEncode(items)); } catch (_) {} notifyListeners(); }
-  void add(String room, String event, String preview, DateTime at) {
-    items.add({'id': 'r${DateTime.now().microsecondsSinceEpoch}', 'room': room, 'event': event, 'preview': preview.length > 140 ? '${preview.substring(0, 140)}…' : preview, 'at': at.toIso8601String()});
+  void add(String room, String event, String preview, DateTime at, {String? key}) {
+    if (key != null && items.any((x) => x['key'] == key)) return;
+    items.add({'id': 'r${DateTime.now().microsecondsSinceEpoch}', if (key != null) 'key': key, 'room': room, 'event': event, 'preview': preview.length > 140 ? '${preview.substring(0, 140)}…' : preview, 'at': at.toIso8601String()});
     _save();
   }
   void dismiss(String id) { items.removeWhere((x) => x['id'] == id); if (due.value?['id'] == id) due.value = null; _save(); _check(); }

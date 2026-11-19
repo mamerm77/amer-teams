@@ -6,6 +6,7 @@ import 'package:matrix/matrix.dart';
 import 'package:path_provider/path_provider.dart';
 import 'api_service.dart';
 import 'workflow_engine.dart';
+import 'decisions_tasks.dart';
 
 /// Runs the owner's workflows on the owner's device (docs/WORKFLOWS.md). The device holds the keys, so message
 /// triggers are read and posts are sent here, encrypted and with the owner's own rights, never more. The server
@@ -174,6 +175,14 @@ class WorkflowRunner {
         final a = await api!.ask(wfRender('${s['prompt'] ?? ''}', ctx), agent: 'assist');
         if (a['error'] == true) throw Exception('Amer could not answer: ${a['answer']}');
         return {'answer': a['answer']};
+      case 'create_task':
+        final room = _room((s['room'] ?? trig['room']) as String?);
+        final who = wfPeople(s['assignee'] ?? c!.userID, ctx);
+        final id = 'task-${r['id']}-${s['id']}';
+        await saveTask(room, {'task_id': id, 'title': wfRender('${s['title']}', ctx), 'owner': who.isEmpty ? c!.userID : who.first, 'status': 'open',
+            if (s['due_days'] is num) 'due': DateTime.now().add(Duration(days: (s['due_days'] as num).toInt())).toIso8601String().substring(0, 10),
+            if (trig['event_id'] != null) 'source_event': trig['event_id']});
+        return {'task_id': id};
       case 'http':
         final body = {for (final e in ((s['body'] as Map?) ?? const {}).entries) '${e.key}': wfRender('${e.value}', ctx)};
         final res = await api!.workflowHttp(r['id'] as String, s['id'] as String, body);

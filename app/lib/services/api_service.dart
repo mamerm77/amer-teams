@@ -48,6 +48,18 @@ class ApiService {
   Future<Map<String, dynamic>> agentBudget() async => jsonDecode((await http.get(_u('/v1/agentops/budget'), headers: _h)).body);
   Future<List<dynamic>> deliverables(String id) => _get('/v1/agentops/personal/${Uri.encodeComponent(id)}/deliverables');
 
+  // ---------- Decision ledger (docs/DECISIONS.md) ----------
+  Future<Map<String, dynamic>> confirmDecision(Map<String, Object?> b) => _post('/v1/decisions/confirm', b);
+  Future<List<dynamic>> _getQ(String p, Map<String, String> q) async {
+    final r = await http.get(_u(p).replace(queryParameters: q), headers: _h);     // never put '?' in the path
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode >= 300) throw Exception(j['detail'] ?? 'Request failed (${r.statusCode})');
+    return j as List;
+  }
+  Future<List<dynamic>> decisionsIn(String roomId) => _getQ('/v1/decisions', {'room_id': roomId});
+  Future<List<dynamic>> myDecisions(String me) => _getQ('/v1/decisions', {'owner': me});
+  Future<void> decisionStatus(String id, String roomId, int version, String status) => _post('/v1/decisions/${Uri.encodeComponent(id)}/status', {'room_id': roomId, 'version': version, 'status': status});
+
   // ---------- Find-a-time (docs/FIND_A_TIME.md) ----------
   Future<void> putFreeBusy(Map<String, Object?> fb) async {
     final r = await http.put(_u('/v1/calendar/freebusy'), headers: _h, body: jsonEncode(fb));

@@ -20,8 +20,8 @@ from .admin import require_admin
 router = APIRouter()
 TRIGGERS = {"message", "schedule", "webhook", "form", "alarm", "calendar", "manual"}
 STEPS = {"post", "ask_form", "approval", "condition", "wait", "call_connector", "run_agent", "create_task", "http"}
-DEVICE_STEPS = {"post", "ask_form", "approval", "run_agent"}
-NOT_YET = {"create_task": "they arrive with task boards", "call_connector": "they arrive with calendar and tool connectors"}
+DEVICE_STEPS = {"post", "ask_form", "approval", "run_agent", "create_task"}
+NOT_YET = {"call_connector": "they arrive with calendar and tool connectors"}
 MAX_STEPS, MAX_RUNS_DAY, MAX_RUN_DAYS = 50, 1000, 30
 OPS = (">=", "<=", "!=", "==", ">", "<", " contains ")
 
@@ -72,6 +72,7 @@ def validate(d: Any) -> list[str]:
         if s.get("next") and s["next"] not in ids and s["next"] != "end": err.append(f"{sid}: next goes to unknown step {s['next']!r}")
         if k == "wait" and not (isinstance(s.get("minutes"), (int, float)) and 0 < s["minutes"] <= MAX_RUN_DAYS * 1440): err.append(f"{sid}: wait needs minutes (1 to {MAX_RUN_DAYS * 1440})")
         if k == "http" and not str(s.get("url", "")).startswith("https://"): err.append(f"{sid}: http needs an https:// url")
+        if k == "create_task" and not str(s.get("title", "")).strip(): err.append(f"{sid}: a task needs a title")
     if err: return err
     g = {k: [x for x in v if x != "end"] for k, v in _edges(steps).items()}
     seen, todo = set(), [ids[0]]
@@ -247,6 +248,7 @@ Step types (each has a unique "id" like "s1"):
  condition {"type":"condition","if":"$s1.field > 500000","then":STEP_ID,"else":STEP_ID}
  wait {"type":"wait","minutes":int}
  run_agent {"type":"run_agent","prompt":str}
+ create_task {"type":"create_task","title":str,"assignee":USER_ID or "$trigger.sender","due_days":int,"room":ROOM_ID (optional)}
 Results: a form gives $sN.<field>; an approval gives $sN.decision ("approved"/"rejected") and $sN.by; run_agent gives $sN.answer.
 Steps run in order unless a condition branches; use "next":"end" to stop. Use ROOM_IDs only from the list given.
 List every guess you made in assumptions (e.g. who approves). British English."""

@@ -24,6 +24,8 @@ import '../services/compliance_service.dart';
 import '../services/workflow_engine.dart';
 import 'canvas_screen.dart';
 import 'find_time_screen.dart';
+import 'tasks_screen.dart';
+import '../services/decisions_tasks.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
 
@@ -345,6 +347,8 @@ class _S extends State<ChatScreen> {
       if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
       if (!mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.auto_awesome), title: const Text('Suggest a reply (Amer)'), onTap: () => Navigator.pop(s, 'suggest')),
       ListTile(leading: const Icon(Icons.alarm_add_outlined), title: const Text('Remind me'), onTap: () => Navigator.pop(s, 'remind')),
+      ListTile(leading: const Icon(Icons.add_task), title: const Text('Create task'), onTap: () => Navigator.pop(s, 'task')),
+      ListTile(leading: const Icon(Icons.gavel), title: const Text('Mark as decision'), onTap: () => Navigator.pop(s, 'decision')),
       ListTile(leading: const Icon(Icons.copy), title: const Text('Copy'), onTap: () => Navigator.pop(s, 'copy')),
       if (canEdit) ListTile(leading: const Icon(Icons.edit), title: const Text('Edit'), onTap: () => Navigator.pop(s, 'edit')),
       if (canDelete) ListTile(leading: Icon(Icons.delete, color: Theme.of(context).colorScheme.error), title: Text(mine ? 'Delete for everyone' : 'Delete for everyone (moderator)'), onTap: () => Navigator.pop(s, 'delete')),
@@ -354,6 +358,8 @@ class _S extends State<ChatScreen> {
     if (a.startsWith('react:')) await sendEncryptedReaction(room, e.eventId, a.substring(6));
     if (a == 'reply') setState(() { replyTo = e; editing = null; });
     if (a == 'copy') await Clipboard.setData(ClipboardData(text: _text(e)));
+    if (a == 'task' && mounted) await editTask(context, room, title: plainMentions(_text(e)), sourceEvent: e.eventId);
+    if (a == 'decision' && mounted) await proposeDialog(context, room, text: plainMentions(_text(e)), sourceEvent: e.eventId);
     if (a == 'remind' && mounted) {
       final now = DateTime.now(), tomorrow9 = DateTime(now.year, now.month, now.day + 1, 9);
       final at = await showDialog<DateTime>(context: context, builder: (d) => SimpleDialog(title: const Text('Remind me'), children: [
@@ -400,9 +406,11 @@ class _S extends State<ChatScreen> {
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    const shownTypes = {kAnnouncement, 'com.amerteams.canvas.create', EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
+    const shownTypes = {kDecisionProposal, kTask, kAnnouncement, 'com.amerteams.canvas.create', EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
     final lifetime = (room.getState('m.room.retention')?.content['max_lifetime'] as num?)?.toInt();
-    var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit
+    final latestTask = <String>{}; final hideTask = <String>{};
+    for (final e in (tl?.events ?? []).where((e) => e.type == kTask)) { if (!latestTask.add('${e.content['task_id']}')) hideTask.add(e.eventId); }
+    var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && !hideTask.contains(e.eventId) && e.relationshipType != RelationshipTypes.edit
         && (lifetime == null || DateTime.now().difference(e.originServerTs).inMilliseconds < lifetime)).toList();
     evs = widget.threadRootId != null
         ? evs.where((e) => e.eventId == widget.threadRootId || _inThread(e)).toList()
@@ -444,7 +452,9 @@ class _S extends State<ChatScreen> {
             if (v == 'info') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatInfoScreen(roomId: room.id)));
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
+            if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
           }, itemBuilder: (_) => const [
+            PopupMenuItem(value: 'tasks', child: Text('Tasks')),
             PopupMenuItem(value: 'time', child: Text('Find a time')),
             PopupMenuItem(value: 'info', child: Text('Chat info')),
             PopupMenuItem(value: 'files', child: Text('Files and media')),
@@ -609,6 +619,44 @@ class _S extends State<ChatScreen> {
     ]);
   }
 
+  // ---------- decisions (docs/DECISIONS.md) ----------
+  Map<String, Map>? _ledger; DateTime? _ledgerAt;
+  Map<String, Map> _ledgerNow() {
+    if (_ledgerAt == null || DateTime.now().difference(_ledgerAt!) > const Duration(seconds: 15)) {
+      _ledgerAt = DateTime.now();
+      context.read<ApiService>().decisionsIn(room.id).then((l) { if (mounted) setState(() => _ledger = {for (final d in l.cast<Map>()) '${d['decision_id']}|${d['version']}': d}); }).catchError((_) {});
+    }
+    return _ledger ?? const {};
+  }
+  Widget _decision(BuildContext c, Event e) {
+    final cs = Theme.of(c).colorScheme, k = '${e.content['decision_id']}|${e.content['version']}';
+    final led = _ledgerNow()[k];
+    final confirms = {for (final x in (tl?.events ?? []).where((x) => x.type == kDecisionConfirm && x.content['decision_id'] == e.content['decision_id'] && x.content['version'] == e.content['version'])) x.senderId};
+    final owner = room.unsafeGetUserFromMemoryOrFallback('${e.content['owner']}').calcDisplayname();
+    final expired = led == null && DateTime.now().difference(e.originServerTs) > const Duration(hours: 72);
+    final status = led?['status'] as String?;
+    return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), color: status == 'superseded' ? cs.surfaceContainerHigh : cs.primaryContainer.withValues(alpha: .5), child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(Icons.gavel, color: cs.primary), const SizedBox(width: 8), Expanded(child: Text(
+          status == null ? (expired ? 'Proposed decision · not confirmed within 72 h' : 'Proposed decision') : status == 'superseded' ? 'Decision · superseded' : 'Decision · in the ledger (#${led!['seq']})',
+          style: Theme.of(c).textTheme.titleSmall)), Text('v${e.content['version']}', style: Theme.of(c).textTheme.labelSmall)]),
+      const SizedBox(height: 6),
+      Text('${e.content['text']}', style: TextStyle(fontSize: 15, decoration: status == 'superseded' ? TextDecoration.lineThrough : null)),
+      const SizedBox(height: 6),
+      Text('Owner $owner${e.content['due'] != null ? ' · due ${e.content['due']}' : ''}${status != null && status != 'confirmed' && status != 'superseded' ? ' · ${status.replaceAll('_', ' ')}' : ''}', style: const TextStyle(fontSize: 12)),
+      Text(confirms.isEmpty ? 'No confirmations yet: the owner and one other member are needed' : 'Confirmed by ${confirms.map((u) => room.unsafeGetUserFromMemoryOrFallback(u).calcDisplayname()).join(', ')}',
+          style: TextStyle(fontSize: 12, color: cs.outline)),
+      Wrap(spacing: 8, children: [
+        if (status == null && !expired && !confirms.contains(me)) FilledButton.icon(icon: const Icon(Icons.check), label: const Text('Confirm'), onPressed: () async {
+          try { final r = await confirmDecision(room, context.read<ApiService>(), e); _ledgerAt = null;
+            _snack(r['status'] == 'confirmed' ? 'Confirmed: the decision is in the ledger' : 'Confirmed. Still needs ${r['needs']}.'); }
+          catch (x) { _snack('$x'.replaceFirst('Exception: ', '')); } }),
+        if (status != 'superseded') TextButton(onPressed: () => proposeDialog(c, room, previous: e), child: const Text('Change (new version)')),
+        if (led != null && e.content['owner'] == me && (status == 'confirmed' || status == 'in_progress')) TextButton(onPressed: () async {
+          await context.read<ApiService>().decisionStatus('${e.content['decision_id']}', room.id, (e.content['version'] as num).toInt(), 'done'); _ledgerAt = null; setState(() {}); }, child: const Text('Mark done')),
+      ]),
+    ])));
+  }
+
   /// Announcement with "I acknowledge"; the sender sees who has and has not, and can remind the rest.
   Widget _announcement(BuildContext c, Event e) {
     final cs = Theme.of(c).colorScheme;
@@ -668,6 +716,8 @@ class _S extends State<ChatScreen> {
       return Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e.body, style: Theme.of(c).textTheme.labelSmall)));
     }
     if (e.type == kAnnouncement) return _announcement(c, e);
+    if (e.type == kDecisionProposal) return _decision(c, e);
+    if (e.type == kTask) return TaskTile(t: Task(e), onChanged: () => setState(() {}));
     if (e.type == 'com.amerteams.canvas.create') {
       return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(leading: const Icon(Icons.description_outlined),
         title: Text('${e.content['title'] ?? 'Canvas'}'), subtitle: Text('Canvas by ${e.senderFromMemoryOrFallback.calcDisplayname()}'),
@@ -748,6 +798,11 @@ class _S extends State<ChatScreen> {
     } else {
       final mentioned = mentionsMe(e, me);
       body = Container(color: mentioned && !mine ? cs.tertiaryContainer : null, child: _rich(c, _text(e)));
+      if (looksLikeDecision(e.body) && !(tl?.events ?? []).any((x) => x.type == kDecisionProposal && x.content['source_event'] == e.eventId)) {
+        body = Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [body,
+          TextButton.icon(style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact), icon: const Icon(Icons.gavel, size: 16),
+            label: const Text('Looks like a decision · propose it'), onPressed: () => proposeDialog(c, room, text: plainMentions(_text(e)), sourceEvent: e.eventId))]);
+      }
     }
     final replyId = e.relationshipType == null ? (e.content.tryGetMap<String, Object?>('m.relates_to')?.tryGetMap<String, Object?>('m.in_reply_to')?['event_id'] as String?) : null;
     final replied = replyId == null || tl == null ? null : tl!.events.where((x) => x.eventId == replyId).firstOrNull;

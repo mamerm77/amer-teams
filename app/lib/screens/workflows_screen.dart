@@ -157,6 +157,7 @@ class _E extends State<WorkflowEditor> {
       'wait' => (Icons.hourglass_empty, 'Wait ${s['minutes']} minutes'),
       'run_agent' => (Icons.auto_awesome, 'Ask Amer: ${s['prompt']}'),
       'http' => (Icons.http, 'Call ${s['url']} (admin-approved hosts only)'),
+      'create_task' => (Icons.add_task, 'Create task “${s['title']}” for ${s['assignee'] ?? 'me'}${s['due_days'] != null ? ', due in ${s['due_days']} days' : ''}'),
       _ => (Icons.help_outline, '${s['type']}'),
     };
     return Column(children: [
