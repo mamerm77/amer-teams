@@ -15,6 +15,7 @@ from nio import AsyncClient, AsyncClientConfig, RoomMessageText, UnknownEvent
 from livekit import rtc
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 import pq_hybrid as pq
+from canvas_crdt_ref import Doc as CanvasDoc     # independent implementation of the canvas CRDT
 
 HS = os.getenv("HS", "http://localhost")
 API = os.getenv("ORCH", f"{HS}/api")
@@ -30,6 +31,7 @@ class Peer:
     def __init__(self):
         self.c = AsyncClient(HS, BOB, store_path=tempfile.mkdtemp(), config=AsyncClientConfig(store_sync_tokens=True, encryption_enabled=True))
         self.mode = "answer"; self.room = None; self.pk, self.sk = pq.keygen()
+        self.canvases = {}; self.last_canvas = None
         self.calls = {}; self.pq_devs = {}; self.lk = None; self.src = None; self.tone_task = None
 
     async def send(self, typ, content):
@@ -86,6 +88,14 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: canvas add "):                 # edit the latest canvas with the Python CRDT
+            d = self.canvases.get(self.last_canvas)
+            texts = [e for e in (d.visible("blocks") if d else []) if e["val"] in ("p", "h")]
+            if d and texts:
+                lst = f"{texts[0]['id'][0]}@{texts[0]['id'][1]}:text"
+                op = d.insert(lst, len(d.visible(lst)), b[len("bob: canvas add "):])
+                await self.send("com.amerteams.canvas.update", {"canvas_id": self.last_canvas, "device": self.c.device_id, "ops": [op], "body": "Canvas edit"})
+            else: log("canvas: nothing to edit yet")
         elif b.startswith("bob: in 8s post updates"):        # unread messages for the catch-up digest
             async def updates():
                 await asyncio.sleep(8)
@@ -106,6 +116,11 @@ class Peer:
     async def on_unknown(self, room, ev):
         t, c = ev.type, ev.source.get("content", {})
         if ev.sender == BOB or not t.startswith("com.amerteams."): return
+        if t in ("com.amerteams.canvas.create", "com.amerteams.canvas.update"):
+            cid = c.get("canvas_id"); self.last_canvas = cid
+            d = self.canvases.setdefault(cid, CanvasDoc(self.c.device_id))
+            for op in c.get("ops", []): d.apply(op)
+            log("canvas", cid, [d.text(f"{e['id'][0]}@{e['id'][1]}:text") for e in d.visible("blocks")]); return
         log("event", t, {k: v for k, v in c.items() if k in ("call_id", "reason", "outcome", "media", "key_index")})
         cid = c.get("call_id")
         if t == "com.amerteams.pq.device" and c.get("user_id") == ev.sender:

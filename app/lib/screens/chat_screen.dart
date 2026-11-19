@@ -21,6 +21,7 @@ import '../services/chat_extras.dart';
 import '../services/outbox.dart';
 import '../services/compliance_service.dart';
 import '../services/workflow_engine.dart';
+import 'canvas_screen.dart';
 
 /// Encrypted chat: replies, reactions, edit, delete, typing indicator, read receipts,
 /// photo previews (decrypted on device), files, search, call and meeting cards.
@@ -310,7 +311,7 @@ class _S extends State<ChatScreen> {
   @override
   Widget build(BuildContext c) {
     final cs = Theme.of(c).colorScheme;
-    const shownTypes = {EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
+    const shownTypes = {'com.amerteams.canvas.create', EventTypes.Message, EventTypes.Encrypted, kCallInviteEvent, kCallEndEvent, 'com.amerteams.meeting', PollEventContent.startType, kChecklistEvent};
     final lifetime = (room.getState('m.room.retention')?.content['max_lifetime'] as num?)?.toInt();
     var evs = (tl?.events ?? []).where((e) => shownTypes.contains(e.type) && e.relationshipType != RelationshipTypes.edit
         && (lifetime == null || DateTime.now().difference(e.originServerTs).inMilliseconds < lifetime)).toList();
@@ -346,6 +347,7 @@ class _S extends State<ChatScreen> {
               ]))]),
         actions: [
           IconButton(tooltip: searching ? 'Close search' : 'Search', icon: Icon(searching ? Icons.close : Icons.search), onPressed: () => setState(() { searching = !searching; searchCtl.clear(); })),
+          IconButton(tooltip: 'Canvases', icon: const Icon(Icons.description_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)))),
           IconButton(tooltip: 'Voice call', icon: const Icon(Icons.call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, video: false)))),
           IconButton(tooltip: 'Video call', icon: const Icon(Icons.videocam), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id)))),
           PopupMenuButton<String>(onSelected: (v) {
@@ -517,6 +519,11 @@ class _S extends State<ChatScreen> {
     if (e.type == kCallEndEvent && e.content['version'] == 2) return const SizedBox.shrink();   // shown on the call card
     if (e.type == kCallEndEvent) {
       return Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text(e.body, style: Theme.of(c).textTheme.labelSmall)));
+    }
+    if (e.type == 'com.amerteams.canvas.create') {
+      return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(leading: const Icon(Icons.description_outlined),
+        title: Text('${e.content['title'] ?? 'Canvas'}'), subtitle: Text('Canvas by ${e.senderFromMemoryOrFallback.calcDisplayname()}'),
+        trailing: const Icon(Icons.open_in_new), onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CanvasScreen(room: room, id: '${e.content['canvas_id']}')))));
     }
     final wf = e.type == EventTypes.Message ? e.content[kWfContent] : null;
     if (wf is Map && (wf['kind'] == 'form' || wf['kind'] == 'approval')) return _workflowCard(c, e, Map<String, Object?>.from(wf));

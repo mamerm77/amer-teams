@@ -280,6 +280,18 @@ void main() {
       await tap(find.text('Approve'), 'Approve');
       expectFound(await waitFor(find.textContaining('Approved by @moh'), secs: 40), 'the workflow posted the result');
     });
+    await step('Canvas: create, write, and converge with Bob\'s edit (independent CRDT)', () async {
+      await home(); await openChat();
+      await tap(find.byTooltip('Canvases'), 'Canvases'); await tap(find.text('New canvas'), 'New canvas');
+      await t.enterText(field('Title'), 'Ring plan'); await tap(find.text('Create'), 'Create');
+      await tap(find.text('Text'), 'Text block');
+      await t.enterText(field('Write…'), 'Ring ready'); await wait(3);                  // sent within 400 ms
+      await t.pageBack(); await wait(1); await t.pageBack(); await wait(1);
+      await sendText('bob: canvas add  for traffic'); await wait(6);
+      await tap(find.byTooltip('Canvases'), 'Canvases'); await tap(find.text('Ring plan'), 'open canvas');
+      expectFound(await waitFor(find.text('Ring ready for traffic'), secs: 30), 'merged text from both editors');
+      await t.pageBack(); await wait(1); await t.pageBack(); await wait(1);
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
