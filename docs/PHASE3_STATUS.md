@@ -41,7 +41,7 @@ Each built feature has a doc listing its open gaps.
 | Deepfake detection | Not started |
 | AI call handling for phone lines | Not started |
 | Room devices and booking | Built: booking with no double booking (database constraint), private titles, check-in and no-show release, paired room display; tested 12/12 (ROOMS.md) |
-| Frontline shifts and walkie-talkie | Not started |
+| Frontline shifts and walkie-talkie | Built: manager-published shifts, no overlaps, clock in/out, approved swaps (tested 8/8); encrypted push-to-talk with floor control; no background PTT (FRONTLINE.md) |
 | DLP and inherited sensitivity labels | Partial: chat labels block AI (Guardian); DLP not started |
 
 ## Creative (15)

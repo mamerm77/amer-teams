@@ -1,3 +1,4 @@
+import 'frontline_screen.dart';
 import 'skills_screen.dart';
 import 'operator_screen.dart';
 import '../services/premortem.dart';
@@ -539,7 +540,11 @@ class _S extends State<ChatScreen> {
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
             if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
+            if (v == 'shifts') Navigator.push(c, MaterialPageRoute(builder: (_) => ShiftsScreen(room: room)));
+            if (v == 'ptt') Navigator.push(c, MaterialPageRoute(builder: (_) => WalkieTalkieScreen(room: room)));
           }, itemBuilder: (_) => [
+            const PopupMenuItem(value: 'shifts', child: Text('Shifts')),
+            if (room.encrypted) const PopupMenuItem(value: 'ptt', child: Text('Walkie-talkie')),
             if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),
             if (Flags.instance.on('find_time')) const PopupMenuItem(value: 'time', child: Text('Find a time')),
             const PopupMenuItem(value: 'info', child: Text('Chat info')),
