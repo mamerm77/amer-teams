@@ -20,6 +20,7 @@ import '../services/workflow_runner.dart';
 import '../services/glass_box.dart';
 import '../services/later.dart';
 import 'chat_screen.dart';
+import 'find_time_screen.dart';
 
 class HomeScreen extends StatefulWidget { const HomeScreen({super.key}); @override State<HomeScreen> createState() => _S(); }
 class _S extends State<HomeScreen> with WidgetsBindingObserver {
@@ -31,6 +32,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     WorkflowRunner.instance.start(m.client, ApiService(m));        // the owner's workflows run on this device
     GlassBox.instance.start(m, ApiService(m));                     // personal agents' approvals; approved actions run here
     ScheduledSender.instance.start(m.client); Reminders.instance.start();
+    CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
   }

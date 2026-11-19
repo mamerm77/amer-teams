@@ -48,6 +48,14 @@ class ApiService {
   Future<Map<String, dynamic>> agentBudget() async => jsonDecode((await http.get(_u('/v1/agentops/budget'), headers: _h)).body);
   Future<List<dynamic>> deliverables(String id) => _get('/v1/agentops/personal/${Uri.encodeComponent(id)}/deliverables');
 
+  // ---------- Find-a-time (docs/FIND_A_TIME.md) ----------
+  Future<void> putFreeBusy(Map<String, Object?> fb) async {
+    final r = await http.put(_u('/v1/calendar/freebusy'), headers: _h, body: jsonEncode(fb));
+    if (r.statusCode >= 300) throw Exception(jsonDecode(utf8.decode(r.bodyBytes))['detail'] ?? 'Request failed (${r.statusCode})');
+  }
+  Future<Map<String, dynamic>> findTime(List<String> invitees, int minutes, DateTime from, DateTime to) => _post('/v1/calendar/find-time',
+      {'invitees': invitees, 'duration_min': minutes, 'window_start': from.toUtc().toIso8601String(), 'window_end': to.toUtc().toIso8601String()});
+
   // ---------- Workflows (docs/WORKFLOWS.md) ----------
   Future<List<dynamic>> workflows() => _get('/v1/workflows');
   Future<Map<String, dynamic>> workflowDraft(String text, List<Map<String, String>> rooms) => _post('/v1/workflows/draft', {'text': text, 'rooms': rooms});

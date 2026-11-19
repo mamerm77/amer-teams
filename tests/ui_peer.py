@@ -63,6 +63,10 @@ class Peer:
             await h.put(f"{HS}/_matrix/client/v3/user/{BOB}/account_data/m.direct", headers={"Authorization": f"Bearer {self.c.access_token}"}, json={MOH: [self.room]})
             await h.post(f"{HS}/_matrix/client/v3/logout", headers=M)          # the app signs in with its own device
         await self.c.set_displayname("Bob Tester")
+        async with httpx.AsyncClient(timeout=15) as h:                 # Bob shares free/busy (any day, all day) for find-a-time
+            r = await h.put(f"{API}/v1/calendar/freebusy", headers={"Authorization": f"Bearer {self.c.access_token}"},
+                            json={"tz": "Asia/Dubai", "work": {"days": [0, 1, 2, 3, 4, 5, 6], "start": "00:00", "end": "23:59"}, "busy": []})
+            log("freebusy", r.status_code)
         await self.c.sync(timeout=1000); await self.keys()
         await self.send("com.amerteams.pq.device", {"user_id": BOB, "device_id": self.c.device_id, "alg": "ML-KEM-768",
                                                      "pk": base64.b64encode(self.pk).decode(), "body": "🔐 Quantum-safe device key"})

@@ -319,6 +319,15 @@ void main() {
       await t.pageBack(); await wait(1);
       expectFound(await waitFor(find.text('Weekly report attached'), secs: 40), 'scheduled message sent');
     });
+    await step('Find a time with Bob: 3 slots, Bob\'s calendar checked, book one', () async {
+      await home(); await openChat();
+      await tap(find.byTooltip('Show menu'), 'chat menu'); await tap(find.text('Find a time'), 'Find a time');
+      await tap(find.text('Find the best times'), 'Find the best times');
+      expectFound(await waitFor(find.text('Everyone is free at:'), secs: 30), 'slots found');
+      expectFound(find.textContaining('Not checked').evaluate().isEmpty, 'Bob\'s free/busy was used');
+      await tap(find.text('Book'), 'Book');
+      expectFound(await waitFor(find.textContaining('Booked '), secs: 20), 'meeting booked');
+    });
     await step('Forward a message', () async {
       await home(); await openChat();
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');

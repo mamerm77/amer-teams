@@ -5,12 +5,13 @@ import '../services/api_service.dart';
 import '../services/matrix_service.dart';
 import 'call_screen.dart';
 import '../services/meeting_service.dart';
+import 'find_time_screen.dart';
 
 /// Meetings are encrypted events inside chats. The Scheduler agent turns plain language into a meeting.
 class CalendarScreen extends StatefulWidget { const CalendarScreen({super.key}); @override State<CalendarScreen> createState() => _S(); }
 class _S extends State<CalendarScreen> {
   Future<List<Meeting>>? f;
-  @override void initState() { super.initState(); f = context.read<MatrixService>().meetings(); }
+  @override void initState() { super.initState(); f = context.read<MatrixService>().meetings(); CalendarPrefs.publish(context.read<MatrixService>(), context.read<ApiService>()).catchError((_) {}); }
   void _reload() => setState(() => f = context.read<MatrixService>().meetings());
 
   Future<void> _new() async {
@@ -34,7 +35,10 @@ class _S extends State<CalendarScreen> {
   }
 
   @override Widget build(BuildContext c) => Scaffold(
-    appBar: AppBar(title: const Text('Calendar'), actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _reload)]),
+    appBar: AppBar(title: const Text('Calendar'), actions: [
+      TextButton.icon(icon: const Icon(Icons.manage_search), label: const Text('Find a time'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FindTimeScreen()))),
+      IconButton(tooltip: 'Working hours and prayer times', icon: const Icon(Icons.schedule), onPressed: () => showCalendarSettings(c)),
+      IconButton(icon: const Icon(Icons.refresh), onPressed: _reload)]),
     floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.auto_awesome), label: const Text('Schedule with Amer'), onPressed: _new),
     body: FutureBuilder<List<Meeting>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());

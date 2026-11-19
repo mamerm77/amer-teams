@@ -23,6 +23,7 @@ import '../services/outbox.dart';
 import '../services/compliance_service.dart';
 import '../services/workflow_engine.dart';
 import 'canvas_screen.dart';
+import 'find_time_screen.dart';
 
 const kAnnouncement = 'com.amerteams.announcement', kAck = 'com.amerteams.ack';
 
@@ -442,7 +443,9 @@ class _S extends State<ChatScreen> {
             if (v == 'sum') summarise();
             if (v == 'info') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatInfoScreen(roomId: room.id)));
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
+            if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
           }, itemBuilder: (_) => const [
+            PopupMenuItem(value: 'time', child: Text('Find a time')),
             PopupMenuItem(value: 'info', child: Text('Chat info')),
             PopupMenuItem(value: 'files', child: Text('Files and media')),
             PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
