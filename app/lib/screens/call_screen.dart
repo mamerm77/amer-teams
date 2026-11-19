@@ -6,6 +6,7 @@ import '../services/ai_gate.dart';
 import 'package:flutter/services.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:amer_background/amer_background.dart';
+import '../services/recording.dart';
 import 'package:matrix/matrix.dart' as mx;
 import 'package:provider/provider.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -249,7 +250,7 @@ class _S extends State<CallScreen> {
       sec('Speaker', Icons.volume_up_outlined, 'audiooutput', lk.setAudioOutputDevice),
     ])));
   }
-  void _refresh() { if (mounted) setState(() {}); }
+  void _refresh() { _recTick(); if (mounted) setState(() {}); }
 
   void _onCtl() {
     final c = ctl!;
@@ -296,6 +297,7 @@ class _S extends State<CallScreen> {
       final j = jsonDecode(utf8.decode(e.data)); final who = e.participant?.name ?? 'Someone';
       setState(() {
         if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); }
+        if (j['t'] == 'rec') _onRec(j, e.participant?.identity ?? '', who);
         if (j['t'] == 'react') floating.add((who, j['e'] as String, DateTime.now()));
         if (j['t'] == 'cap' && aiOn && j['x'] is String) lines.add({'speaker': who, 'text': j['x'], 'ts': j['ts'] is int ? j['ts'] : DateTime.now().millisecondsSinceEpoch});
       });
@@ -391,6 +393,7 @@ class _S extends State<CallScreen> {
   }
 
   Future<void> _leave() async {
+    if (rec.recording && isHost) await _stopRec('host left');
     if (ctl != null) {                         // 1:1: signalling sends hangup + end and tears media down
       await stt.stop(); await ev?.dispose(); ev = null; await ctl!.hangup(); return;
     }
@@ -409,6 +412,75 @@ class _S extends State<CallScreen> {
     if (mounted) Navigator.pop(context);
   }
   @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+
+  // ---------- recordings with consent (docs/RECORDINGS.md) ----------
+  final rec = RecordingConsent(); final recorder = DeviceRecorder(); final _asked = <String>{};
+  bool _recPrompt = false;
+  String get _myId => call?.lk.localParticipant?.identity ?? '';
+  List<String> get _present => [_myId, ...?call?.lk.remoteParticipants.values.map((p) => p.identity)];
+  void _audit(String e) { if (rec.id != null) context.read<ApiService>().recordingEvent(widget.roomId, callId, rec.id!, e).catchError((_) => <String, dynamic>{}); }
+
+  Future<void> _askRecord() async {
+    if (!DeviceRecorder.supported) { _snack('Recording is made on the host\'s phone or tablet: not available on this device'); return; }
+    rec.reset(); rec.id = 'rec-${DateTime.now().millisecondsSinceEpoch}'; rec.agreed.add(_myId); _asked.clear();
+    _audit('requested'); _audit('consent');
+    await _send({'t': 'rec', 'op': 'ask', 'id': rec.id}); _asked.addAll(_present);
+    setState(() {}); _snack('Asking everyone for consent to record');
+    _recTick();
+  }
+  /// Host side: start when everyone present agreed; ask late joiners; stop if anyone present has not agreed.
+  void _recTick() {
+    if (!isHost || rec.id == null || call == null) return;
+    for (final p in _present.where((p) => !_asked.contains(p))) { _asked.add(p); _send({'t': 'rec', 'op': rec.recording ? 'ask-late' : 'ask', 'id': rec.id}); }
+    if (!rec.recording && rec.allAgreed(_present)) { _startRec(); }
+    else if (rec.recording && rec.declined.isNotEmpty) { _stopRec('${rec.declined.first} declined'); }
+  }
+  Future<void> _startRec() async {
+    rec.recording = true; setState(() {});
+    try {
+      final cam = call!.lk.remoteParticipants.values.expand((p) => p.videoTrackPublications).map((p) => p.track).whereType<VideoTrack>().firstOrNull
+          ?? call!.lk.localParticipant?.videoTrackPublications.map((p) => p.track).whereType<VideoTrack>().firstOrNull;
+      await recorder.start(cam?.mediaStreamTrack);
+      _audit('started'); await _send({'t': 'rec', 'op': 'started', 'id': rec.id});
+    } catch (e) { rec.recording = false; setState(() {}); _snack('Could not start recording: $e'); }
+  }
+  Future<void> _stopRec(String why) async {
+    if (!rec.recording) { rec.reset(); setState(() {}); return; }
+    rec.recording = false; final id = rec.id; setState(() {});
+    _audit('stopped'); await _send({'t': 'rec', 'op': 'stopped', 'id': id, 'why': why});
+    final f = await recorder.stop(); rec.reset(); setState(() {});
+    if (f == null) { _snack('The recording was empty'); return; }
+    try {
+      await room.sendFileEvent(MatrixVideoFile(bytes: await f.readAsBytes(), name: 'Meeting recording ${DateTime.now().toIso8601String().substring(0, 16)}.mp4', mimeType: 'video/mp4'));
+      await f.delete(); _snack('Recording shared in the chat, end-to-end encrypted ($why)');
+    } catch (e) { _snack('Could not share the recording: $e'); }
+  }
+  void _onRec(Map j, String from, String who) {
+    final id = j['id'] as String?; final op = j['op'];
+    if (op == 'ask' || op == 'ask-late') { if (!_recPrompt) _consentDialog(id!, who, op == 'ask-late'); return; }
+    if (op == 'started') { rec.id = id; rec.recording = true; return; }
+    if (op == 'stopped') { rec.reset(); _snack('Recording stopped${j['why'] != null ? ' (${j['why']})' : ''}'); return; }
+    if (!isHost || id != rec.id) return;
+    if (op == 'yes') { rec.agreed.add(from); _recTick(); }
+    if (op == 'no' || op == 'withdraw') { rec.agreed.remove(from); rec.declined.add(who); _recTick(); if (!rec.recording) { _snack('$who declined: not recording'); rec.reset(); } }
+  }
+  Future<void> _consentDialog(String id, String host, bool late) async {
+    _recPrompt = true;
+    final ok = await showDialog<bool>(context: context, barrierDismissible: false, builder: (d) => AlertDialog(
+      title: const Text('Record this meeting?'),
+      content: Text('$host wants to record${late ? ' (already recording)' : ''}. The recording includes video and audio of everyone and is shared in the meeting chat, end-to-end encrypted. It starts only if everyone agrees; you can withdraw at any time.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Decline')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('I agree'))]));
+    _recPrompt = false;
+    rec.id = id; if (ok == true) rec.agreed.add(_myId);
+    final api = context.read<ApiService>(); api.recordingEvent(widget.roomId, callId, id, ok == true ? 'consent' : 'decline').catchError((_) => <String, dynamic>{});
+    await _send({'t': 'rec', 'op': ok == true ? 'yes' : 'no', 'id': id});
+    if (mounted) setState(() {});
+  }
+  Future<void> _withdraw() async {
+    final id = rec.id; if (id == null) return;
+    context.read<ApiService>().recordingEvent(widget.roomId, callId, id, 'withdrawn').catchError((_) => <String, dynamic>{});
+    await _send({'t': 'rec', 'op': 'withdraw', 'id': id}); rec.agreed.remove(_myId); setState(() {});
+  }
 
   // ---------- UI ----------
   bool bgBlur = false, lowLight = false;
@@ -459,6 +531,7 @@ class _S extends State<CallScreen> {
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(room.getLocalizedDisplayname(), overflow: TextOverflow.ellipsis),
           Row(children: [
+            if (rec.recording) const Padding(padding: EdgeInsets.only(right: 6), child: Chip(visualDensity: VisualDensity.compact, avatar: Icon(Icons.fiber_manual_record, color: Colors.red, size: 14), label: Text('Recording'))),
             Icon(Icons.lock, size: 14, color: call!.encrypted ? Colors.green : cs.error), const SizedBox(width: 4),
             Flexible(child: Text('${call!.encrypted ? 'Encrypted · quantum-safe' : 'NOT ENCRYPTED'} · $timer · code ${call!.safetyCode}',
                 style: Theme.of(c).textTheme.labelSmall, overflow: TextOverflow.ellipsis)),
@@ -483,6 +556,8 @@ class _S extends State<CallScreen> {
               case 'amer': _toggleAi();
               case 'agenda': _agendaDialog();
               case 'webinar': _setWebinar(!webinar);
+              case 'rec': rec.recording ? _stopRec('stopped by host') : _askRecord();
+              case 'withdraw': _withdraw();
               case 'end': _host('end');
             }
           }, itemBuilder: (_) => [
@@ -495,6 +570,8 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) PopupMenuItem(value: 'webinar', child: ListTile(leading: const Icon(Icons.campaign), title: Text(webinar ? 'Turn off webinar mode' : 'Webinar mode'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'agenda', child: ListTile(leading: Icon(Icons.list_alt), title: Text('Agenda and timer'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
+            if (isHost && widget.meeting) PopupMenuItem(value: 'rec', child: ListTile(leading: Icon(rec.recording ? Icons.stop : Icons.fiber_manual_record, color: Colors.red), title: Text(rec.recording ? 'Stop recording' : 'Record (with consent)'))),
+            if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
         ]),

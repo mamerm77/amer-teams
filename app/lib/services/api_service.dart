@@ -135,6 +135,10 @@ class ApiService {
   Future<Map<String, dynamic>> meetingControl(String roomId, String callId, String action, {String? identity}) =>
       _post('/v1/meetings/control', {'room_id': roomId, 'call_id': callId, 'action': action, 'identity': identity});
 
+  /// Recording consent trail (docs/RECORDINGS.md). The server records nothing; it keeps who agreed, and when.
+  Future<Map<String, dynamic>> recordingEvent(String roomId, String callId, String recId, String event) =>
+      _post('/v1/meetings/recording', {'room_id': roomId, 'call_id': callId, 'recording_id': recId, 'event': event});
+
   // ---------- Phone network ----------
   Future<Map<String, dynamic>> phonePolicy() async => jsonDecode((await http.get(_u('/v1/phone/policy'), headers: _h)).body);
   Future<Map<String, dynamic>> dial(String number) => _post('/v1/phone/dial', {'number': number});

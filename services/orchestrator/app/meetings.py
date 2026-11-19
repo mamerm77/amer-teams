@@ -88,3 +88,33 @@ async def presence(room_id: str, call_id: str, user=Depends(auth.matrix_user)):
         except Exception:
             ps = []            # room does not exist on the media server: nobody is in the meeting
     return {"count": len(ps), "participants": [p.identity for p in ps]}
+
+# ---------- recordings with consent (docs/RECORDINGS.md) ----------
+# The server never records: media is end-to-end encrypted. It keeps the consent trail only, so an organisation can
+# show who agreed to which recording and when. The recording itself is made on the host's device and shared in the
+# chat as an encrypted file.
+class RecordingEvent(BaseModel):
+    room_id: str
+    call_id: str
+    recording_id: str
+    event: str            # requested | consent | decline | started | stopped | withdrawn
+
+REC_EVENTS = {"requested", "consent", "decline", "started", "stopped", "withdrawn"}
+
+@router.post("/recording")
+async def recording_event(req: RecordingEvent, user=Depends(auth.matrix_user)):
+    if req.event not in REC_EVENTS: raise HTTPException(422, "Unknown recording event")
+    if db.pool is None: return {"ok": True}
+    if req.event in ("requested", "started", "stopped") and await power_level(user, req.room_id) < HOST_LEVEL:
+        raise HTTPException(403, "Only a host can start or stop a recording")
+    await db.audit(user["user_id"], f"recording.{req.event}", f"{req.room_id}|{req.call_id}|{req.recording_id}")
+    return {"ok": True}
+
+@router.get("/recording/{recording_id}")
+async def recording_trail(recording_id: str, room_id: str, user=Depends(auth.matrix_user)):
+    if await power_level(user, room_id) < HOST_LEVEL: raise HTTPException(403, "Hosts only")
+    if db.pool is None: return []
+    async with db.pool.connection() as c:
+        rows = await (await c.execute("SELECT user_id, action, extract(epoch from ts)::bigint FROM audit_log WHERE action LIKE 'recording.%%' AND detail LIKE %s ORDER BY id",
+                                      (f"%|{recording_id}",))).fetchall()
+    return [{"user": a, "event": x.split(".", 1)[1], "at": t} for a, x, t in rows]
