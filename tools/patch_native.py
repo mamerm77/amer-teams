@@ -15,6 +15,8 @@ if "ios" in sys.argv:
     p = pathlib.Path("ios/Runner/Info.plist"); s = p.read_text()
     add = """	<key>NSCameraUsageDescription</key><string>Video calls</string>
 	<key>NSMicrophoneUsageDescription</key><string>Voice and video calls</string>
+	<key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+	<key>NSLocalNetworkUsageDescription</key><string>Connect to your Amer Teams server on this Wi-Fi network</string>
 	<key>NSSpeechRecognitionUsageDescription</key><string>On-device live captions</string>
 	<key>UIBackgroundModes</key><array><string>audio</string><string>voip</string><string>remote-notification</string></array>
 """

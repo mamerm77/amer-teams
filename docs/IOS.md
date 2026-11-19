@@ -8,7 +8,7 @@
 5. On the iPhone: Settings → General → VPN & Device Management → your Apple ID → **Trust**. On iOS 16+ also turn on Settings → Privacy & Security → **Developer Mode** and restart.
 
 Limits of the free route (Apple rules): the app must be re-installed every **7 days** (Sideloadly can refresh it), at most 3 sideloaded apps, and **push notifications do not work**, so keep the app open to receive calls. Chat, calls, meetings, files and the AI co-pilot work normally.
-iOS blocks plain HTTP, so point the app at a server with HTTPS (a public domain via Caddy), not the `http://<PC-IP>` Wi-Fi test mode.
+The app is allowed plain HTTP **only to your local network** (Apple's `NSAllowsLocalNetworking`), so it works with the `http://<PC-IP>` Wi-Fi test mode. iOS asks once for *Local Network* permission: tap **Allow**. Internet servers still require HTTPS.
 
 ## Paid route: TestFlight (for many testers)
 
