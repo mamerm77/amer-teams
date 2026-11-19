@@ -1,3 +1,4 @@
+import 'meeting_twin_screen.dart';
 import 'team_room_bar.dart';
 import 'frontline_screen.dart';
 import 'skills_screen.dart';
@@ -541,9 +542,11 @@ class _S extends State<ChatScreen> {
             if (v == 'files') Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
             if (v == 'time') Navigator.push(c, MaterialPageRoute(builder: (_) => FindTimeScreen(room: room)));
             if (v == 'tasks') Navigator.push(c, MaterialPageRoute(builder: (_) => TasksScreen(room: room)));
+            if (v == 'twin') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingTwinScreen(room: room)));
             if (v == 'shifts') Navigator.push(c, MaterialPageRoute(builder: (_) => ShiftsScreen(room: room)));
             if (v == 'ptt') Navigator.push(c, MaterialPageRoute(builder: (_) => WalkieTalkieScreen(room: room)));
           }, itemBuilder: (_) => [
+            const PopupMenuItem(value: 'twin', child: Text('Meeting twin')),
             const PopupMenuItem(value: 'shifts', child: Text('Shifts')),
             if (room.encrypted) const PopupMenuItem(value: 'ptt', child: Text('Walkie-talkie')),
             if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),

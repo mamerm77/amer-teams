@@ -51,7 +51,7 @@ Each built feature has a doc listing its open gaps.
 | 2 | Agent glass box | Built |
 | 3 | Encrypted AI (on device or enclave) | Partial: routing table, no silent fallback, server-enforced policy, where-it-ran labels. No on-device model or enclave yet (ENCRYPTED_AI.md) |
 | 4 | Decision ledger | Built, not yet seen passing in use (DECISIONS.md) |
-| 5 | Meeting digital twin | Not started |
+| 5 | Meeting digital twin | Built: on-device view of all minutes, decisions, open/overdue actions, recurring topics, and ask-the-history with dates (MEETING_TWIN.md) |
 | 6 | Pre-mortem agent | Built: /premortem, ranked plan-specific risks, share or turn mitigations into tasks (PREMORTEM.md) |
 | 7 | Network-aware calls | Built: per-tile quality, automatic data saver then audio-only (screen share kept), recovery; manual modes (NETWORK_AWARE.md) |
 | 8 | Quantum-safe badge | Built: chat padlock with key types, rotation and verified devices; says plainly that messages are not yet quantum-safe |
