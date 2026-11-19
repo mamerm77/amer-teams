@@ -1,3 +1,4 @@
+import '../services/private_notes.dart';
 import 'meeting_twin_screen.dart';
 import 'team_room_bar.dart';
 import 'frontline_screen.dart';
@@ -87,6 +88,7 @@ class _S extends State<ChatScreen> {
   @override void initState() {
     super.initState();
     outbox = Outbox(room)..addListener(() { if (mounted) setState(() {}); })..load();
+    _loadPrivate();
     if (widget.threadRootId == null && !widget.filesOnly) {
       Drafts.instance.load().then((_) { final d = Drafts.instance.of(room.id); if (d != null && input.text.isEmpty && mounted) setState(() => input.text = d); });
     }
@@ -196,8 +198,8 @@ class _S extends State<ChatScreen> {
         final ctx = (tl?.events ?? []).where((e) => e.type == EventTypes.Message).take(30).toList().reversed.map((e) => '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(e.body)}').join('\n');
         try {
           final r = await context.read<ApiService>().ask(arg, context: 'Recent messages in this chat:\n$ctx', labels: [if (label != null) label], encrypted: room.encrypted);
-          if (mounted) showModalBottomSheet(context: context, builder: (_) => Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Amer · only you can see this', style: TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 8), SelectableText('${r['answer']}'), const SizedBox(height: 8), Text(g.where, style: const TextStyle(fontSize: 12))])));
+          await PrivateNotes.add(room, 'Amer', 'Q: $arg\n${r['answer']}\n(${g.where})');
+          await _loadPrivate();
         } catch (e) { _snack('Amer could not answer: $e'); }
       default:
         final near = slash.keys.where((k) => k.startsWith(cmd.substring(0, min(3, cmd.length)))).join(', ');
@@ -253,6 +255,9 @@ class _S extends State<ChatScreen> {
       ])));
     } catch (e) { _snack('Could not draft the review: $e'); }
   }
+
+  List<Event> privateNotes = [];
+  Future<void> _loadPrivate() async { final n = await PrivateNotes.forRoom(room.client, room.id); if (mounted) setState(() => privateNotes = n); }
 
   Future<void> send() async {
     final t = input.text.trim(); if (t.isEmpty) return;
@@ -556,6 +561,12 @@ class _S extends State<ChatScreen> {
             const PopupMenuItem(value: 'sum', child: Text('Summarise with Amer'))]),
         ]),
       body: Column(children: [
+        for (final n in privateNotes.take(3)) Material(color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.5), child: ListTile(dense: true,
+          leading: const Icon(Icons.visibility_off_outlined, size: 18), title: Text('${n.content['agent']} · only you can see this', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          subtitle: SelectableText('${n.content['text']}', maxLines: 8),
+          trailing: Wrap(children: [
+            IconButton(tooltip: 'Share in chat', icon: const Icon(Icons.share, size: 18), onPressed: () async { await room.sendTextEvent('${n.content['text']}'); await PrivateNotes.dismiss(n); _loadPrivate(); }),
+            IconButton(tooltip: 'Dismiss', icon: const Icon(Icons.close, size: 18), onPressed: () async { await PrivateNotes.dismiss(n); _loadPrivate(); })]))),
         if (room.getState(kIncident) != null) IncidentBanner(room: room, onReview: _incidentReview),
         if (!room.isDirectChat && room.encrypted && !widget.filesOnly) TeamRoomBar(room: room),
         if (lifetime != null) Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), color: Theme.of(c).colorScheme.surfaceContainerHigh,

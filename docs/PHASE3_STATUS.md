@@ -29,7 +29,7 @@ Each built feature has a doc listing its open gaps.
 | Reusable AI skills and custom agents | Built: skills with inputs, custom agents, /skill in chats, Guardian on every run; tested 13/13 (SKILLS.md) |
 | In-person meeting notes | Built: on-device transcription, speaker marking, AI minutes, decisions and tasks; no diarisation (IN_PERSON_NOTES.md) |
 | No-code workflows | Built |
-| Agent messages visible to one user | Partial: meeting answers and `/ask` are private on the asker's screen; the encrypted-to-one-user event is not built |
+| Agent messages visible to one user | Built: notes in your own encrypted room, shown inline in the chat on all your devices, share or dismiss; /ask uses it (PRIVATE_AGENT_MESSAGES.md) |
 | Canvases / Loop | Built |
 | Shared files tab with versions | Existing files view; versions and grouping not started |
 | Drafts, mentions, followed quick views | Built |
