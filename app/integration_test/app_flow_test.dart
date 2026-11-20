@@ -51,6 +51,8 @@ void main() {
     Future<void> openApp(String name) async {
       await tap(find.text('Apps'), 'Apps tab');
       final entry = find.widgetWithText(ListTile, name);            // the app's entry, not a chip or label with the same word
+      await waitFor(entry);
+      if (entry.evaluate().isNotEmpty) { try { await t.ensureVisible(entry.first); await wait(.5); } catch (_) {} }   // scrolled below the fold
       await tap(entry.evaluate().isNotEmpty ? entry.first : find.text(name), name);
     }
     Future<void> type(Finder f, String text, String what) async {
