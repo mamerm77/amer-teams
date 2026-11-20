@@ -1,3 +1,4 @@
+import 'dart:math' show Random;
 import 'dart:io';
 import 'package:flutter/foundation.dart';  // also provides Uint8List
 import 'package:matrix/encryption.dart' show KeyVerificationMethod;
@@ -33,7 +34,7 @@ class MatrixService extends ChangeNotifier {
       verificationMethods: {KeyVerificationMethod.emoji, KeyVerificationMethod.numbers},
     );
     await client.init();
-    client.onSync.stream.listen((_) => notifyListeners());
+    client.onSync.stream.listen((_) { notifyListeners(); acceptApprovedRequests().catchError((_) {}); });
     notifyListeners();
   }
 
@@ -116,6 +117,7 @@ class MatrixService extends ChangeNotifier {
     final id = await client.createRoom(name: name, topic: description.isEmpty ? null : description, invite: invite,
         preset: public ? CreateRoomPreset.publicChat : CreateRoomPreset.privateChat,
         visibility: public ? Visibility.public : Visibility.private,
+        powerLevelContentOverride: {'invite': public ? 0 : 50},       // Teams: in a private team only owners add people
         creationContent: {'type': 'm.space'});
     await createChannel(id, 'General');
     return id;
@@ -162,6 +164,42 @@ class MatrixService extends ChangeNotifier {
       try { await team.invite(u); } catch (_) {}
       for (final ch in channelsOf(team).where((ch) => channelSettings(ch)['private'] != true)) { try { await ch.invite(u); } catch (_) {} }
     }
+  }
+
+  // ---- Join a team with a code (Teams parity, docs/TEAM_SETTINGS.md) ----
+  /// Owner: a 7-character code for the team (an alias #team-code:server); the team accepts join requests (knock).
+  Future<String> teamCode(Room team) async {
+    final existing = team.getState(kTeamCode)?.content['code'] as String?;
+    if (existing != null) return existing;
+    const abc = 'abcdefghjkmnpqrstuvwxyz23456789'; final rnd = Random.secure();
+    final code = List.generate(7, (_) => abc[rnd.nextInt(abc.length)]).join();
+    await client.setRoomAlias('#team-$code:${client.userID!.split(':').last}', team.id);
+    if (team.joinRules != JoinRules.public) await team.setJoinRules(JoinRules.knock);
+    await client.setRoomStateWithKey(team.id, kTeamCode, '', {'code': code});
+    return code;
+  }
+  static const kTeamCode = 'com.amerteams.team_code';
+  /// Anyone: ask to join the team with that code; the owners approve it.
+  Future<void> requestToJoin(String code) async {
+    final alias = '#team-${code.trim().toLowerCase()}:${client.userID!.split(':').last}';
+    final id = (await client.getRoomIdByAlias(alias)).roomId;
+    if (id == null) throw StateError('No team has that code');
+    await client.knockRoom(id, reason: 'Joined with the team code');
+    final mine = ((client.accountData['com.amerteams.knocks']?.content['rooms'] as List?) ?? const []).map((x) => '$x').toList();
+    await client.setAccountData(userId, 'com.amerteams.knocks', {'rooms': {...mine, id}.toList()});
+  }
+  /// Called on every sync: an invitation to a team I asked to join is accepted at once, with its channels.
+  Future<void> acceptApprovedRequests() async {
+    final asked = ((client.accountData['com.amerteams.knocks']?.content['rooms'] as List?) ?? const []).map((x) => '$x').toSet();
+    for (final r in client.rooms.where((r) => r.membership == Membership.invite && asked.contains(r.id))) {
+      asked.remove(r.id);
+      await client.setAccountData(userId, 'com.amerteams.knocks', {'rooms': asked.toList()});
+      try { await joinTeam(r.id); } catch (_) {}
+    }
+  }
+  /// Owner: approve (invite to the team and its standard channels) or decline a request.
+  Future<void> answerJoinRequest(Room team, String user, bool approve) async {
+    if (approve) { await addTeamMembers(team, [user]); } else { await team.kick(user); }
   }
 
   /// Joins a team and all of its channels (restricted: allowed because we are now a member).

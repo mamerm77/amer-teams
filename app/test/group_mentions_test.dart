@@ -6,7 +6,7 @@ final members = {'@me:x': ('Me', 100), '@ali:x': ('Ali', 50), '@sara:x': ('Sara'
 
 void main() {
   test('picker filters by prefix', () {
-    expect(groupCandidates('').length, 4);
+    expect(groupCandidates('').length, 5);
     expect(groupCandidates('mo').map((g) => g.tag), ['moderators']);
   });
   test('@channel and @here become @room for allowed senders', () {

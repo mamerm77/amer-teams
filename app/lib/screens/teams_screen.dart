@@ -22,6 +22,7 @@ class TeamsScreen extends StatelessWidget {
     final invites = m.client.rooms.where((r) => r.isSpace && r.membership == Membership.invite).toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Teams'), actions: [
+        TextButton.icon(onPressed: () => _joinWithCode(c), icon: const Icon(Icons.vpn_key_outlined), label: const Text('Join with a code')),
         TextButton.icon(onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const _Discover())), icon: const Icon(Icons.travel_explore), label: const Text('Discover teams'))]),
       floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.group_add), label: const Text('New team'), onPressed: () => _newTeam(c, m)),
       body: m.teams.isEmpty && invites.isEmpty
@@ -97,6 +98,17 @@ final kChannelTabs = <String, Widget Function(Room)>{
   'Milestones': (r) => MilestonesApp(room: r), 'Goals': (r) => GoalsApp(room: r), 'Updates': (r) => UpdatesApp(room: r), 'Praise': (r) => PraiseApp(room: r),
 };
 
+/// Teams' "Join a team with a code": sends a join request the team's owners approve.
+Future<void> _joinWithCode(BuildContext c) async {
+  final t = TextEditingController();
+  final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: const Text('Join a team with a code'),
+    content: TextField(controller: t, autofocus: true, decoration: const InputDecoration(labelText: 'Team code (ask a team owner)')),
+    actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Ask to join'))]));
+  if (ok != true || t.text.trim().isEmpty || !c.mounted) return;
+  try { await c.read<MatrixService>().requestToJoin(t.text); if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Request sent. You join automatically when an owner approves.'))); }
+  catch (e) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('$e'.contains('M_NOT_FOUND') || '$e'.contains('No team') ? 'No team has that code' : 'Could not send the request: $e'))); }
+}
+
 /// One team: channels, members, meet, leave.
 class TeamScreen extends StatelessWidget {
   const TeamScreen({super.key, required this.teamId}); final String teamId;
@@ -110,12 +122,22 @@ class TeamScreen extends StatelessWidget {
       appBar: AppBar(title: Text(t.getLocalizedDisplayname()), actions: [
         PopupMenuButton<String>(onSelected: (v) async {
           if (v == 'settings') { Navigator.push(c, MaterialPageRoute(builder: (_) => TeamSettingsScreen(teamId: t.id))); return; }
+          if (v == 'code') {
+            try { final code = await m.teamCode(t); if (!c.mounted) return;
+              await showDialog(context: c, builder: (d) => AlertDialog(title: const Text('Team code'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+                SelectableText(code, style: const TextStyle(fontSize: 32, letterSpacing: 4, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8), const Text('People enter this in Teams → "Join with a code". You approve each request here.')]),
+                actions: [FilledButton(onPressed: () => Navigator.pop(d), child: const Text('Done'))])); }
+            catch (e) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Only owners can make a team code: $e'))); }
+            return;
+          }
           if (v == 'leave') {
             final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: Text('Leave ${t.getLocalizedDisplayname()}?'), content: const Text('You will leave the team and all of its channels.'),
               actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Leave'))]));
             if (ok == true) { await m.leaveTeam(t); if (c.mounted) Navigator.pop(c); }
           }
         }, itemBuilder: (_) => const [PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Team settings'))),
+          PopupMenuItem(value: 'code', child: ListTile(leading: Icon(Icons.vpn_key_outlined), title: Text('Team code'))),
           PopupMenuItem(value: 'leave', child: ListTile(leading: Icon(Icons.logout), title: Text('Leave team')))])]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         if (teamArchived(t)) const MaterialBanner(leading: Icon(Icons.archive_outlined), content: Text('This team is archived: channels are read-only. Owners can restore it in Team settings.'), actions: [SizedBox.shrink()]),
@@ -145,6 +167,10 @@ class TeamScreen extends StatelessWidget {
             await m.createChannel(t.id, n.text.trim(), description: d.text.trim(), members: who);
           }),
         ]),
+        if (canManage) for (final u in t.getParticipants().where((u) => u.membership == Membership.knock)) Card(color: cs.tertiaryContainer, child: ListTile(
+          leading: const Icon(Icons.person_add_alt), title: Text('${u.calcDisplayname()} asks to join'), subtitle: Text(u.id),
+          trailing: Wrap(spacing: 6, children: [TextButton(onPressed: () => m.answerJoinRequest(t, u.id, false), child: const Text('Decline')),
+            FilledButton(onPressed: () => m.answerJoinRequest(t, u.id, true), child: const Text('Approve'))]))),
         const SizedBox(height: 12),
         Text('Channels', style: Theme.of(c).textTheme.titleSmall),
         for (final ch in [...channels.where((x) => m.isFavourite(x) && !m.isHidden(x)), ...channels.where((x) => !m.isFavourite(x) && !m.isHidden(x))]) Card(child: ListTile(

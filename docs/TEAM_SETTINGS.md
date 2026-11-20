@@ -13,3 +13,6 @@ Team owners open **Team settings** from the team's menu. On Save, each setting i
 Owners can also edit the team's name and description and change its picture. Members cannot change the settings: the server refuses the change.
 
 Tests: `tests/team_settings_test.py` (4 checks on the real stack, using a real member account).
+
+## Join a team with a code
+Owners open the team menu → **Team code** for a 7-character code: a Matrix alias `#team-<code>:server`, with the team set to accept join requests (knock). Anyone enters the code in Teams → **Join with a code**. The request appears at the top of the team for owners, with **Approve** (adds them to the team and its standard channels) or **Decline**. Once approved, the requester's app joins the team and its channels by itself. Only owners can approve: private teams are created so that only owners add people (`invite` power level 50), as in Teams. Tests: `tests/team_code_test.py` (5 checks on the real stack).

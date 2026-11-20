@@ -42,7 +42,8 @@ class _S extends State<TeamSettingsScreen> {
     final chans = m.channelsOf(team); var failed = 0;
     try {
       await m.client.setRoomStateWithKey(team.id, kTeamSettings, '', o);
-      await _pl(team, (pl) => (pl['events'] as Map)['m.space.child'] = o['members_create_channels'] == false ? 50 : 0);
+      await _pl(team, (pl) { (pl['events'] as Map)['m.space.child'] = o['members_create_channels'] == false ? 50 : 0;
+        if (team.joinRules != JoinRules.public) pl['invite'] = 50; });            // private team: only owners add people (Teams rule)
       for (final ch in chans) {
         try {
           await _pl(ch, (pl) {

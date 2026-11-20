@@ -16,6 +16,7 @@ class GroupMention {
 const kGroupMentions = [
   GroupMention('channel', 'Everyone in this chat', 50, everyone: true),
   GroupMention('here', 'Everyone in this chat', 50, everyone: true),
+  GroupMention('team', 'Everyone in this team (in a team channel)', 50, everyone: true),   // Teams' @team: a standard channel holds the whole team
   GroupMention('moderators', 'Moderators and admins', 50),
   GroupMention('admins', 'Admins', 100),
 ];
@@ -24,7 +25,7 @@ const kGroupMentions = [
 List<GroupMention> groupCandidates(String query) =>
     kGroupMentions.where((g) => g.tag.startsWith(query.toLowerCase())).toList();
 
-final _groupTag = RegExp(r'(^|\s)@(channel|here|moderators|admins)\b', caseSensitive: false);
+final _groupTag = RegExp(r'(^|\s)@(channel|here|team|moderators|admins)\b', caseSensitive: false);
 
 /// Which group tags a message uses.
 Set<String> groupTagsIn(String text) =>
@@ -49,7 +50,7 @@ ExpandResult expandGroupMentions(String text, {required String me, required int 
     required Map<String, (String, int)> members, required String Function(String name, String id) pill}) {
   final tags = groupTagsIn(text);
   if (tags.isEmpty) return ExpandResult(text);
-  if ((tags.contains('channel') || tags.contains('here')) && myPower < notifyLevel) {
+  if ((tags.contains('channel') || tags.contains('here') || tags.contains('team')) && myPower < notifyLevel) {
     return ExpandResult(text, refused: 'Only members with power level $notifyLevel or more can notify everyone with @channel.');
   }
   var out = text.replaceAllMapped(_groupTag, (m) {

@@ -19,3 +19,12 @@
 
 ## Channel notifications
 Each channel's menu → Channel notifications offers three choices: all new posts and replies, only @mentions (Teams' "off"), or nothing.
+
+## Slash commands (as in Teams)
+`/available`, `/busy`, `/dnd`, `/brb`, `/away` and `/offline` set your status, optionally with a message after the command. `/hide` hides the chat until someone posts. `/mute` and `/unmute` change its notifications. `/goto name` opens another chat or channel. `/files` shows the chat's files and `/saved` your saved messages. These sit alongside `/poll`, `/meet`, `/remind`, `/ask`, `/announce`, `/later`, `/canvas`, `/premortem` and `/skill`.
+
+## @team
+In a team channel, `@team` notifies everyone in the team. It follows the same rule as `@channel`: the team setting "Members can use @channel" decides whether members may send it, and the server enforces that.
+
+## Missed activity emails
+Notifications → Missed activity emails: every hour (default), once a day, or off. An email is sent when messages have been unread for more than an hour. It contains **counts only** ("5 messages in 2 chats"), because messages are end-to-end encrypted and the server cannot read them. The counts come from the push notifications Synapse already sends, and drop to zero when you read. The emails need SMTP on the server, and go to the email on your contact card. Tests: `tests/missed_email_test.py` (5 checks).

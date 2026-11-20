@@ -34,6 +34,7 @@ class _S extends State<NotificationsScreen> {
     const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final days = (q['days'] as List).cast<int>().toSet();
     return Scaffold(appBar: AppBar(title: Text(L.t(context, 'Notifications')), actions: [TextButton(onPressed: _save, child: Text(L.t(context, 'Save')))]), body: ListView(children: [
+      const _MissedEmail(),
       SwitchListTile(secondary: const Icon(Icons.bedtime_outlined), title: const Text('Quiet hours'), subtitle: const Text('Hold notifications at these times. Messages still arrive; you see them when you open the app.'),
         value: q['enabled'] == true, onChanged: (v) => setState(() => s!['quiet'] = {...q, 'enabled': v})),
       if (q['enabled'] == true) ...[
@@ -59,4 +60,17 @@ Future<void> chooseChatNotifications(BuildContext c, Room room) async {
     for (final (st, l) in [(PushRuleState.notify, 'All messages'), (PushRuleState.mentionsOnly, 'Mentions only'), (PushRuleState.dontNotify, 'Off')])
       SimpleDialogOption(onPressed: () => Navigator.pop(d, st), child: Row(children: [Icon(room.pushRuleState == st ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 18), const SizedBox(width: 8), Text(l)]))]));
   if (v != null) await room.setPushRuleState(v);
+}
+
+
+/// Missed activity emails (Teams parity): a summary by email when messages stay unread while you are away. Counts only:
+/// messages are end-to-end encrypted, so the email never contains them.
+class _MissedEmail extends StatefulWidget { const _MissedEmail(); @override State<_MissedEmail> createState() => _ME(); }
+class _ME extends State<_MissedEmail> {
+  String? f; bool configured = true;
+  @override void initState() { super.initState(); context.read<ApiService>().getMap('/v1/notify/missed-email').then((r) { if (mounted) setState(() { f = '${r['frequency']}'; configured = r['email_configured'] == true; }); }).catchError((_) {}); }
+  @override Widget build(BuildContext c) => f == null ? const SizedBox.shrink() : ListTile(leading: const Icon(Icons.mark_email_unread_outlined), title: const Text('Missed activity emails'),
+    subtitle: Text(configured ? 'Counts only, sent to the email on your contact card' : 'Your server has no email set up yet; ask your administrator'),
+    trailing: DropdownButton<String>(value: f, items: const [DropdownMenuItem(value: 'hourly', child: Text('Every hour')), DropdownMenuItem(value: 'daily', child: Text('Once a day')), DropdownMenuItem(value: 'off', child: Text('Off'))],
+      onChanged: (v) async { if (v == null) return; setState(() => f = v); try { await context.read<ApiService>().putMap('/v1/notify/missed-email', {'frequency': v}); } catch (_) {} }));
 }

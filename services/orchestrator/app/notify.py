@@ -9,6 +9,7 @@ message itself is fetched and decrypted on the phone.
 Held pushes are not lost: the messages are in the chat and in the unread counts when the person opens the app.
 """
 from __future__ import annotations
+import os, asyncio
 import json, os, time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -108,8 +109,62 @@ async def notify(request: Request):
     keep = []
     for d in n.get("devices", []):
         o = await _owner(d.get("pushkey", ""))
+        if o: await _track(o[0], n)
         if o and hold(o[1], sender, prio): continue
         keep.append(d)
     if not keep: return {"rejected": []}
     slim = {k: n[k] for k in ("event_id", "room_id", "counts", "prio", "id") if k in n}        # event_id_only: nothing else leaves
     return await _forward({"notification": {**slim, "devices": keep}})
+
+
+# ---------- missed activity email (Teams parity) ----------
+async def _track(user: str, n: dict):
+    """Latest unread count per chat, from the push Synapse sends (also when the count drops to 0 after reading)."""
+    rid = n.get("room_id"); unread = int((n.get("counts") or {}).get("unread", 0))
+    if not rid or db.pool is None: return
+    try:
+        async with db.pool.connection() as c:
+            await c.execute("INSERT INTO missed_activity (user_id, room_id, unread, last_at) VALUES (%s,%s,%s,now()) ON CONFLICT (user_id, room_id) DO UPDATE SET unread=EXCLUDED.unread, last_at=now()",
+                            (user, rid, unread))
+    except Exception: pass
+
+class MissedEmail(BaseModel): frequency: str
+
+@router.get("/v1/notify/missed-email")
+async def get_missed(user=Depends(auth.matrix_user)):
+    async with db.pool.connection() as c:
+        r = await (await c.execute("SELECT frequency FROM missed_email WHERE user_id=%s", (user["user_id"],))).fetchone()
+    return {"frequency": r[0] if r else "hourly", "email_configured": bool(os.getenv("SMTP_HOST"))}
+
+@router.put("/v1/notify/missed-email")
+async def set_missed(req: MissedEmail, user=Depends(auth.matrix_user)):
+    if req.frequency not in ("off", "hourly", "daily"): raise HTTPException(422, "frequency: off, hourly or daily")
+    async with db.pool.connection() as c:
+        await c.execute("INSERT INTO missed_email (user_id, frequency) VALUES (%s,%s) ON CONFLICT (user_id) DO UPDATE SET frequency=EXCLUDED.frequency", (user["user_id"], req.frequency))
+    return {"ok": True}
+
+async def missed_due() -> list[tuple[str, str, int, int]]:
+    """(user, email, chats, messages) for people with unread activity older than an hour, not emailed within their period."""
+    async with db.pool.connection() as c:
+        rows = await (await c.execute(
+            "SELECT a.user_id, p.email, count(*), sum(a.unread) FROM missed_activity a JOIN people_profile p ON p.user_id=a.user_id "
+            "LEFT JOIN missed_email m ON m.user_id=a.user_id "
+            "WHERE a.unread > 0 AND a.last_at < now() - interval '1 hour' AND p.email IS NOT NULL AND coalesce(m.frequency,'hourly') <> 'off' "
+            "AND (m.last_sent IS NULL OR m.last_sent < now() - CASE WHEN m.frequency='daily' THEN interval '1 day' ELSE interval '1 hour' END) "
+            "GROUP BY a.user_id, p.email")).fetchall()
+    return [(u, e, int(n), int(m)) for u, e, n, m in rows]
+
+async def missed_loop():
+    from .people import _mail, _base
+    while True:
+        await asyncio.sleep(900)
+        try:
+            for user, email, chats, msgs in await missed_due():
+                ok = await _mail(email, f"You have {msgs} unread message{'s' if msgs != 1 else ''} in Amer Teams",
+                                 f"While you were away, {msgs} message{'s' if msgs != 1 else ''} arrived in {chats} chat{'s' if chats != 1 else ''}.\n"
+                                 f"Open Amer Teams to read them: {_base()}\n\nMessages are end-to-end encrypted, so this email cannot show them.\n"
+                                 "Change how often you get these in the app: Notifications → Missed activity emails.")
+                async with db.pool.connection() as c:
+                    await c.execute("INSERT INTO missed_email (user_id, last_sent) VALUES (%s, now()) ON CONFLICT (user_id) DO UPDATE SET last_sent=now()", (user,))
+                if not ok: break                                         # no SMTP: stop until it is configured
+        except Exception: pass

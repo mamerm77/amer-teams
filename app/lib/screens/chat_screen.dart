@@ -1,3 +1,4 @@
+import 'saved_screen.dart';
 import 'team_settings_screen.dart' show membersMayEditDelete;
 import 'immersive_reader.dart';
 import 'video_player_screen.dart';
@@ -181,6 +182,9 @@ class _S extends State<ChatScreen> {
 
   // ---------- slash commands (docs/CHAT_EXTRAS.md) ----------
   static const slash = {
+    '/available': 'Set your status to Available', '/busy': 'Set your status to Busy', '/dnd': 'Do not disturb', '/brb': 'Be right back', '/away': 'Appear away', '/offline': 'Appear offline',
+    '/hide': 'Hide this chat until someone posts', '/mute': 'Mute this chat (only @mentions notify)', '/unmute': 'Unmute this chat', '/goto': '/goto name: open another chat or channel',
+    '/files': 'Files, photos and voice in this chat', '/saved': 'Your saved messages',
     '/poll': 'Create a poll', '/meet': 'Start a meeting in this chat now', '/remind': '/remind 30 text: remind me in 30 minutes',
     '/ask': '/ask question: ask Amer, answer only you see', '/announce': '/announce text: announcement everyone acknowledges',
     '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases', '/premortem': '/premortem plan: how could this fail? (or the recent chat)', '/skill': 'Run one of your skills or agents on this chat'};
@@ -188,6 +192,22 @@ class _S extends State<ChatScreen> {
     if (!t.startsWith('/')) return false;
     final sp = t.indexOf(' '); final cmd = (sp < 0 ? t : t.substring(0, sp)).toLowerCase(); final arg = sp < 0 ? '' : t.substring(sp + 1).trim();
     switch (cmd) {
+      case '/available' || '/busy' || '/dnd' || '/brb' || '/away' || '/offline':     // Teams' status commands
+        final a = switch (cmd) { '/busy' => Avail.busy, '/dnd' => Avail.dnd, '/brb' => Avail.brb, '/away' => Avail.away, '/offline' => Avail.offline, _ => Avail.available };
+        await Availability.instance.set(a, arg); _snack('Status: ${Availability.label(a)}');
+      case '/hide':
+        final c = room.client; final h = Map<String, Object?>.from((c.accountData['com.amerteams.hidden_chats']?.content['rooms'] as Map?) ?? {});
+        h[room.id] = room.lastEvent?.originServerTs.millisecondsSinceEpoch ?? DateTime.now().millisecondsSinceEpoch;
+        await c.setAccountData(c.userID!, 'com.amerteams.hidden_chats', {'rooms': h});
+        _snack('Chat hidden: it comes back when someone posts'); if (mounted) { if (widget.onClose != null) { widget.onClose!(); } else { Navigator.maybePop(context); } }
+      case '/mute': await room.setPushRuleState(PushRuleState.mentionsOnly); _snack('Muted: only @mentions notify you');
+      case '/unmute': await room.setPushRuleState(PushRuleState.notify); _snack('Unmuted');
+      case '/goto':
+        final hit = room.client.rooms.where((r) => r.membership == Membership.join && r.getLocalizedDisplayname().toLowerCase().contains(arg.toLowerCase())).firstOrNull;
+        if (hit == null || arg.isEmpty) { _snack('No chat or channel called "$arg"'); return true; }
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: hit.id)));
+      case '/files': Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, filesOnly: true)));
+      case '/saved': Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedScreen()));
       case '/poll': await _newPoll();
       case '/meet': Navigator.push(context, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: true)));
       case '/canvas': Navigator.push(context, MaterialPageRoute(builder: (_) => CanvasListScreen(room: room)));

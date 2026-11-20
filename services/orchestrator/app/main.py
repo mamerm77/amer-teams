@@ -51,6 +51,7 @@ async def _start():
     asyncio.create_task(ops.loop())
     asyncio.create_task(calltrace.retention_loop())
     asyncio.create_task(guest_accounts.expiry_loop())
+    asyncio.create_task(notify.missed_loop())
     s = agentops_store.store()
     if hasattr(s, "mark_interrupted"): await s.mark_interrupted()
     try: await approvals_store().cancel_waiting()          # a restart ends waiting sessions: their approvals are cancelled
