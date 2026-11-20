@@ -61,7 +61,7 @@ const kGuides = <(String, List<Guide>)>[
   ]),
   ('Your AI team', [
     Guide(Icons.apartment, 'Ask your agents to do work', 'Teams: Copilot and agents (Facilitator, Project Manager…)',
-      ['Open Apps → "My agent office".', 'Optional: "Work on a chat" so they read that chat (on your device).', 'Type the request and press "Ask Amer". The Chief of Staff hands parts to the right agents.',
+      ['Open Apps → "Agent office".', 'Optional: "Work on a chat" so they read that chat (on your device).', 'Type the request and press "Ask Amer". The Chief of Staff hands parts to the right agents.',
        'If they propose actions (post a message, create tasks, book a meeting), nothing happens until you press Approve.'],
       open: _office, note: 'Needs the AI key set on your server by the administrator. Confidential chats are never sent to the AI.'),
   ]),

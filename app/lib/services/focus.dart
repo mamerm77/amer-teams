@@ -1,3 +1,4 @@
+import 'availability.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart';
@@ -30,7 +31,7 @@ class FocusGuard {
     final now = DateTime.now(), u = now.add(Duration(minutes: minutes));
     await api.postMap('/v1/notify/focus', {'minutes': minutes});
     await c!.setAccountData(c!.userID!, type, {'start': now.millisecondsSinceEpoch, 'until': u.millisecondsSinceEpoch, 'history': _trim([...history.map((h) => [h.$1.millisecondsSinceEpoch, h.$2.millisecondsSinceEpoch])])});
-    await c!.setPresence(c!.userID!, PresenceType.unavailable, statusMsg: 'Focusing until ${_hm(u)}');
+    Availability.instance.overlay(Avail.focusing, 'until ${_hm(u)}');          // presence is decided in one place (availability.dart)
     _api = api; _replied.clear(); _schedule(Duration(minutes: minutes));
   }
 
@@ -39,7 +40,7 @@ class FocusGuard {
     final s = started ?? DateTime.now(), e = DateTime.now();
     try { await api.postMap('/v1/notify/focus', {'minutes': 0}); } catch (_) {}
     await c!.setAccountData(c!.userID!, type, {'until': 0, 'history': _trim([...history.map((h) => [h.$1.millisecondsSinceEpoch, h.$2.millisecondsSinceEpoch]), [s.millisecondsSinceEpoch, e.millisecondsSinceEpoch]])});
-    await c!.setPresence(c!.userID!, PresenceType.online, statusMsg: '');
+    Availability.instance.overlay(null);
     _end?.cancel();
     final rooms = c!.rooms.where((r) => r.notificationCount > 0 && (r.lastEvent?.originServerTs.isAfter(s) ?? false)).toList();
     return FocusSummary(e.difference(s), rooms.length, rooms.fold(0, (n, r) => n + r.notificationCount), rooms.fold(0, (n, r) => n + r.highlightCount), rooms.map((r) => r.getLocalizedDisplayname()).take(5).toList());

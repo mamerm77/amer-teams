@@ -1,3 +1,4 @@
+import '../services/roles.dart' show confirmDestructive;
 import 'saved_screen.dart';
 import 'team_settings_screen.dart' show membersMayEditDelete;
 import 'immersive_reader.dart';
@@ -185,7 +186,7 @@ class _S extends State<ChatScreen> {
     '/available': 'Set your status to Available', '/busy': 'Set your status to Busy', '/dnd': 'Do not disturb', '/brb': 'Be right back', '/away': 'Appear away', '/offline': 'Appear offline',
     '/hide': 'Hide this chat until someone posts', '/mute': 'Mute this chat (only @mentions notify)', '/unmute': 'Unmute this chat', '/goto': '/goto name: open another chat or channel',
     '/files': 'Files, photos and voice in this chat', '/saved': 'Your saved messages',
-    '/poll': 'Create a poll', '/meet': 'Start a meeting in this chat now', '/remind': '/remind 30 text: remind me in 30 minutes',
+    '/poll': 'Create a poll', '/meet': 'Meet now in this chat', '/remind': '/remind 30 text: remind me in 30 minutes',
     '/ask': '/ask question: ask Amer, answer only you see', '/announce': '/announce text: announcement everyone acknowledges',
     '/later': 'Schedule this message', '/canvas': 'Open this chat\'s canvases', '/premortem': '/premortem plan: how could this fail? (or the recent chat)', '/skill': 'Run one of your skills or agents on this chat'};
   Future<bool> _command(String t) async {
@@ -577,7 +578,7 @@ class _S extends State<ChatScreen> {
       if (at != null) { Reminders.instance.add(room.id, e.eventId, '${e.senderFromMemoryOrFallback.calcDisplayname()}: ${plainMentions(_text(e))}', at); _snack('Reminder set for ${DateFormat('d MMM HH:mm').format(at)}'); }
     }
     if (a == 'edit') setState(() { editing = e; replyTo = null; input.text = _text(e); });
-    if (a == 'delete') await room.redactEvent(e.eventId);
+    if (a == 'delete' && mounted && await confirmDestructive(context, 'Delete message', 'It is removed for everyone in this chat.')) await room.redactEvent(e.eventId);
     if (a == 'thread' && mounted) _openThread(e.eventId);
     if (a == 'star' && mounted) { await StarService(context.read<MatrixService>()).toggle(room.id, e.eventId); _snack('Saved messages updated'); }
     if (a == 'select') { setState(() => selected.add(e.eventId)); return; }
@@ -651,7 +652,7 @@ class _S extends State<ChatScreen> {
                   final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
                   final (av, status) = Availability.parse(p.data);
                   final seen = p.data?.lastActiveTimestamp;
-                  final away = switch (av) { Avail.call || Avail.meeting || Avail.presenting => Availability.label(av), Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
+                  final away = switch (av) { Avail.call || Avail.meeting || Avail.presenting || Avail.focusing || Avail.ooo => Availability.label(av), Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
                   final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
                       : room.isDirectChat && _peerInvitedOnly ? 'Invited · hasn\'t signed in yet · 🔒 encrypted'
                       : room.isDirectChat ? '${room.directChatMatrixID != null && room.directChatMatrixID!.split(':').last != me.split(':').last ? 'External (${room.directChatMatrixID!.split(':').last}) · ' : ''}${online && av == Avail.available ? 'Online' : away}${status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'

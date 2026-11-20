@@ -219,7 +219,7 @@ class _S extends State<CallScreen> {
     final mine = ((e.content['rooms'] as List?) ?? []).cast<Map>().where((r) => (r['members'] as List).contains(me)).firstOrNull;
     if (mine == null || !mounted) return;
     final go = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('Breakout room'),
-      content: Text('The host has moved you to ${mine['title']}.'),
+      content: Text('The organiser has moved you to ${mine['title']}.'),
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Stay'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(L.t(context, 'Join')))]));
     if (go != true || !mounted) return;
     final child = room.client.getRoomById(mine['room_id'] as String);
@@ -393,7 +393,7 @@ class _S extends State<CallScreen> {
     } catch (e) { _snack('Could not change Amer: $e'); }
   }
   Future<void> _askDialog([String? preset]) async {
-    if (!aiOn) { _snack(isHost ? 'Switch Amer on for this meeting first (More → Amer in this meeting)' : 'The host has not switched Amer on for this meeting'); return; }
+    if (!aiOn) { _snack(isHost ? 'Switch Amer on for this meeting first (More → Amer in this meeting)' : 'The organiser has not switched Amer on for this meeting'); return; }
     final gate = aiFor(room); if (!gate.allowed) { _snack(gate.where); return; }
     final q = TextEditingController(text: preset);
     final question = preset ?? await showDialog<String>(context: context, builder: (d) => AlertDialog(
@@ -451,7 +451,7 @@ class _S extends State<CallScreen> {
 
   Future<void> _leave() async {
     unawaited(Handoff.clear(room.client));
-    if (rec.recording && canRecord) await _stopRec('host left');
+    if (rec.recording && canRecord) await _stopRec('the person recording left');
     if (ctl != null) {                         // 1:1: signalling sends hangup + end and tears media down
       await stt.stop(); await ev?.dispose(); ev = null; await ctl!.hangup(); return;
     }
@@ -655,7 +655,7 @@ class _S extends State<CallScreen> {
         link = api.publicUrl('/join?w=${r['slug']}'); extra = 'Registration page. Each person who registers gets a personal join link and joins as an attendee.';
       } else {
         final r = await api.guestLink(widget.roomId, callId);
-        link = api.publicUrl('/join#${r['code']}'); extra = 'Works in a browser for 24 hours. Guests wait in the lobby until a host lets them in.';
+        link = api.publicUrl('/join#${r['code']}'); extra = 'Works in a browser for 24 hours. Guests wait in the lobby until an organiser or presenter lets them in.';
       }
       if (!mounted) return;
       await showDialog(context: context, builder: (d) => AlertDialog(title: Text(webinar ? 'Webinar registration' : 'Guest link'),
@@ -705,7 +705,7 @@ class _S extends State<CallScreen> {
   void _audit(String e) { if (rec.id != null) context.read<ApiService>().recordingEvent(widget.roomId, callId, rec.id!, e).catchError((_) => <String, dynamic>{}); }
 
   Future<void> _askRecord() async {
-    if (!DeviceRecorder.supported) { _snack('Recording is made on the host\'s phone or tablet: not available on this device'); return; }
+    if (!DeviceRecorder.supported) { _snack('Recording is made on the organiser\'s phone or tablet: not available on this device'); return; }
     rec.reset(); rec.id = 'rec-${DateTime.now().millisecondsSinceEpoch}'; rec.agreed.add(_myId); _asked.clear();
     _audit('requested'); _audit('consent');
     await _send({'t': 'rec', 'op': 'ask', 'id': rec.id}); _asked.addAll(_present);
@@ -861,7 +861,7 @@ class _S extends State<CallScreen> {
               case 'amer': _toggleAi();
               case 'agenda': _agendaDialog();
               case 'webinar': _setWebinar(!webinar);
-              case 'rec': rec.recording ? _stopRec('stopped by host') : _askRecord();
+              case 'rec': rec.recording ? _stopRec('stopped by the organiser') : _askRecord();
               case 'withdraw': _withdraw();
               case 'guest': _guestLinkDialog();
               case 'dialin': _dialIn();

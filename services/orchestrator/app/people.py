@@ -33,8 +33,8 @@ def _need():
 async def _profiles(ids: list[str]) -> dict[str, dict]:
     if not ids: return {}
     async with db.pool.connection() as c:
-        rows = await (await c.execute("SELECT user_id, email, phone, title, dept, office FROM people_profile WHERE user_id = ANY(%s)", (ids,))).fetchall()
-    return {r[0]: dict(zip(("email", "phone", "title", "dept", "office"), r[1:])) for r in rows}
+        rows = await (await c.execute("SELECT user_id, email, phone, title, dept, office, manager FROM people_profile WHERE user_id = ANY(%s)", (ids,))).fetchall()
+    return {r[0]: dict(zip(("email", "phone", "title", "dept", "office", "manager"), r[1:])) for r in rows}
 
 async def _directory() -> list[dict]:
     j = await _syn("GET", "/_synapse/admin/v2/users?limit=1000&guests=false&deactivated=false")
@@ -58,6 +58,22 @@ async def search(q: str = "", limit: int = 30, user=Depends(auth.matrix_user)):
     out.sort(key=lambda p: (not p["display_name"].lower().startswith(s), p["display_name"].lower()))
     return {"results": out[:max(1, min(limit, 100))], "can_invite": bool(EMAIL.match(q.strip()) or _phone(q))}
 
+@router.get("/org/{uid}")
+async def org(uid: str, user=Depends(auth.matrix_user)):
+    """Org chart around a person: managers up the chain (from contact cards), the person, and direct reports."""
+    _need()
+    names = {p["user_id"]: p["display_name"] for p in await _directory()}
+    async with db.pool.connection() as c:
+        rows = await (await c.execute("SELECT user_id, title, manager FROM people_profile")).fetchall()
+    card = {u: (t, m) for u, t, m in rows}
+    chain, cur = [], uid
+    for _ in range(10):
+        m = card.get(cur, (None, None))[1]
+        if not m or m in chain or m == uid: break
+        chain.insert(0, m); cur = m
+    who = lambda u: {"user_id": u, "display_name": names.get(u, u), "title": card.get(u, (None, None))[0]}
+    return {"managers": [who(u) for u in chain], "person": who(uid), "reports": [who(u) for u, (_, m) in card.items() if m == uid]}
+
 @router.get("/profile/{uid}")
 async def profile(uid: str, user=Depends(auth.matrix_user)):
     _need(); return {"user_id": uid, **(await _profiles([uid])).get(uid, {})}
@@ -65,6 +81,7 @@ async def profile(uid: str, user=Depends(auth.matrix_user)):
 class Me(BaseModel):
     email: str | None = Field(default=None, max_length=200); phone: str | None = Field(default=None, max_length=30)
     title: str | None = Field(default=None, max_length=100); dept: str | None = Field(default=None, max_length=100); office: str | None = Field(default=None, max_length=100)
+    manager: str | None = Field(default=None, max_length=200)
 
 @router.put("/me")
 async def set_me(req: Me, user=Depends(auth.matrix_user)):
@@ -72,9 +89,9 @@ async def set_me(req: Me, user=Depends(auth.matrix_user)):
     if req.email and not EMAIL.match(req.email): raise HTTPException(422, "That email address does not look right")
     if req.phone and not _phone(req.phone): raise HTTPException(422, "Phone numbers need 7 to 20 digits, e.g. +971 50 123 4567")
     async with db.pool.connection() as c:
-        await c.execute("INSERT INTO people_profile (user_id, email, phone, title, dept, office) VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET "
-                        "email=EXCLUDED.email, phone=EXCLUDED.phone, title=EXCLUDED.title, dept=EXCLUDED.dept, office=EXCLUDED.office, updated_at=now()",
-                        (user["user_id"], (req.email or "").strip().lower() or None, _phone(req.phone), req.title, req.dept, req.office))
+        await c.execute("INSERT INTO people_profile (user_id, email, phone, title, dept, office, manager) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET "
+                        "email=EXCLUDED.email, phone=EXCLUDED.phone, title=EXCLUDED.title, dept=EXCLUDED.dept, office=EXCLUDED.office, manager=EXCLUDED.manager, updated_at=now()",
+                        (user["user_id"], (req.email or "").strip().lower() or None, _phone(req.phone), req.title, req.dept, req.office, req.manager if req.manager != user["user_id"] else None))
     return {"ok": True}
 
 # ---------- contacts and groups ----------

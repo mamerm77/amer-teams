@@ -40,20 +40,19 @@ class AppItem {
 
 const _sections = <(String, List<AppItem>)>[
   ('Team apps (like Microsoft Teams)', [
-    AppItem(Icons.contacts_outlined, 'People', 'Your contacts and contact groups, invite someone new by email or phone, and your own contact card', open: _people),
+    AppItem(Icons.contacts_outlined, 'People', 'Everyone in the organisation with the org chart, your contacts and contact groups, invitations, and your contact card', open: _people),
     AppItem(Icons.view_kanban_outlined, 'Planner', 'A board of a chat\'s tasks: To do, In progress, Blocked, Done; assign and set due dates', open: _planner),
     AppItem(Icons.table_rows_outlined, 'Lists', 'Track issues, assets or risks in a shared table with typed columns, filters and sorting', open: _lists),
     AppItem(Icons.assignment_outlined, 'Forms', 'Surveys and quizzes with choice, text and rating questions; live results', open: _forms),
     AppItem(Icons.menu_book_outlined, 'Notes', 'A shared notebook for a chat (like OneNote or a wiki): sections, pages and to-dos', open: _notes),
     AppItem(Icons.update, 'Updates', 'Recurring check-ins (weekly status, stand-up) and who has submitted', open: _updates),
     AppItem(Icons.celebration_outlined, 'Praise', 'Thank a colleague with a badge and a note, posted in the chat', open: _praise),
-    AppItem(Icons.flag_outlined, 'Goals', 'Objectives and key results with progress check-ins (like Viva Goals)', open: _goals),
+    AppItem(Icons.track_changes, 'Goals', 'Objectives and key results with progress check-ins (like Viva Goals)', open: _goals),
     AppItem(Icons.event_available, 'Bookings', 'Bookable services with free time slots: consultations, reviews, office hours', open: _bookings),
-    AppItem(Icons.groups_2_outlined, 'Communities', 'A community feed: discussions, questions with a best answer, announcements (like Viva Engage)', open: _community),
-    AppItem(Icons.account_tree_outlined, 'Who', 'People directory with titles, departments, skills and the org chart', open: _who),
+    AppItem(Icons.forum, 'Communities', 'A community feed: discussions, questions with a best answer, announcements (like Viva Engage)', open: _community),
     AppItem(Icons.video_library_outlined, 'Stream', 'The video library of a chat: recordings and shared videos', open: _stream),
     AppItem(Icons.chair_alt_outlined, 'Places', 'Plan office days and book desks; see who is in', open: _places),
-    AppItem(Icons.timeline, 'Milestones', 'A project timeline with dates and status', open: _milestones),
+    AppItem(Icons.linear_scale, 'Milestones', 'A project timeline with dates and status', open: _milestones),
   ]),
   ('Your work', [
     AppItem(Icons.auto_awesome, 'Catch me up', 'What happened while you were away, per chat, with what needs you', open: _catchUp),
@@ -61,7 +60,7 @@ const _sections = <(String, List<AppItem>)>[
     AppItem(Icons.bookmark_outline, 'Saved messages', 'Messages you saved, in your own folders', open: _saved),
     AppItem(Icons.forum_outlined, 'Followed threads', 'Threads you follow, newest replies first', open: _threads),
     AppItem(Icons.headphones, 'Focus and wellbeing', 'Hold notifications for a while; see your week (only you)', open: _focus),
-    AppItem(Icons.person_search, 'Who knows about…', 'Find colleagues by topic; publish what you know', open: _expertise),
+    AppItem(Icons.person_search, 'Find an expert', 'Find colleagues by topic; publish what you know', open: _expertise),
     AppItem(Icons.notifications_active_outlined, 'Notifications', 'Quiet hours, per-chat levels, priority people', open: _notify),
   ]),
   ('Meetings and calls', [
@@ -72,11 +71,11 @@ const _sections = <(String, List<AppItem>)>[
     AppItem(Icons.videocam_outlined, 'In a meeting', 'Record with consent, translated captions, Q&A, guest link, phone dial-in, blur, live identity check', where: 'Meeting → More (…)'),
   ]),
   ('Amer and agents', [
-    AppItem(Icons.apartment, 'My agent office', 'Your own team of AI agents at their desks: ask your Chief of Staff, watch them hand work to each other', open: _office),
-    AppItem(Icons.groups_2_outlined, 'My agents', 'Your personal agent team, with the glass box of what they did', open: _agents),
+    AppItem(Icons.apartment, 'Agent office', 'Your AI team. Ask: the Chief of Staff hands parts to specialists and the Teams agents. Projects: longer work with tools, deliverables and a budget', open: _office),
+    AppItem(Icons.work_history_outlined, 'Agent office · Projects', 'Longer agent projects with web research, deliverables, a monthly budget and the glass box of every step', open: _agents),
     AppItem(Icons.storefront_outlined, 'Skills and marketplace', 'Reusable AI skills and custom agents; your organisation\'s marketplace', open: _skills),
     AppItem(Icons.account_tree_outlined, 'Workflows', 'Automations described in plain language', open: _workflows),
-    AppItem(Icons.hub_outlined, 'Agent Ops', 'All agents running, their cost and health', open: _agentOps),
+    AppItem(Icons.hub_outlined, 'Agent monitoring', 'Administrators: every agent running, its cost and health', open: _agentOps),
     AppItem(Icons.chat_outlined, 'In a chat', '/ask, /premortem, /skill, Meeting twin, Files with versions, Connectors, Shifts, Walkie-talkie', where: 'Chat → menu (⋮) or type /'),
   ]),
   ('Operations', [
@@ -113,7 +112,6 @@ Widget _updates() => AppHost(title: 'Updates', icon: Icons.update, about: 'Recur
 Widget _praise() => AppHost(title: 'Praise', icon: Icons.celebration_outlined, about: 'Recognise colleagues with badges.', builder: (_, r) => PraiseApp(room: r));
 Widget _bookings() => AppHost(title: 'Bookings', icon: Icons.event_available, about: 'Offer bookable times and let people pick a free slot.', builder: (_, r) => BookingsApp(room: r));
 Widget _community() => AppHost(title: 'Communities', icon: Icons.groups_2_outlined, about: 'A community feed for a large group or channel.', builder: (_, r) => CommunityApp(room: r));
-Widget _who() => AppHost(title: 'Who', icon: Icons.account_tree_outlined, about: 'Find people by name, title, department, skill or office, and see the org chart.', builder: (_, r) => WhoApp(room: r));
 Widget _stream() => AppHost(title: 'Stream', icon: Icons.video_library_outlined, about: 'All videos and recordings shared in a chat.', builder: (_, r) => StreamApp(room: r));
 Widget _places() => AppHost(title: 'Places', icon: Icons.chair_alt_outlined, about: 'Office days and desk booking for a team.', builder: (_, r) => PlacesApp(room: r));
 Widget _milestones() => AppHost(title: 'Milestones', icon: Icons.timeline, about: 'A project timeline.', builder: (_, r) => MilestonesApp(room: r));

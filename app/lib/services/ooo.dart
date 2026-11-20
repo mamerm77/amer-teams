@@ -1,3 +1,4 @@
+import 'availability.dart';
 import 'dart:async';
 import 'package:matrix/matrix.dart';
 
@@ -41,9 +42,9 @@ class OutOfOffice {
     try {
       if (active) {
         final t = statusText();
-        if (_statusSet != t) { await c!.setPresence(c!.userID!, PresenceType.unavailable, statusMsg: t); _statusSet = t; }
+        if (_statusSet != t) { Availability.instance.overlay(Avail.ooo, t); _statusSet = t; }   // presence is decided in one place
       } else if (_statusSet != null) {                  // the period ended: back to normal
-        await c!.setPresence(c!.userID!, PresenceType.online, statusMsg: ''); _statusSet = null;
+        Availability.instance.overlay(null); _statusSet = null;
       }
     } catch (_) {}
   }

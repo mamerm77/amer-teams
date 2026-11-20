@@ -16,7 +16,7 @@ import 'api_service.dart';
 ///   notifications are held by the server (focus mode) with the same exception.
 /// Matrix presence only knows online / unavailable / offline, so the finer state travels as a tag at the start of
 /// the status message ("[busy] In a review"); your choice is kept in account data so all your devices agree.
-enum Avail { available, busy, dnd, brb, away, offline, call, meeting, presenting }
+enum Avail { available, busy, dnd, brb, away, offline, call, meeting, presenting, focusing, ooo }
 
 class Availability {
   Availability._();
@@ -26,16 +26,17 @@ class Availability {
   final state = ValueNotifier<(Avail, String)>((Avail.available, ''));
   Client? _c; Timer? _t; ApiService? api;
   DateTime _lastInput = DateTime.now(); bool _foreground = true;
-  String? _activity;                         // 'call' | 'meeting' | 'presenting' while in one (set by the call screen)
+  String? _activity;
+  (Avail, String)? _overlay;                 // Focus or Out of office, reported by those features (one place decides presence)                         // 'call' | 'meeting' | 'presenting' while in one (set by the call screen)
   List<String> priority = [];                // priority people: break through Do not disturb
   String _published = '';
 
   static String label(Avail a) => const {Avail.available: 'Available', Avail.busy: 'Busy', Avail.dnd: 'Do not disturb', Avail.brb: 'Be right back',
-    Avail.away: 'Away', Avail.offline: 'Appear offline', Avail.call: 'In a call', Avail.meeting: 'In a meeting', Avail.presenting: 'Presenting'}[a]!;
-  static Color colour(Avail a) => switch (a) { Avail.available => Colors.green, Avail.busy || Avail.dnd || Avail.call || Avail.meeting || Avail.presenting => Colors.red,
+    Avail.away: 'Away', Avail.offline: 'Appear offline', Avail.call: 'In a call', Avail.meeting: 'In a meeting', Avail.presenting: 'Presenting', Avail.focusing: 'Focusing', Avail.ooo: 'Out of office'}[a]!;
+  static Color colour(Avail a) => switch (a) { Avail.available => Colors.green, Avail.busy || Avail.dnd || Avail.call || Avail.meeting || Avail.presenting || Avail.focusing => Colors.red, Avail.ooo => Colors.purple,
     Avail.brb || Avail.away => Colors.amber, Avail.offline => Colors.grey };
   static IconData icon(Avail a) => switch (a) { Avail.dnd || Avail.presenting => Icons.remove_circle, Avail.brb || Avail.away => Icons.schedule, Avail.offline => Icons.cancel_outlined,
-    Avail.call => Icons.call, Avail.meeting => Icons.videocam, _ => Icons.circle };
+    Avail.call => Icons.call, Avail.meeting => Icons.videocam, Avail.focusing => Icons.headphones, Avail.ooo => Icons.flight_takeoff, _ => Icons.circle };
   static const manualChoices = [Avail.available, Avail.busy, Avail.dnd, Avail.brb, Avail.away, Avail.offline];
 
   /// Teams' default duration when you set a status without choosing one.
@@ -45,7 +46,7 @@ class Availability {
   /// Reads someone's state from their presence (tag in the status message, else the plain presence).
   static (Avail, String) parse(CachedPresence? p) {
     final raw = p?.statusMsg ?? '';
-    final m = RegExp(r'^\[(busy|dnd|brb|away|call|meeting|presenting)\]\s*').firstMatch(raw);
+    final m = RegExp(r'^\[(busy|dnd|brb|away|call|meeting|presenting|focusing|ooo)\]\s*').firstMatch(raw);
     if (m != null) return (Avail.values.byName(m.group(1)!), raw.substring(m.end));
     final a = switch (p?.presence) { PresenceType.online => Avail.available, PresenceType.unavailable => Avail.away, _ => Avail.offline };
     return (a, raw);
@@ -62,6 +63,8 @@ class Availability {
   void input() { final wasIdle = _idle; _lastInput = DateTime.now(); if (wasIdle) _refresh(); }
   void foreground(bool on) { _foreground = on; if (on) _lastInput = DateTime.now(); _refresh(); }
   void activity(String? a) { _activity = a; _refresh(); }       // the call screen: 'call', 'meeting', 'presenting' or null
+  /// Focus (Avail.focusing) and Out of office (Avail.ooo) report here instead of setting presence themselves.
+  void overlay(Avail? a, [String msg = '']) { _overlay = a == null ? null : (a, msg); _published = ''; _refresh(); }
   bool get _idle => !_foreground || DateTime.now().difference(_lastInput) > idleAfter;
 
   Map<String, Object?> get _saved => _c?.accountData[_key]?.content ?? const {};
@@ -75,10 +78,14 @@ class Availability {
   /// What everyone sees now, from your choice and what the app knows (Teams' precedence).
   (Avail, String) get effective {
     final (m, msg) = _manual;
-    if (m == Avail.offline || m == Avail.dnd) return (m!, msg);              // your Do not disturb / Appear offline win
+    // Teams' precedence: what you set as Do not disturb / Appear offline; then calls and meetings; then Focus;
+    // then Out of office; then the rest of what you set; then automatic Away / Available.
+    if (m == Avail.offline || m == Avail.dnd) return (m!, msg);
     if (_activity == 'presenting') return (Avail.presenting, msg);
     if (_activity == 'meeting') return (Avail.meeting, msg);
     if (_activity == 'call') return (Avail.call, msg);
+    final o = _overlay;
+    if (o != null) return (o.$1, msg.isNotEmpty ? msg : o.$2);
     if (m != null) return (m, msg);
     if (_idle) return (Avail.away, msg);
     return (Avail.available, msg);
@@ -96,7 +103,7 @@ class Availability {
     final c = _c; if (c == null || c.userID == null) return;
     final (a, msg) = effective; state.value = (a, msg);
     final tag = switch (a) { Avail.available => '', Avail.offline => '', _ => '[${a.name}] ' };
-    final presence = switch (a) { Avail.offline => PresenceType.offline, Avail.away || Avail.brb => PresenceType.unavailable, _ => PresenceType.online };
+    final presence = switch (a) { Avail.offline => PresenceType.offline, Avail.away || Avail.brb || Avail.ooo => PresenceType.unavailable, _ => PresenceType.online };
     final key = '${presence.name}|$tag$msg';
     if (key == _published) return;
     _published = key;
@@ -116,7 +123,7 @@ class Availability {
   }
 
   /// Banners and ringing are held in Do not disturb and while presenting, except for priority people.
-  bool get quiet => state.value.$1 == Avail.dnd || state.value.$1 == Avail.presenting;
+  bool get quiet => state.value.$1 == Avail.dnd || state.value.$1 == Avail.presenting || state.value.$1 == Avail.focusing;
   bool holds(String? sender) => quiet && !priority.contains(sender);
   bool get doNotDisturb => state.value.$1 == Avail.dnd;
 }
@@ -145,7 +152,7 @@ Future<void> showAvailability(BuildContext c) async {
     content: SizedBox(width: 400, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (!Availability.manualChoices.contains(cur.$1)) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text('Now: ${Availability.label(cur.$1)} (set automatically)', style: Theme.of(d).textTheme.bodySmall)),
       for (final v in Availability.manualChoices) RadioListTile<Avail>(dense: true, value: v, groupValue: a, onChanged: (x) => set(() => a = x!),
-        title: Row(children: [Icon(Availability.icon(v), size: 14, color: Availability.colour(v)), const SizedBox(width: 8), Text(v == Avail.available ? 'Available (automatic)' : Availability.label(v))])),
+        title: Row(children: [Icon(Availability.icon(v), size: 14, color: Availability.colour(v)), const SizedBox(width: 8), Text(v == Avail.available ? 'Available (automatic)' : v == Avail.away ? 'Appear away' : Availability.label(v))])),
       const SizedBox(height: 8),
       TextField(controller: msg, maxLength: 280, decoration: const InputDecoration(labelText: 'Status message', hintText: 'e.g. In a design review until 3 pm')),
       DropdownButtonFormField<String>(value: clear, decoration: const InputDecoration(labelText: 'Duration'), items: [

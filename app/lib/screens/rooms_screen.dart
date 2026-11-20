@@ -50,7 +50,9 @@ class _RS extends State<RoomsScreen> {
   @override
   Widget build(BuildContext c) {
     final m = c.watch<MatrixService>();
-    bool archived(r) => r.tags.containsKey(TagType.lowPriority);
+    // One way to put a chat aside, as in Teams: Hide (comes back with a new message). Chats archived by older versions count as hidden.
+    final hiddenAt = _hidden(m);
+    bool archived(Room r) => r.tags.containsKey(TagType.lowPriority) || (hiddenAt[r.id] != null && (r.lastEvent?.originServerTs.millisecondsSinceEpoch ?? 0) <= hiddenAt[r.id]!);
     var list = m.chats.where((r) => switch (filter) {
       'unread' => r.notificationCount > 0 || r.isUnread, 'people' => r.isDirectChat, 'groups' => !r.isDirectChat,
       'mentions' => r.highlightCount > 0, 'drafts' => Drafts.instance.of(r.id) != null,
@@ -60,7 +62,7 @@ class _RS extends State<RoomsScreen> {
     return Scaffold(
       appBar: AppBar(title: searching ? TextField(controller: q, autofocus: true, decoration: const InputDecoration(hintText: 'Search chats', border: InputBorder.none), onChanged: (_) => setState(() {})) : Text(t(c, 'Chats')),
         bottom: PreferredSize(preferredSize: const Size.fromHeight(48), child: SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
-          for (final (k, l) in [('all', 'All'), ('unread', 'Unread'), ('mentions', '@Mentions'), ('drafts', 'Drafts'), ('people', 'People'), ('groups', 'Groups'), ('pinned', 'Pinned'), ('archived', 'Archived')])
+          for (final (k, l) in [('all', 'All'), ('unread', 'Unread'), ('mentions', '@Mentions'), ('drafts', 'Drafts'), ('people', 'People'), ('groups', 'Groups'), ('pinned', 'Favourites'), ('archived', 'Hidden')])
             Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ChoiceChip(label: Text(t(c, l)), selected: filter == k, onSelected: (_) async { if (k == 'drafts') await Drafts.instance.load(); setState(() => filter = k); })),
           Padding(padding: const EdgeInsets.only(right: 6, bottom: 8), child: ActionChip(avatar: const Icon(Icons.forum_outlined, size: 16), label: const Text('Followed threads'),
             onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const FollowedThreadsScreen()))))]))),
@@ -71,7 +73,7 @@ class _RS extends State<RoomsScreen> {
         IconButton(tooltip: 'Notifications', icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
         IconButton(tooltip: 'Set your status', icon: const Icon(Icons.emoji_emotions_outlined), onPressed: () => showAvailability(c)),
         ]),
-      floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: Text(t(c, 'New encrypted chat')), onPressed: () => _new(c, m)),
+      floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: Text(t(c, 'New chat')), onPressed: () => _new(c, m)),
       body: Builder(builder: (_) {
         final cs = Theme.of(c).colorScheme; final me = m.userId;
         final invites = m.client.rooms.where((r) => r.membership == Membership.invite && !r.isSpace).toList();
@@ -84,7 +86,7 @@ class _RS extends State<RoomsScreen> {
             Text(filter == 'all' ? 'No chats yet' : 'Nothing here', style: Theme.of(c).textTheme.titleMedium), const SizedBox(height: 6),
             const Text('Every chat is end-to-end encrypted. Start one with a colleague, or ask Amer anything.', textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            Wrap(spacing: 8, children: [FilledButton.icon(onPressed: () => _new(c, m), icon: const Icon(Icons.add), label: const Text('Start a chat')),
+            Wrap(spacing: 8, children: [FilledButton.icon(onPressed: () => _new(c, m), icon: const Icon(Icons.add), label: const Text('New chat')),
               OutlinedButton.icon(onPressed: () => openAmerChat(c), icon: const Icon(Icons.auto_awesome), label: const Text('Chat with Amer'))])])));
         }
         return ListView(children: [
@@ -222,29 +224,29 @@ class _RS extends State<RoomsScreen> {
     return DateFormat('d/M/yy').format(t);
   }
   Future<void> _menu(BuildContext c, Room r) async {
-    final unread = r.notificationCount > 0 || r.isUnread, muted = r.pushRuleState != PushRuleState.notify, archived = r.tags.containsKey(TagType.lowPriority);
+    final unread = r.notificationCount > 0 || r.isUnread, muted = r.pushRuleState != PushRuleState.notify, archived = r.tags.containsKey(TagType.lowPriority);   // legacy archive = hidden
     final a = await showModalBottomSheet<String>(context: c, builder: (s) => SafeArea(child: Wrap(children: [
       ListTile(title: Text(peerName(r), style: Theme.of(c).textTheme.titleSmall)),
       ListTile(leading: Icon(r.isFavourite ? Icons.star : Icons.star_border), title: Text(r.isFavourite ? 'Remove from Favourites' : 'Add to Favourites'), onTap: () => Navigator.pop(s, 'pin')),
       ListTile(leading: const Icon(Icons.drive_file_move_outline), title: const Text('Move to a section…'), onTap: () => Navigator.pop(s, 'move')),
-      ListTile(leading: const Icon(Icons.visibility_off_outlined), title: const Text('Hide (comes back with a new message)'), onTap: () => Navigator.pop(s, 'hide')),
-      ListTile(leading: Icon(muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined), title: Text(muted ? 'Unmute' : 'Mute'), onTap: () => Navigator.pop(s, 'mute')),
+      if (!archived && !_hidden(context.read<MatrixService>()).containsKey(r.id)) ListTile(leading: const Icon(Icons.visibility_off_outlined), title: const Text('Hide (comes back with a new message)'), onTap: () => Navigator.pop(s, 'hide'))
+      else ListTile(leading: const Icon(Icons.visibility_outlined), title: const Text('Unhide'), onTap: () => Navigator.pop(s, 'unhide')),
+      ListTile(leading: Icon(muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined), title: Text(muted ? 'Unmute' : 'Mute (only @mentions notify)'), onTap: () => Navigator.pop(s, 'mute')),
       ListTile(leading: Icon(unread ? Icons.mark_chat_read_outlined : Icons.mark_chat_unread_outlined), title: Text(unread ? 'Mark as read' : 'Mark as unread'), onTap: () => Navigator.pop(s, 'read')),
-      ListTile(leading: Icon(archived ? Icons.unarchive_outlined : Icons.archive_outlined), title: Text(archived ? 'Unarchive' : 'Archive'), onTap: () => Navigator.pop(s, 'archive')),
     ])));
     switch (a) {
       case 'pin': await r.setFavourite(!r.isFavourite);
       case 'move': if (c.mounted) await _moveTo(c, context.read<MatrixService>(), r);
       case 'hide': await _hide(context.read<MatrixService>(), r, true);
+      case 'unhide': await _hide(context.read<MatrixService>(), r, false); if (archived) await r.removeTag(TagType.lowPriority);
       case 'mute': await r.setPushRuleState(muted ? PushRuleState.notify : PushRuleState.mentionsOnly);   // Teams: muted chats still notify @mentions
       case 'read': if (unread) { await r.setReadMarker(r.lastEvent?.eventId, mRead: r.lastEvent?.eventId); } else { await r.markUnread(true); }
-      case 'archive': archived ? await r.removeTag(TagType.lowPriority) : await r.addTag(TagType.lowPriority);
     }
     if (mounted) setState(() {});
   }
 
   Future<void> _new(BuildContext c, MatrixService m) async {
-    final people = await pickPeople(c, multiple: true, title: 'New encrypted chat');
+    final people = await pickPeople(c, multiple: true, title: 'New chat');
     if (people == null || people.isEmpty || !c.mounted) return;
     var name = '';
     if (people.length > 1) {

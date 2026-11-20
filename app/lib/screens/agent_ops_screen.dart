@@ -138,7 +138,7 @@ class _S extends State<AgentOpsScreen> with SingleTickerProviderStateMixin {
     final p = _cur; final wide = MediaQuery.sizeOf(c).width > 900;
     return Scaffold(
       appBar: AppBar(title: Text(L.t(context, 'Agent Ops')), actions: [
-        TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: Text(L.t(context, 'My agents')), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+        TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('Agent office · Projects'), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
         TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: Text(L.t(context, 'Skills and marketplace')), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
         if (order.isNotEmpty) SizedBox(width: wide ? 260 : 130, child: DropdownButton<String>(isExpanded: true, value: selected, underline: const SizedBox(), hint: const Text('Project'),
           items: [for (final id in order) DropdownMenuItem(value: id, child: Text(projects[id]!.name.isEmpty ? id : projects[id]!.name, overflow: TextOverflow.ellipsis))],

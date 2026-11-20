@@ -108,7 +108,7 @@ class _S extends State<PersonalAgentsScreen> {
     final rooms = cl.rooms.where((r) => r.membership == Membership.join && !r.isSpace).take(30).toList();
     final used = (budget?['tokens_used'] as num?) ?? 0, cap = (budget?['tokens_cap'] as num?) ?? 1;
     return Scaffold(
-      appBar: AppBar(title: Text(L.t(context, 'My agent team'))),
+      appBar: AppBar(title: const Text('Agent office · Projects')),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
         for (final a in GlassBox.instance.awaiting) _approval(c, a),
         Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

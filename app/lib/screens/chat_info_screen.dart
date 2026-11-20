@@ -1,3 +1,4 @@
+import '../services/roles.dart';
 import '../services/locale.dart';
 import '../services/labels.dart';
 import 'package:flutter/material.dart';
@@ -100,18 +101,20 @@ class _S extends State<ChatInfoScreen> {
           title: Text(u.id == me ? '${u.calcDisplayname()} (you)' : u.calcDisplayname()),
           subtitle: Text('${u.id}${u.membership == Membership.invite ? ' · invited' : ''}'),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (u.powerLevel.level >= 100) const Chip(label: Text('Admin')) else if (u.powerLevel.level >= 50) const Chip(label: Text('Moderator')),
+            if (u.powerLevel.level >= kModeratorLevel) Chip(label: Text(roleName(u.powerLevel.level))),
             if (u.id != me && (admin || room.canKick)) PopupMenuButton<String>(onSelected: (a) async {
               try {
-                if (a == 'admin') await room.setPower(u.id, 100);
+                if (a == 'owner') await room.setPower(u.id, kOwnerLevel);
+                if (a == 'moderator') await room.setPower(u.id, kModeratorLevel);
                 if (a == 'user') await room.setPower(u.id, 0);
-                if (a == 'remove') await room.kick(u.id);
+                if (a == 'remove' && await confirmDestructive(c, 'Remove from chat', 'Remove ${u.calcDisplayname()} from ${room.getLocalizedDisplayname()}.')) await room.kick(u.id);
                 setState(() {});
               } catch (e) { _msg(e); }
             }, itemBuilder: (_) => [
-              if (admin && u.powerLevel.level < 100) const PopupMenuItem(value: 'admin', child: Text('Make admin')),
-              if (admin && u.powerLevel.level >= 50) const PopupMenuItem(value: 'user', child: Text('Remove admin')),
-              if (room.canKick) const PopupMenuItem(value: 'remove', child: Text('Remove from group'))]),
+              if (admin && u.powerLevel.level < kOwnerLevel) const PopupMenuItem(value: 'owner', child: Text('Make owner')),
+              if (admin && u.powerLevel.level < kModeratorLevel) const PopupMenuItem(value: 'moderator', child: Text('Make moderator')),
+              if (admin && u.powerLevel.level >= kModeratorLevel) const PopupMenuItem(value: 'user', child: Text('Make member')),
+              if (room.canKick) const PopupMenuItem(value: 'remove', child: Text('Remove from chat'))]),
           ])),
         const Divider(),
       ],

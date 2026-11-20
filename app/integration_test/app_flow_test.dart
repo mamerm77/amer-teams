@@ -122,7 +122,7 @@ void main() {
       await waitFor(find.text('message to delete'));
       await tap(find.byTooltip('Reply, react, forward, edit, delete…'), 'options');
       await tap(find.text('Delete for everyone'), 'Delete for everyone');
-      if (find.widgetWithText(FilledButton, 'Delete').evaluate().isNotEmpty) await tap(find.widgetWithText(FilledButton, 'Delete'), 'confirm');
+      if (find.widgetWithText(FilledButton, 'Delete message').evaluate().isNotEmpty) await tap(find.widgetWithText(FilledButton, 'Delete message'), 'confirm');   // deleting asks first (cannot be undone)
       await wait(3);
       if (find.text('message to delete').evaluate().isNotEmpty) throw StateError('message still shown after delete');
     });
@@ -340,7 +340,7 @@ void main() {
     });
     await step('Glass box: an agent\'s message waits for approval, then the app sends exactly that', () async {
       await home(); await openChat(); await sendText('bob: agent asks to send');
-      await home(); await tap(find.text('Amer'), 'Amer tab'); await tap(find.text('My agents'), 'My agents');
+      await home(); await tap(find.text('Amer'), 'Amer tab'); await tap(find.text('Agent office · Projects'), 'Agent office · Projects');
       expectFound(await waitFor(find.textContaining('wants to send a message'), secs: 40), 'approval card');
       expectFound(find.text('Hello from your agent team').evaluate().isNotEmpty, 'preview of the exact text');
       await tap(find.text('Approve'), 'Approve');

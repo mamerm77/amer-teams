@@ -38,8 +38,8 @@ class _S extends State<CopilotScreen> {
   }
   @override Widget build(BuildContext c) => Scaffold(appBar: AppBar(title: Text(L.t(context, 'Amer co-pilot')), actions: [
     ListenableBuilder(listenable: Flags.instance, builder: (_, __) => Row(mainAxisSize: MainAxisSize.min, children: [
-      if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: Text(L.t(context, 'My agents')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
-      TextButton.icon(icon: const Icon(Icons.apartment), label: const Text('My agent office'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const OfficeScreen()))),
+      if (Flags.instance.on('personal_agents')) TextButton.icon(icon: const Icon(Icons.groups_2_outlined), label: const Text('Agent office · Projects'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
+      TextButton.icon(icon: const Icon(Icons.apartment), label: const Text('Agent office'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const OfficeScreen()))),
       TextButton.icon(icon: const Icon(Icons.storefront_outlined), label: Text(L.t(context, 'Skills and marketplace')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SkillsScreen()))),
       TextButton.icon(icon: const Icon(Icons.person_search), label: Text(L.t(context, 'Who knows about…')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const ExpertiseScreen()))),
       if (Flags.instance.on('workflows')) TextButton.icon(icon: const Icon(Icons.account_tree_outlined), label: Text(L.t(context, 'Workflows')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const WorkflowsScreen()))),

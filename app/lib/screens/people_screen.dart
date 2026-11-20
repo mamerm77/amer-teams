@@ -1,3 +1,4 @@
+import '../services/roles.dart' show confirmDestructive;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
@@ -50,13 +51,17 @@ class _S extends State<PeopleScreen> {
     if (!mounted) return;
     final f = {for (final k in ['email', 'phone', 'title', 'dept', 'office']) k: TextEditingController(text: '${cur[k] ?? ''}')};
     const labels = {'email': 'Work email', 'phone': 'Phone', 'title': 'Job title', 'dept': 'Department', 'office': 'Office / location'};
-    final ok = await showDialog<bool>(context: context, builder: (d) => AlertDialog(title: const Text('My contact details'),
-      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Colleagues find you by these and see them on your profile card.'),
-        for (final k in f.keys) TextField(controller: f[k], decoration: InputDecoration(labelText: labels[k]))])),
-      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))]));
+    String? manager = cur['manager'] as String?; String managerName = manager ?? 'Not set';
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('My contact details'),
+      content: SizedBox(width: 420, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Colleagues find you by these and see them on your contact card and in the organisation chart.'),
+        for (final k in f.keys) TextField(controller: f[k], decoration: InputDecoration(labelText: labels[k])),
+        ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.supervisor_account_outlined), title: const Text('Manager'), subtitle: Text(managerName),
+          trailing: TextButton(child: const Text('Choose'), onPressed: () async { final p = await pickPeople(d, title: 'Your manager'); if (p != null && p.isNotEmpty) set(() { manager = p.first.userId; managerName = p.first.displayName ?? p.first.userId; }); })),
+      ]))),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
     if (ok != true) return;
-    try { await api.putMap('/v1/people/me', {for (final e in f.entries) e.key: e.value.text.trim().isEmpty ? null : e.value.text.trim()}); _snack('Saved'); }
+    try { await api.putMap('/v1/people/me', {for (final e in f.entries) e.key: e.value.text.trim().isEmpty ? null : e.value.text.trim(), 'manager': manager}); _snack('Saved'); }
     catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); }
   }
 
@@ -70,14 +75,14 @@ class _S extends State<PeopleScreen> {
         if (v == 'fav') { await api.putMap('/v1/people/contacts', {'user_id': m['user_id'], 'favourite': m['favourite'] != true}); }
         if (v == 'remove') { await api.deletePath('/v1/people/contacts/${Uri.encodeComponent('${m['user_id']}')}'); }
         _load();
-      }, itemBuilder: (_) => [PopupMenuItem(value: 'fav', child: Text(m['favourite'] == true ? 'Remove from favourites' : 'Add to favourites')), const PopupMenuItem(value: 'remove', child: Text('Remove contact'))]),
+      }, itemBuilder: (_) => [PopupMenuItem(value: 'fav', child: Text(m['favourite'] == true ? 'Remove from Favourites' : 'Add to Favourites')), const PopupMenuItem(value: 'remove', child: Text('Remove contact'))]),
     ]));
 
   @override Widget build(BuildContext c) {
     final names = {for (final x in contacts) '${x['user_id']}': '${x['display_name']}'};
-    return DefaultTabController(length: 3, child: Scaffold(
+    return DefaultTabController(length: 4, child: Scaffold(
       appBar: AppBar(title: const Text('People'), actions: [TextButton.icon(icon: const Icon(Icons.badge_outlined), label: const Text('My contact details'), onPressed: _myCard)],
-        bottom: TabBar(tabs: [Tab(text: 'Contacts (${contacts.length})'), Tab(text: 'Groups (${groups.length})'), Tab(text: 'Invitations (${invites.length})')])),
+        bottom: TabBar(isScrollable: true, tabs: [Tab(text: 'Contacts (${contacts.length})'), Tab(text: 'Groups (${groups.length})'), Tab(text: 'Invitations (${invites.length})'), const Tab(text: 'Organisation')])),
       body: err != null ? Center(child: Text(err!)) : TabBarView(children: [
         RefreshIndicator(onRefresh: _load, child: ListView(children: [
           Padding(padding: const EdgeInsets.all(12), child: Wrap(spacing: 8, runSpacing: 8, children: [
@@ -96,7 +101,7 @@ class _S extends State<PeopleScreen> {
               OverflowBar(children: [
                 TextButton.icon(icon: const Icon(Icons.chat), label: const Text('Group chat'), onPressed: () => _chatWith((g['members'] as List).map((x) => '$x').toList())),
                 TextButton.icon(icon: const Icon(Icons.edit), label: const Text('Edit'), onPressed: () => _group(g)),
-                TextButton.icon(icon: const Icon(Icons.delete_outline), label: const Text('Delete'), onPressed: () async { await api.deletePath('/v1/people/groups/${Uri.encodeComponent('${g['name']}')}'); _load(); }),
+                TextButton.icon(icon: const Icon(Icons.delete_outline), label: const Text('Delete'), onPressed: () async { if (!await confirmDestructive(c, 'Delete group', 'Delete the contact group ${g['name']} (the people stay in your contacts).')) return; await api.deletePath('/v1/people/groups/${Uri.encodeComponent('${g['name']}')}'); _load(); }),
               ]),
             ])),
         ]),
@@ -107,8 +112,40 @@ class _S extends State<PeopleScreen> {
             title: Text('${i['name']}'), subtitle: Text('${i['email'] ?? i['phone']} · ${i['status'] == 'joined' ? 'joined as ${i['user_id']}${i['added'] == true ? ', added to your teams and chats' : ''}' : i['status']}'),
             trailing: i['status'] == 'pending' ? TextButton(onPressed: () async { await api.deletePath('/v1/people/invites/${i['id']}'); _load(); }, child: const Text('Cancel')) : null),
         ])),
+        const _Organisation(),
       ])));
   }
+}
+
+/// Everyone in the organisation, from the one contact card each person keeps (title, department, office, manager),
+/// with the org chart: managers up the chain, the person, direct reports. (Replaces the separate "Who" app.)
+class _Organisation extends StatefulWidget { const _Organisation(); @override State<_Organisation> createState() => _OS(); }
+class _OS extends State<_Organisation> {
+  List<Map> all = []; String q = '';
+  @override void initState() { super.initState(); _search(''); }
+  Future<void> _search(String t) async {
+    q = t; try { final r = await context.read<ApiService>().getMap('/v1/people/search?q=${Uri.encodeQueryComponent(t)}&limit=100'); if (mounted) setState(() => all = (r['results'] as List).cast<Map>()); } catch (_) {}
+  }
+  Future<void> _chart(String uid) async {
+    Map<String, dynamic> o; try { o = await context.read<ApiService>().getMap('/v1/people/org/${Uri.encodeComponent(uid)}'); } catch (_) { return; }
+    if (!mounted) return;
+    Widget row(Map p, {bool me = false, IconData? icon}) => ListTile(dense: !me, leading: Icon(icon ?? Icons.person), title: Text('${p['display_name']}', style: TextStyle(fontWeight: me ? FontWeight.bold : null)), subtitle: Text('${p['title'] ?? ''}'));
+    showModalBottomSheet(context: context, builder: (s) => ListView(padding: const EdgeInsets.all(16), children: [
+      Text('Organisation chart', style: Theme.of(s).textTheme.titleMedium),
+      for (final m in (o['managers'] as List).cast<Map>()) row(m, icon: Icons.arrow_upward),
+      row(o['person'] as Map, me: true),
+      if ((o['reports'] as List).isNotEmpty) const Padding(padding: EdgeInsets.only(top: 8), child: Text('Direct reports')),
+      for (final r in (o['reports'] as List).cast<Map>()) row(r, icon: Icons.subdirectory_arrow_right),
+      if ((o['managers'] as List).isEmpty && (o['reports'] as List).isEmpty) const Padding(padding: EdgeInsets.all(8), child: Text('No manager or reports on the contact cards yet.')),
+    ]));
+  }
+  @override Widget build(BuildContext c) => Column(children: [
+    Padding(padding: const EdgeInsets.all(12), child: TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Name, email, phone, job title or department', border: OutlineInputBorder(), isDense: true), onChanged: _search)),
+    Expanded(child: ListView(children: [for (final p in all) ListTile(
+      leading: CircleAvatar(child: Text('${p['display_name']}'.isEmpty ? '?' : '${p['display_name']}'.characters.first.toUpperCase())),
+      title: Text('${p['display_name']}'), subtitle: Text([p['title'], p['dept'], p['office'], p['email']].where((x) => x != null).join(' · ')),
+      trailing: IconButton(tooltip: 'Organisation chart', icon: const Icon(Icons.account_tree_outlined), onPressed: () => _chart('${p['user_id']}')))])),
+  ]);
 }
 
 extension on String { String ifEmpty(String other) => isEmpty ? other : this; }

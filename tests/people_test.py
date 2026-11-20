@@ -60,6 +60,11 @@ async def main():
               any(x["user_id"] == f"@sara{sfx}:amer.test" for x in cs["contacts"]) and any(x["user_id"] == a for x in sc["contacts"]) and prof.get("email") == f"sara.{sfx}@example.ae", prof)
         found = (await h.get(f"{ORCH}/v1/people/search", headers=B, params={"q": f"sara.{sfx}@"})).json()["results"]
         check("10. Everyone can now find her by email", any(p["user_id"] == f"@sara{sfx}:amer.test" for p in found), found)
+        await h.put(f"{ORCH}/v1/people/me", headers=B, json={"title": "Optical planner", "manager": a})
+        await h.put(f"{ORCH}/v1/people/me", headers=C, json={"title": "Engineer", "manager": b})
+        o = (await h.get(f"{ORCH}/v1/people/org/{b}", headers=A)).json()
+        check("11. Organisation chart from the one contact card: Omar's manager is Layla, Noor reports to Omar",
+              [m["user_id"] for m in o["managers"]] == [a] and [r["user_id"] for r in o["reports"]] == [c] and o["person"]["title"] == "Optical planner", o)
     json.dump(R, open(os.getenv("OUT", "/opt/amer/people_test.json"), "w"), indent=1)
     print(f"{sum(r['pass'] for r in R)}/{len(R)} passed"); sys.exit(0 if all(r["pass"] for r in R) else 1)
 asyncio.run(main())

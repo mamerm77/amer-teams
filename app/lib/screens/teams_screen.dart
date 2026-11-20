@@ -1,3 +1,4 @@
+import '../services/roles.dart';
 import 'team_settings_screen.dart';
 import 'teams_apps.dart';
 import '../services/locale.dart';
@@ -196,7 +197,7 @@ class TeamScreen extends StatelessWidget {
               if (v == 'members' && c.mounted) { final p = await pickPeople(c, multiple: true, title: 'Add people to ${ch.getLocalizedDisplayname()}'); for (final u in p ?? const []) { try { await ch.invite(u.userId); } catch (_) {} } }
             }, itemBuilder: (_) => [
               PopupMenuItem(value: 'notif', child: Text('Channel notifications: ${switch (ch.pushRuleState) { PushRuleState.notify => 'all posts', PushRuleState.mentionsOnly => '@mentions only', _ => 'off' }}')),
-              PopupMenuItem(value: 'fav', child: Text(m.isFavourite(ch) ? 'Remove from favourites' : 'Add to favourites')),
+              PopupMenuItem(value: 'fav', child: Text(m.isFavourite(ch) ? 'Remove from Favourites' : 'Add to Favourites')),
               const PopupMenuItem(value: 'hide', child: Text('Hide')),
               if (ch.getPowerLevelByUserId(m.userId).level >= 50) PopupMenuItem(value: 'mod', child: Text(m.channelSettings(ch)['moderated'] == true ? 'Turn off moderation' : 'Moderate: only moderators start posts')),
               if (m.channelSettings(ch)['private'] == true && ch.canInvite) const PopupMenuItem(value: 'members', child: Text('Add people to this private channel')),
@@ -214,7 +215,7 @@ class TeamScreen extends StatelessWidget {
         Text('Members (${members.length})', style: Theme.of(c).textTheme.titleSmall),
         for (final u in members) ListTile(dense: true, leading: CircleAvatar(radius: 16, child: Text(_initials(u.calcDisplayname()), style: const TextStyle(fontSize: 12))),
           title: Text(u.calcDisplayname()), subtitle: Text(u.id),
-          trailing: t.getPowerLevelByUserId(u.id).level >= 100 ? const Chip(label: Text('Owner')) : t.getPowerLevelByUserId(u.id).level >= 50 ? const Chip(label: Text('Admin')) : null),
+          trailing: t.getPowerLevelByUserId(u.id).level >= kModeratorLevel ? Chip(label: Text(roleName(t.getPowerLevelByUserId(u.id).level))) : null),
       ]));
   }
 }

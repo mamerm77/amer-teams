@@ -64,7 +64,7 @@ class _S extends State<CallsScreen> {
     if (ok != true || !mounted) return;
     final nav = Navigator.of(context);
     showDialog(context: context, barrierDismissible: false, builder: (_) => const AlertDialog(content: Row(children: [
-      CircularProgressIndicator(), SizedBox(width: 16), Expanded(child: Text('Waiting for the host to let you in…'))])));
+      CircularProgressIndicator(), SizedBox(width: 16), Expanded(child: Text('Waiting for an organiser to let you in…'))])));
     try {
       final roomId = await meet.joinById(ctl.text);
       nav.pop();

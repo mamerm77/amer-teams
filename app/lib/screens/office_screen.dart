@@ -1,3 +1,4 @@
+import 'personal_agents_screen.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -54,7 +55,8 @@ class _S extends State<OfficeScreen> {
     final cs = Theme.of(c).colorScheme; final x = o;
     final depts = {for (final a in (x?['agents'] as List? ?? const [])) a['dept'] as String}.toList();
     return Scaffold(
-      appBar: AppBar(title: const Text('My agent office'), actions: [
+      appBar: AppBar(title: const Text('Agent office · Ask'), actions: [
+        TextButton.icon(icon: const Icon(Icons.work_history_outlined), label: const Text('Projects'), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const PersonalAgentsScreen()))),
         SegmentedButton<bool>(segments: const [ButtonSegment(value: true, label: Text('3D')), ButtonSegment(value: false, label: Text('2D'))], selected: {iso}, onSelectionChanged: (v) => setState(() => iso = v.first)),
         const SizedBox(width: 12)]),
       body: err != null ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(err!)))

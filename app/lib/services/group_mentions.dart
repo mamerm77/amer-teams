@@ -17,8 +17,8 @@ const kGroupMentions = [
   GroupMention('channel', 'Everyone in this chat', 50, everyone: true),
   GroupMention('here', 'Everyone in this chat', 50, everyone: true),
   GroupMention('team', 'Everyone in this team (in a team channel)', 50, everyone: true),   // Teams' @team: a standard channel holds the whole team
-  GroupMention('moderators', 'Moderators and admins', 50),
-  GroupMention('admins', 'Admins', 100),
+  GroupMention('moderators', 'Moderators and owners', 50),
+  GroupMention('admins', 'Owners', 100),
 ];
 
 /// Group tags matching what the user has typed after @ (empty query lists all).
