@@ -152,11 +152,20 @@ class TeamScreen extends StatelessWidget {
             if (m.channelSettings(ch)['moderated'] == true) const Tooltip(message: 'Moderated: only moderators start posts', child: Icon(Icons.shield_outlined, size: 16)),
             if (ch.notificationCount > 0) Badge(label: Text('${ch.notificationCount}')),
             PopupMenuButton<String>(tooltip: 'Channel options', onSelected: (v) async {
+              if (v == 'notif' && c.mounted) {
+                final pick = await showDialog<PushRuleState>(context: c, builder: (d) => SimpleDialog(title: Text('Notifications for ${ch.getLocalizedDisplayname()}'), children: [
+                  SimpleDialogOption(onPressed: () => Navigator.pop(d, PushRuleState.notify), child: const ListTile(title: Text('All new posts and replies'), subtitle: Text('Activity and banner'))),
+                  SimpleDialogOption(onPressed: () => Navigator.pop(d, PushRuleState.mentionsOnly), child: const ListTile(title: Text('Only @mentions'), subtitle: Text('Teams: channel notifications off'))),
+                  SimpleDialogOption(onPressed: () => Navigator.pop(d, PushRuleState.dontNotify), child: const ListTile(title: Text('Nothing'), subtitle: Text('Not even @mentions'))),
+                ]));
+                if (pick != null) await ch.setPushRuleState(pick);
+              }
               if (v == 'fav') await m.toggleChannelPref(ch, 'favourite');
               if (v == 'hide') await m.toggleChannelPref(ch, 'hidden');
               if (v == 'mod') await m.setChannelSettings(ch, {'moderated': m.channelSettings(ch)['moderated'] != true});
               if (v == 'members' && c.mounted) { final p = await pickPeople(c, multiple: true, title: 'Add people to ${ch.getLocalizedDisplayname()}'); for (final u in p ?? const []) { try { await ch.invite(u.userId); } catch (_) {} } }
             }, itemBuilder: (_) => [
+              PopupMenuItem(value: 'notif', child: Text('Channel notifications: ${switch (ch.pushRuleState) { PushRuleState.notify => 'all posts', PushRuleState.mentionsOnly => '@mentions only', _ => 'off' }}')),
               PopupMenuItem(value: 'fav', child: Text(m.isFavourite(ch) ? 'Remove from favourites' : 'Add to favourites')),
               const PopupMenuItem(value: 'hide', child: Text('Hide')),
               if (ch.getPowerLevelByUserId(m.userId).level >= 50) PopupMenuItem(value: 'mod', child: Text(m.channelSettings(ch)['moderated'] == true ? 'Turn off moderation' : 'Moderate: only moderators start posts')),

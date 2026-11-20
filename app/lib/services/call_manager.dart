@@ -1,3 +1,4 @@
+import 'availability.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -87,7 +88,8 @@ class CallManager {
         if (c != null) { current = c; c.accept(); _open(c); }
         return;
       }
-      final c = CallController.incoming(api, room, e, busy: busy);
+      // Do not disturb / Presenting: calls are declined as busy, except from priority people (Teams rule)
+      final c = CallController.incoming(api, room, e, busy: busy || Availability.instance.holds(e.senderId));
       if (c == null) return;                                                  // auto-rejected as busy, or expired
       current = c;
       c.addListener(() { if (c.ended && current == c) current = null; });

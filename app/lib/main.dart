@@ -1,3 +1,4 @@
+import 'services/availability.dart';
 import 'package:media_kit/media_kit.dart';
 import 'ui/depth.dart';
 import 'services/accessibility.dart';
@@ -46,7 +47,7 @@ class AmerTeamsApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: Depth.instance.theme(A11y.instance.theme(amerTheme(Brightness.light), Brightness.light), null, Depth.instance.appMode(reduceMotion: A11y.instance.reduceMotion, highContrast: A11y.instance.highContrast)),
       darkTheme: Depth.instance.theme(A11y.instance.theme(amerTheme(Brightness.dark), Brightness.dark), null, Depth.instance.appMode(reduceMotion: A11y.instance.reduceMotion, highContrast: A11y.instance.highContrast)),
-      builder: (ctx, child) => A11y.instance.apply(ctx, LockGate(child: child!)),
+      builder: (ctx, child) => PresenceActivity(child: A11y.instance.apply(ctx, LockGate(child: child!))),
       home: m.isLoggedIn ? const _VerificationListener(child: HomeScreen()) : const LoginScreen(),
     ));
   }

@@ -629,7 +629,7 @@ class _S extends State<ChatScreen> {
                   final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
                   final (av, status) = Availability.parse(p.data);
                   final seen = p.data?.lastActiveTimestamp;
-                  final away = switch (av) { Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
+                  final away = switch (av) { Avail.call || Avail.meeting || Avail.presenting => Availability.label(av), Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
                   final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
                       : room.isDirectChat && _peerInvitedOnly ? 'Invited · hasn\'t signed in yet · 🔒 encrypted'
                       : room.isDirectChat ? '${room.directChatMatrixID != null && room.directChatMatrixID!.split(':').last != me.split(':').last ? 'External (${room.directChatMatrixID!.split(':').last}) · ' : ''}${online && av == Avail.available ? 'Online' : away}${status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'

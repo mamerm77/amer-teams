@@ -2,7 +2,9 @@ import 'people_screen.dart';
 import 'help_screen.dart';
 import '../services/urgent.dart';
 import '../services/availability.dart';
-import 'package:matrix/matrix.dart' show Client;
+import 'package:matrix/matrix.dart' show Client, Membership;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'people_picker.dart';
 import '../services/accessibility.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
@@ -89,6 +91,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     final sm = ScaffoldMessenger.of(context); sm.hideCurrentMaterialBanner();
     final p = Urgent.instance.pending.value; if (p.isEmpty) return;
     final e = p.first;
+    if (Availability.instance.holds(e.senderId)) return;   // Do not disturb: no banners, except priority people
     sm.showMaterialBanner(MaterialBanner(backgroundColor: Colors.red.shade50, leading: const Icon(Icons.notification_important, color: Colors.red),
       content: Text('Urgent from ${e.senderFromMemoryOrFallback.calcDisplayname()} in ${e.room.getLocalizedDisplayname()}: ${e.body.substring(8)}', maxLines: 2, overflow: TextOverflow.ellipsis),
       actions: [TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Urgent.instance.dismiss(e); openChat(context, e.roomId!); }, child: const Text('Open')),
@@ -175,14 +178,40 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
           child: CircleAvatar(radius: 16, child: Text(me.length > 1 ? me[1].toUpperCase() : '?'))),
       ]))))); }
 
+  /// Ctrl+N: new chat (Teams: New message).
+  Future<void> _newChat(BuildContext c) async {
+    final m = context.read<MatrixService>();
+    final p = await pickPeople(c, multiple: true, title: 'New chat'); if (p == null || p.isEmpty) return;
+    final id = p.length == 1 ? await m.client.startDirectChat(p.first.userId, enableEncryption: true) : await m.client.createGroupChat(invite: p.map((x) => x.userId).toList(), enableEncryption: true);
+    setState(() => i = 1); if (c.mounted) openChat(c, id);
+  }
+  /// Ctrl+G: go to any chat or channel by name (Teams: go-to mode).
+  Future<void> _goTo(BuildContext c) async {
+    final m = context.read<MatrixService>();
+    final all = m.client.rooms.where((r) => r.membership == Membership.join && !r.isSpace).toList();
+    final id = await showDialog<String>(context: c, builder: (d) { var q = '';
+      return StatefulBuilder(builder: (d, set) { final hits = all.where((r) => r.getLocalizedDisplayname().toLowerCase().contains(q.toLowerCase())).take(12).toList();
+        return AlertDialog(title: const Text('Go to'), content: SizedBox(width: 440, height: 380, child: Column(children: [
+          TextField(autofocus: true, decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Chat or channel name'), onChanged: (v) => set(() => q = v),
+            onSubmitted: (_) { if (hits.isNotEmpty) Navigator.pop(d, hits.first.id); }),
+          Expanded(child: ListView(children: [for (final r in hits) ListTile(dense: true, leading: Icon(r.isDirectChat ? Icons.person_outline : Icons.tag), title: Text(r.getLocalizedDisplayname()), onTap: () => Navigator.pop(d, r.id))])),
+        ])));
+      }); });
+    if (id == null) return;
+    setState(() => i = 1); if (c.mounted) openChat(c, id);
+  }
+
   @override
   Widget build(BuildContext c) {
     final wide = MediaQuery.sizeOf(c).width > 720;
     if (wide) {
-      return Scaffold(appBar: _top(c), body: Row(children: [
+      return CallbackShortcuts(bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyN, control: true): () => _newChat(c),
+          const SingleActivator(LogicalKeyboardKey.keyG, control: true): () => _goTo(c),
+        }, child: Focus(autofocus: true, child: Scaffold(appBar: _top(c), body: Row(children: [
         NavigationRail(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), labelType: NavigationRailLabelType.all, minWidth: 68,
           destinations: [for (final d in _dest) NavigationRailDestination(icon: Icon(d.$1), selectedIcon: Icon(d.$2), label: Text(t(c, d.$3)))]),
-        const VerticalDivider(width: 1), Expanded(child: _page(c, i))]));
+        const VerticalDivider(width: 1), Expanded(child: _page(c, i))]))));
     }
     // Phones, as in the Teams and Slack mobile apps: five tabs; Amer and Apps sit under More.
     return Scaffold(body: _page(c, i), bottomNavigationBar: NavigationBar(selectedIndex: i < 4 ? i : 4,

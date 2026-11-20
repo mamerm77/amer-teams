@@ -1,3 +1,4 @@
+import '../services/availability.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'meeting_options_screen.dart';
 import '../services/locale.dart';
@@ -249,7 +250,7 @@ class _S extends State<CallScreen> {
       final id = widget.meeting ? _meetId : widget.callId;   // same on every device
       call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: _pre?.cam ?? widget.video)
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
-          : await SecureCall.join(api, room, widget.callId!, video: widget.video);
+          : await SecureCall.join(api, room, widget.callId!, video: widget.video); Availability.instance.activity(widget.meeting ? 'meeting' : 'call');
       call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData)..on<RoomDisconnectedEvent>(_onDisconnected)..on<ParticipantConnectionQualityUpdatedEvent>(_onQuality);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
@@ -295,7 +296,7 @@ class _S extends State<CallScreen> {
   void _onCtl() {
     final c = ctl!;
     if (call == null && c.state == CallState.connected && c.media != null) {
-      call = c.media; call!.lk.addListener(_refresh);
+      call = c.media; call!.lk.addListener(_refresh); Availability.instance.activity('call');
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
       cam = cam && call!.deviceWarnings.every((w) => !w.contains('camera'));
@@ -456,7 +457,7 @@ class _S extends State<CallScreen> {
     }
     if (mounted) Navigator.pop(context);
   }
-  @override void dispose() { ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
+  @override void dispose() { Availability.instance.activity(null); ctl?.removeListener(_onCtl); if (ctl != null && !ctl!.ended) ctl!.hangup(); if (widget.meeting) cm?.inCall = false; tick?.cancel(); ev?.dispose(); _roomEvents?.cancel(); _chatTl?.then((t) => t.cancelSubscriptions()); super.dispose(); }
 
   // ---------- impersonation protection (docs/IDENTITY_CHECK.md) ----------
   /// Media identities are Matrix user ids, admitted only with a token for a member of this encrypted chat. Whether
@@ -914,7 +915,7 @@ class _S extends State<CallScreen> {
           Flexible(flex: 8, child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
           if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { if (!mic && !optAllowMic(room, me)) { _snack('The organiser has turned off mics for attendees'); return; } mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
           if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { if (!cam && !optAllowCamera(room, me)) { _snack('The organiser has turned off cameras for attendees'); return; } cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
-          if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
+          if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); Availability.instance.activity(sharing ? 'presenting' : (widget.meeting ? 'meeting' : 'call')); setState(() {}); }, off: sharing),
           _btn(Icons.back_hand, myHand ? 'Lower hand' : 'Raise hand', _toggleHand, off: myHand),
           if (optReactions(room)) PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
             itemBuilder: (_) => [for (final e in ['👍', '👏', '❤️', '😂', '😮', '🎉']) PopupMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 22)))]),
