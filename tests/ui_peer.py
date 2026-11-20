@@ -93,6 +93,8 @@ class Peer:
             await self.send("m.room.message", {"msgtype": "m.text", "body": "Moh Amer please review the plan",
                 "format": "org.matrix.custom.html", "formatted_body": f'<a href="https://matrix.to/#/{MOH}">Moh Amer</a> please review the plan',
                 "m.mentions": {"user_ids": [MOH]}})
+        elif b.startswith("bob: confirm decision") and not self.last_proposal:
+            log("decision confirm: no proposal received (not decrypted?)")
         elif b.startswith("bob: confirm decision") and self.last_proposal:   # Bob confirms with his own sign-in
             eid, c, ts = self.last_proposal
             await self.send("com.amerteams.decision.confirm", {"decision_id": c["decision_id"], "version": c["version"], "body": "Confirmed the decision"})

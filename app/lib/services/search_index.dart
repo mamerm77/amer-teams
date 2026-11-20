@@ -16,15 +16,24 @@ class SearchIndex {
   Database? _db; Client? c; StreamSubscription? _sub;
   bool backfilling = false; int indexed = 0;
 
-  Client? _owner; Future<void>? _opening;
+  Client? _owner; Future<void>? _opening; bool _fts = true;
   Future<void> start(Client client) { _owner = client; if (_db != null && c == client) return Future.value(); return _opening ??= _open(client).whenComplete(() => _opening = null); }
   Future<void> _open(Client client) async {
     if (_db != null) stop(); c = client;
     final dir = await getApplicationSupportDirectory();
     final factory = (Platform.isAndroid || Platform.isIOS) ? sqflite.databaseFactory : databaseFactoryFfi;
-    _db = await factory.openDatabase('${dir.path}/search_${client.userID.hashCode}.sqlite', options: OpenDatabaseOptions(version: 1, onCreate: (db, _) async {
-      await db.execute('CREATE VIRTUAL TABLE msgs USING fts4(body, sender_name, file_name, event_id, room_id, sender, ts, kind, tokenize=unicode61)');
-    }));
+    try {
+      _db = await factory.openDatabase('${dir.path}/search_${client.userID.hashCode}.sqlite', options: OpenDatabaseOptions(version: 1, onCreate: (db, _) async {
+        // Full-text index; not every SQLite build has the unicode61 tokenizer or FTS4, so fall back step by step.
+        const cols = 'body, sender_name, file_name, event_id, room_id, sender, ts, kind';
+        for (final ddl in ['CREATE VIRTUAL TABLE msgs USING fts4($cols, tokenize=unicode61)', 'CREATE VIRTUAL TABLE msgs USING fts4($cols)', 'CREATE TABLE msgs ($cols)']) {
+          try { await db.execute(ddl); debugPrint('SEARCH index created: $ddl'); return; } catch (e) { debugPrint('SEARCH index: "$ddl" not available ($e)'); }
+        }
+      }));
+      final t = await _db!.rawQuery("SELECT sql FROM sqlite_master WHERE name='msgs'");
+      _fts = '${t.firstOrNull?['sql'] ?? ''}'.toLowerCase().contains('fts');
+      debugPrint('SEARCH index open (full-text: $_fts)');
+    } catch (e) { debugPrint('SEARCH index could not open: $e'); _db = null; return; }
     _sub = client.onTimelineEvent.stream.listen((e) { _index(e); });
     unawaited(_backfill());
   }
@@ -134,7 +143,10 @@ class SearchIndex {
     final db = _db; if (db == null) return [];
     final words = q.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => '${w.replaceAll(RegExp(r'["*]'), '')}*').join(' ');
     final where = <String>[], args = <Object?>[];
-    if (words.isNotEmpty) { where.add('msgs MATCH ?'); args.add(words); }
+    if (words.isNotEmpty) {
+      if (_fts) { where.add('msgs MATCH ?'); args.add(words); }
+      else { for (final w in q.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty)) { where.add("(' ' || lower(body) || ' ' || lower(file_name) || ' ' || lower(sender_name)) LIKE ?"); args.add('% ${w.toLowerCase()}%'); } }
+    }
     if (roomId != null) { where.add('room_id = ?'); args.add(roomId); }
     if (sender != null) { where.add('sender = ?'); args.add(sender); }
     if (kind != null) { where.add(kind == 'files' ? "kind != 'text'" : 'kind = ?'); if (kind != 'files') args.add(kind); }

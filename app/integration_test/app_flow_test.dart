@@ -507,7 +507,7 @@ void main() {
       expectFound(await waitFor(find.textContaining('Verified.'), secs: 60), 'Verified');
       for (var i = 0; i < 30 && moh2()['stage'] != 'done'; i++) { await wait(1); }
       if (moh2()['verified'] != true) throw StateError('second device did not mark the app verified: ${moh2()}');
-      await tap(find.text('Done'), 'Done');
+      if (find.text('Done').evaluate().isNotEmpty) await tap(find.text('Done'), 'Done');   // the dialog may already have closed once both sides finished
     });
     String? recoveryKey;
     await step('Set up encrypted key backup', () async {

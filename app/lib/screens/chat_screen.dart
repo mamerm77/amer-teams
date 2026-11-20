@@ -869,8 +869,13 @@ class _S extends State<ChatScreen> {
   }
   Widget _decision(BuildContext c, Event e) {
     final cs = Theme.of(c).colorScheme, k = '${e.content['decision_id']}|${e.content['version']}';
+    final confirmEvs = (tl?.events ?? []).where((x) => x.type == kDecisionConfirm && x.content['decision_id'] == e.content['decision_id'] && x.content['version'] == e.content['version']).toList();
+    // a confirmation arrived after the ledger was last read: read it again now (the server may have just recorded it)
+    if (_ledgerAt != null && confirmEvs.any((x) => x.originServerTs.isAfter(_ledgerAt!.subtract(const Duration(seconds: 2))))) {
+      final at = _ledgerAt; Future.delayed(const Duration(seconds: 2), () { if (mounted && _ledgerAt == at) setState(() => _ledgerAt = null); });
+    }
     final led = _ledgerNow()[k];
-    final confirms = {for (final x in (tl?.events ?? []).where((x) => x.type == kDecisionConfirm && x.content['decision_id'] == e.content['decision_id'] && x.content['version'] == e.content['version'])) x.senderId};
+    final confirms = {for (final x in confirmEvs) x.senderId};
     final owner = room.unsafeGetUserFromMemoryOrFallback('${e.content['owner']}').calcDisplayname();
     final expired = led == null && DateTime.now().difference(e.originServerTs) > const Duration(hours: 72);
     final status = led?['status'] as String?;
