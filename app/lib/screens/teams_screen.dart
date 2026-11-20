@@ -1,3 +1,4 @@
+import 'team_settings_screen.dart';
 import 'teams_apps.dart';
 import '../services/locale.dart';
 import 'package:flutter/material.dart';
@@ -108,13 +109,16 @@ class TeamScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(t.getLocalizedDisplayname()), actions: [
         PopupMenuButton<String>(onSelected: (v) async {
+          if (v == 'settings') { Navigator.push(c, MaterialPageRoute(builder: (_) => TeamSettingsScreen(teamId: t.id))); return; }
           if (v == 'leave') {
             final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: Text('Leave ${t.getLocalizedDisplayname()}?'), content: const Text('You will leave the team and all of its channels.'),
               actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Leave'))]));
             if (ok == true) { await m.leaveTeam(t); if (c.mounted) Navigator.pop(c); }
           }
-        }, itemBuilder: (_) => const [PopupMenuItem(value: 'leave', child: ListTile(leading: Icon(Icons.logout), title: Text('Leave team')))])]),
+        }, itemBuilder: (_) => const [PopupMenuItem(value: 'settings', child: ListTile(leading: Icon(Icons.settings_outlined), title: Text('Team settings'))),
+          PopupMenuItem(value: 'leave', child: ListTile(leading: Icon(Icons.logout), title: Text('Leave team')))])]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
+        if (teamArchived(t)) const MaterialBanner(leading: Icon(Icons.archive_outlined), content: Text('This team is archived: channels are read-only. Owners can restore it in Team settings.'), actions: [SizedBox.shrink()]),
         if (t.topic.isNotEmpty) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(t.topic)),
         Wrap(spacing: 8, runSpacing: 8, children: [
           FilledButton.icon(icon: const Icon(Icons.video_call), label: const Text('Meet now'), onPressed: channels.isEmpty ? null :
@@ -124,7 +128,7 @@ class TeamScreen extends StatelessWidget {
             if (p != null && p.isNotEmpty) { await m.addTeamMembers(t, p.map((x) => x.userId).toList());
               if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Invited ${p.length} to the team and its channels'))); }
           }),
-          if (canManage) OutlinedButton.icon(icon: const Icon(Icons.add), label: const Text('Add channel'), onPressed: () async {
+          if (t.canSendEvent('m.space.child') && !teamArchived(t)) OutlinedButton.icon(icon: const Icon(Icons.add), label: const Text('Add channel'), onPressed: () async {
             final n = TextEditingController(), d = TextEditingController(); var private = false;
             final ok = await showDialog<bool>(context: c, builder: (x) => StatefulBuilder(builder: (x, set) => AlertDialog(title: const Text('New channel'), content: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: n, autofocus: true, decoration: const InputDecoration(labelText: 'Channel name')),

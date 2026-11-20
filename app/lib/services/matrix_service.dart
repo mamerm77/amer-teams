@@ -97,6 +97,8 @@ class MatrixService extends ChangeNotifier {
   List<Room> get teams => client.rooms.where((r) => r.isSpace && r.membership == Membership.join).toList();
   List<Room> channelsOf(Room team) => team.spaceChildren
       .map((c) => c.roomId == null ? null : client.getRoomById(c.roomId!)).whereType<Room>().toList();
+  /// The team (space) a channel belongs to, if any.
+  Room? teamOf(Room ch) => teams.where((t) => t.spaceChildren.any((c) => c.roomId == ch.id)).firstOrNull;
   List<Room> get chats => rooms.where((r) => !r.isSpace).toList();
 
   /// A channel shared with partner organisations (docs/PARTNERS.md): marked com.amerteams.shared, which is the only

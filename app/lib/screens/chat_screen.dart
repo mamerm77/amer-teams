@@ -1,3 +1,4 @@
+import 'team_settings_screen.dart' show membersMayEditDelete;
 import 'immersive_reader.dart';
 import 'video_player_screen.dart';
 import 'meeting_options_screen.dart';
@@ -518,8 +519,9 @@ class _S extends State<ChatScreen> {
     // Rules (docs/FEATURE_LOGIC.md): edit own text within 24 h; delete own within 2 days; moderators (power >= 50) any message.
     final age = DateTime.now().difference(e.originServerTs);
     final moderator = room.getPowerLevelByUserId(me).level >= 50;
-    final canEdit = mine && e.messageType == MessageTypes.Text && age < const Duration(hours: 24);
-    final canDelete = e.canRedact && ((mine && age < const Duration(days: 2)) || (!mine && moderator));
+    final team = context.read<MatrixService>().teamOf(room); final teamOk = moderator || membersMayEditDelete(team);   // Teams owner setting
+    final canEdit = teamOk && mine && e.messageType == MessageTypes.Text && age < const Duration(hours: 24);
+    final canDelete = e.canRedact && ((teamOk && mine && age < const Duration(days: 2)) || (!mine && moderator));
     final a = await showModalBottomSheet<String>(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
       Padding(padding: const EdgeInsets.all(12), child: Wrap(spacing: 8, children: [
         for (final r in ['👍', '❤️', '😂', '😮', '😢', '🙏']) ActionChip(label: Text(r, style: const TextStyle(fontSize: 22)), onPressed: () => Navigator.pop(s, 'react:$r'))])),

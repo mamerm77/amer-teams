@@ -1,0 +1,15 @@
+# Team settings (Microsoft Teams owner, member and guest rules)
+
+Team owners open **Team settings** from the team's menu. On Save, each setting is written to the team (`com.amerteams.team`) and applied to every channel's Matrix power levels. That way **the server enforces it** wherever Matrix allows:
+
+| Setting | Default (as in Teams) | Enforced by |
+|---|---|---|
+| Members can create channels | On | Server: the team's `m.space.child` permission (0 or 50) |
+| Members can add, remove and change tabs | On | Server: each channel's `com.amerteams.channel` permission |
+| Members can use @channel | On | Server: each channel's `notifications.room` level (Synapse checks every @room) |
+| Members can edit and delete their messages | On | App (Matrix always lets people redact their own messages) |
+| Archive the team | Off | Server: every channel's `events_default` 100 (read-only except owners); restore sets it back to 0 |
+
+Owners can also edit the team's name and description and change its picture. Members cannot change the settings: the server refuses the change.
+
+Tests: `tests/team_settings_test.py` (4 checks on the real stack, using a real member account).
