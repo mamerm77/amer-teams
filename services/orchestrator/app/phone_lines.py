@@ -75,10 +75,29 @@ async def set_line(req: Line, user=Depends(require_admin)):
         await c.execute("INSERT INTO phone_line (id, hunt_group, greeting, notify_room) VALUES (1,%s,%s,%s) ON CONFLICT (id) DO UPDATE SET hunt_group=EXCLUDED.hunt_group, greeting=EXCLUDED.greeting, notify_room=EXCLUDED.notify_room", (json.dumps(req.hunt_group), req.greeting, req.voicemail_room))
     return {"ok": True}
 
-async def _hunt():
+async def _hunt_raw():
     async with db.pool.connection() as c:
         r = await (await c.execute("SELECT hunt_group FROM phone_line WHERE id=1")).fetchone()
     return r[0] if r else []
+
+async def _hunt():
+    """Who rings for the company line, after each member's forwarding: 'forward' replaces them with the target,
+    'also_ring' adds the target, 'voicemail' removes them (unanswered calls then go to voicemail)."""
+    members = await _hunt_raw()
+    async with db.pool.connection() as c:
+        fw = {u: (m, t) for u, m, t in await (await c.execute("SELECT user_id, mode, target FROM phone_forwarding WHERE user_id = ANY(%s)", (members,))).fetchall()}
+    out = []
+    for u in members:
+        m, t = fw.get(u, ("off", None))
+        if m in ("off", "also_ring"): out.append(u)
+        if m in ("forward", "also_ring") and t: out.append(t)
+    return list(dict.fromkeys(out))
+
+async def _on_line(user_id: str) -> bool:
+    """In the hunt group (after forwarding), or holding a call transferred or parked by someone in it."""
+    if user_id in await _hunt() or user_id in await _hunt_raw(): return True
+    async with db.pool.connection() as c:
+        return bool(await (await c.execute("SELECT 1 FROM phone_inbound WHERE transfer_to=%s LIMIT 1", (user_id,))).fetchone())
 
 async def inbound_event(event: str, lkroom: str, identity: str):
     """Called from the LiveKit webhook for rooms named phone-in-*."""
@@ -91,16 +110,27 @@ async def inbound_event(event: str, lkroom: str, identity: str):
 
 @router.get("/inbound")
 async def waiting(user=Depends(auth.matrix_user)):
-    if user["user_id"] not in await _hunt(): raise HTTPException(403, "You are not in the phone line's hunt group")
+    """Calls waiting for the line, calls transferred to you, and parked calls (with their pick-up code)."""
+    me = user["user_id"]
+    if not await _on_line(me): raise HTTPException(403, "You are not in the phone line's hunt group")
+    ringing = me in await _hunt()
     async with db.pool.connection() as c:
-        rows = await (await c.execute("SELECT livekit_room, caller_masked, extract(epoch from arrived_at)::bigint, answered_by FROM phone_inbound ORDER BY arrived_at")).fetchall()
-    return [{"call": r, "caller": m, "arrived_at": a, "answered_by": b} for r, m, a, b in rows]
+        rows = await (await c.execute("SELECT livekit_room, caller_masked, extract(epoch from arrived_at)::bigint, answered_by, transfer_to, transfer_from, park_code, parked_by FROM phone_inbound ORDER BY arrived_at")).fetchall()
+    out = []
+    for r, m, a, b, tt, tf, pc, pb in rows:
+        if tt and tt != me: continue                        # transferred to someone else
+        if not tt and not pc and not ringing and b != me: continue
+        out.append({"call": r, "caller": m, "arrived_at": a, "answered_by": b, "transferred_by": tf if tt == me else None, "park_code": pc, "parked_by": pb})
+    return out
 
 @router.post("/inbound/{lkroom}/answer")
 async def answer(lkroom: str, user=Depends(auth.matrix_user)):
-    if user["user_id"] not in await _hunt(): raise HTTPException(403, "You are not in the phone line's hunt group")
+    me = user["user_id"]
+    if not await _on_line(me): raise HTTPException(403, "You are not in the phone line's hunt group")
     async with db.pool.connection() as c:
-        r = await (await c.execute("UPDATE phone_inbound SET answered_by=%s, answered_at=now() WHERE livekit_room=%s AND answered_by IS NULL RETURNING caller_masked", (user["user_id"], lkroom))).fetchone()
+        r = await (await c.execute("UPDATE phone_inbound SET answered_by=%s, answered_at=now(), transfer_to=NULL, park_code=NULL, parked_by=NULL "
+                                   "WHERE livekit_room=%s AND (answered_by IS NULL OR transfer_to=%s) AND (transfer_to IS NULL OR transfer_to=%s) RETURNING caller_masked",
+                                   (me, lkroom, me, me))).fetchone()
     if not r: raise HTTPException(409, "Someone else answered this call")
     await db.audit(user["user_id"], "phone.inbound.answer", r[0])
     return {"url": config.LIVEKIT_PUBLIC_URL, "token": livekit_token.sign(user["user_id"], user["user_id"], lkroom), "caller": r[0],
@@ -130,3 +160,76 @@ async def vm_claim(x_amer_connector: str = _Header("")):
     await db.audit("@voicemail", "phone.voicemail", r[1])
     return {"call": r[0], "caller": r[1], "room_id": line[0], "url": config.LIVEKIT_HTTP_URL.replace("http", "ws", 1),
             "token": livekit_token.sign("voicemail", "Voicemail", r[0])}
+
+
+# ---------- transfer, park and pick up (Teams calling parity) ----------
+class Transfer(BaseModel): to: str
+
+async def _held_by(me: str, lkroom: str):
+    async with db.pool.connection() as c:
+        r = await (await c.execute("SELECT caller_masked FROM phone_inbound WHERE livekit_room=%s AND answered_by=%s", (lkroom, me))).fetchone()
+    if not r: raise HTTPException(409, "You are not on this call")
+    return r[0]
+
+@router.post("/inbound/{lkroom}/transfer")
+async def transfer(lkroom: str, req: Transfer, user=Depends(auth.matrix_user)):
+    """Blind transfer: the caller stays connected (hearing the line), the target sees it as 'transferred to you'
+    and answers; the person transferring leaves. For a consult transfer, call the colleague in Amer first."""
+    me = user["user_id"]; caller = await _held_by(me, lkroom)
+    if not req.to.startswith("@") or req.to == me: raise HTTPException(422, "Transfer to another person's user id")
+    async with db.pool.connection() as c:
+        await c.execute("UPDATE phone_inbound SET answered_by=NULL, transfer_to=%s, transfer_from=%s WHERE livekit_room=%s", (req.to, me, lkroom))
+    await db.audit(me, "phone.transfer", f"{caller} -> {req.to}")
+    return {"ok": True, "to": req.to}
+
+@router.post("/inbound/{lkroom}/park")
+async def park(lkroom: str, user=Depends(auth.matrix_user)):
+    """Call park: the caller waits; anyone on the line picks up with the code, from any device."""
+    me = user["user_id"]; caller = await _held_by(me, lkroom)
+    import random
+    for _ in range(20):
+        code = f"{random.randint(100, 999)}"
+        try:
+            async with db.pool.connection() as c:
+                await c.execute("UPDATE phone_inbound SET answered_by=NULL, park_code=%s, parked_by=%s WHERE livekit_room=%s", (code, me, lkroom))
+            break
+        except Exception: continue
+    else: raise HTTPException(503, "No park code free")
+    await db.audit(me, "phone.park", f"{caller} code {code}")
+    return {"code": code}
+
+@router.post("/pickup/{code}")
+async def pickup(code: str, user=Depends(auth.matrix_user)):
+    me = user["user_id"]
+    if not await _on_line(me): raise HTTPException(403, "You are not in the phone line's hunt group")
+    async with db.pool.connection() as c:
+        r = await (await c.execute("UPDATE phone_inbound SET answered_by=%s, answered_at=now(), park_code=NULL, parked_by=NULL WHERE park_code=%s RETURNING livekit_room, caller_masked", (me, code))).fetchone()
+    if not r: raise HTTPException(404, "No call parked with that code")
+    await db.audit(me, "phone.pickup", r[1])
+    return {"url": config.LIVEKIT_PUBLIC_URL, "token": livekit_token.sign(me, me, r[0]), "caller": r[1], "call": r[0],
+            "security": "Encrypted to the phone network (TLS + SRTP), not end-to-end"}
+
+class Forwarding(BaseModel): mode: str; target: str | None = None
+
+@router.get("/forwarding")
+async def get_forwarding(user=Depends(auth.matrix_user)):
+    async with db.pool.connection() as c:
+        r = await (await c.execute("SELECT mode, target FROM phone_forwarding WHERE user_id=%s", (user["user_id"],))).fetchone()
+    return {"mode": r[0], "target": r[1]} if r else {"mode": "off", "target": None}
+
+@router.put("/forwarding")
+async def set_forwarding(req: Forwarding, user=Depends(auth.matrix_user)):
+    if req.mode not in ("off", "forward", "also_ring", "voicemail"): raise HTTPException(422, "mode: off, forward, also_ring or voicemail")
+    if req.mode in ("forward", "also_ring") and not (req.target or "").startswith("@"): raise HTTPException(422, "Choose who to forward to")
+    if req.target == user["user_id"]: raise HTTPException(422, "You cannot forward to yourself")
+    async with db.pool.connection() as c:
+        await c.execute("INSERT INTO phone_forwarding (user_id, mode, target) VALUES (%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET mode=EXCLUDED.mode, target=EXCLUDED.target, updated_at=now()",
+                        (user["user_id"], req.mode, req.target if req.mode in ("forward", "also_ring") else None))
+    return {"ok": True}
+
+@router.get("/voicemail/room")
+async def voicemail_room(user=Depends(auth.matrix_user)):
+    """Where the company line's voicemails are posted (encrypted audio), for the app's voicemail inbox."""
+    async with db.pool.connection() as c:
+        r = await (await c.execute("SELECT notify_room FROM phone_line WHERE id=1")).fetchone()
+    return {"room_id": r[0] if r else None}

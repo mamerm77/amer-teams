@@ -20,3 +20,11 @@ An administrator chooses the voicemail chat (`PUT /v1/phone/line` with `voicemai
 - There's no spoken greeting, only a tone, because no text-to-speech is deployed.
 - **AI call handling** (an AI receptionist that answers, understands the caller and routes or takes a message) needs speech recognition and speech synthesis on the server. Neither is in this deployment, so calls are routed to people (the hunt group), not an AI.
 - Dial-in callers and app participants meet in the bridge, not in the encrypted meeting itself; that's the security boundary, by design.
+
+## Teams-style calling on the company line
+- **Transfer.** While you are on a company-line call, Transfer hands it to a colleague. Their app shows "Transferred to you" and only they can answer it. The caller stays connected throughout. For a consult transfer, call the colleague in Amer first and then transfer.
+- **Call park.** Park puts the caller on hold and gives a 3-digit code. Anyone on the line picks the call up with that code (Phone → Pick up a parked call), from any device. The code stops working once the call is picked up.
+- **Forwarding** (Phone → Call forwarding) has four options: *Ring me*, *Ring me and someone else* (simultaneous ring), *Forward to someone*, and *Send to voicemail* (you stop ringing, and unanswered calls go to voicemail).
+- **Voicemail inbox** (Phone → Voicemail) lists the recorded voicemails, which are posted encrypted to the voicemail chat.
+- **Speed dial.** Numbers you star are saved in your account data, so they appear on all your devices.
+- Every transfer, park and pick-up is recorded in the audit log. Tests: `tests/phone_lines_test.py` (14 checks).
