@@ -1,3 +1,5 @@
+import '../services/app_store.dart' show AppHost;
+import 'teams_apps.dart';
 import 'package:flutter/material.dart';
 import '../services/accessibility.dart';
 import '../services/locale.dart';
@@ -36,6 +38,15 @@ class AppItem {
 }
 
 const _sections = <(String, List<AppItem>)>[
+  ('Team apps (like Microsoft Teams)', [
+    AppItem(Icons.view_kanban_outlined, 'Planner', 'A board of a chat\'s tasks: To do, In progress, Blocked, Done; assign and set due dates', open: _planner),
+    AppItem(Icons.table_rows_outlined, 'Lists', 'Track issues, assets or risks in a shared table with typed columns, filters and sorting', open: _lists),
+    AppItem(Icons.assignment_outlined, 'Forms', 'Surveys and quizzes with choice, text and rating questions; live results', open: _forms),
+    AppItem(Icons.menu_book_outlined, 'Notes', 'A shared notebook for a chat (like OneNote or a wiki): sections, pages and to-dos', open: _notes),
+    AppItem(Icons.update, 'Updates', 'Recurring check-ins (weekly status, stand-up) and who has submitted', open: _updates),
+    AppItem(Icons.celebration_outlined, 'Praise', 'Thank a colleague with a badge and a note, posted in the chat', open: _praise),
+    AppItem(Icons.flag_outlined, 'Goals', 'Objectives and key results with progress check-ins (like Viva Goals)', open: _goals),
+  ]),
   ('Your work', [
     AppItem(Icons.auto_awesome, 'Catch me up', 'What happened while you were away, per chat, with what needs you', open: _catchUp),
     AppItem(Icons.task_alt, 'Tasks', 'Your tasks from every chat: due dates, overdue first', open: _tasks),
@@ -84,7 +95,14 @@ Widget _rooms() => const MeetingRoomsScreen(); Widget _inPerson() => const InPer
 Widget _skills() => const SkillsScreen(); Widget _workflows() => const WorkflowsScreen(); Widget _agentOps() => const AgentOpsScreen(); Widget _operator() => const OperatorScreen();
 Widget _health() => const OpsScreen(); Widget _control() => const ControlScreen(); Widget _trace() => const CallTraceScreen(); Widget _users() => const AdminScreen();
 Widget _analytics() => const AnalyticsScreen(); Widget _guests() => const GuestAccountsScreen(); Widget _partners() => const PartnersScreen(); Widget _flags() => const FlagsScreen();
-Widget _office() => const OfficeScreen(); Widget _security() => const SecurityScreen(); Widget _a11y() => const A11yScreen();
+Widget _office() => const OfficeScreen();
+Widget _planner() => AppHost(title: 'Planner', icon: Icons.view_kanban_outlined, about: 'Plan a chat\'s work on a board. Tasks are the same ones you create from messages.', builder: (_, r) => PlannerApp(room: r));
+Widget _lists() => AppHost(title: 'Lists', icon: Icons.table_rows_outlined, about: 'Shared tables with typed columns: issue trackers, asset registers, risk registers.', builder: (_, r) => ListsApp(room: r));
+Widget _forms() => AppHost(title: 'Forms', icon: Icons.assignment_outlined, about: 'Surveys, quizzes and registrations for the people in a chat.', builder: (_, r) => FormsApp(room: r));
+Widget _notes() => AppHost(title: 'Notes', icon: Icons.menu_book_outlined, about: 'A shared notebook with sections and pages.', builder: (_, r) => NotesApp(room: r));
+Widget _updates() => AppHost(title: 'Updates', icon: Icons.update, about: 'Recurring check-ins and who has submitted this week.', builder: (_, r) => UpdatesApp(room: r));
+Widget _praise() => AppHost(title: 'Praise', icon: Icons.celebration_outlined, about: 'Recognise colleagues with badges.', builder: (_, r) => PraiseApp(room: r));
+Widget _goals() => AppHost(title: 'Goals', icon: Icons.flag_outlined, about: 'Objectives and key results for a team.', builder: (_, r) => GoalsApp(room: r)); Widget _security() => const SecurityScreen(); Widget _a11y() => const A11yScreen();
 
 class AppsScreen extends StatefulWidget {
   const AppsScreen({super.key});
