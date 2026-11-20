@@ -118,10 +118,19 @@ class _S extends State<CallScreen> {
       ]),
       actions: [TextButton(onPressed: _showParking, child: Text('Parking lot (${parking.length})')), if (isHost) TextButton(onPressed: () => _moveAgenda(1), child: Text(idx + 1 < items.length ? 'Next item' : 'Finish'))]);
   }
-  Future<void> _showParking() => showModalBottomSheet(context: context, builder: (s) => SafeArea(child: ListView(shrinkWrap: true, children: [
-    const ListTile(title: Text('Parking lot'), subtitle: Text('Topics raised off the agenda. Add one with /park in the meeting chat.')),
+  Future<void> _park(String text) async {
+    final t = text.trim(); if (t.isEmpty) return;
+    setState(() => _parkedLocal.add(t));
+    await room.sendEvent({'call_id': callId, 'text': t, 'body': '🅿️ Parking lot: $t'}, type: _parkType);
+    _snack('Added to the parking lot');
+  }
+  Future<void> _showParking() => showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => SafeArea(child: Padding(padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(s).bottom), child: ListView(shrinkWrap: true, children: [
+    const ListTile(title: Text('Parking lot'), subtitle: Text('Topics raised off the agenda, to come back to later. Add one here or with /park in the meeting chat.')),
+    Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Builder(builder: (_) { final t = TextEditingController();
+      return Row(children: [Expanded(child: TextField(controller: t, decoration: const InputDecoration(hintText: 'New topic for the parking lot'), onSubmitted: (v) { _park(v); Navigator.pop(s); })),
+        TextButton(onPressed: () { _park(t.text); Navigator.pop(s); }, child: const Text('Add topic'))]); })),
     for (final p in parking) ListTile(leading: const Icon(Icons.local_parking), title: Text(p)),
-    if (parking.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Empty'))])));
+    if (parking.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Empty'))]))));
   bool get aiOn { final s = room.getState(_aiState)?.content; return s?['enabled'] == true && s?['call_id'] == callId; }
   bool asking = false;
   Timer? tick; EventsListener<RoomEvent>? ev;
@@ -1006,7 +1015,7 @@ class _S extends State<CallScreen> {
   Future<void> _sendChat() async {
     final t = chatInput.text.trim(); if (t.isEmpty) return; chatInput.clear();
     if (t.toLowerCase().startsWith('/ask')) { final q = t.substring(4).trim(); return _askDialog(q.isEmpty ? null : q); }   // private: never posted
-    if (t.toLowerCase().startsWith('/park ')) { setState(() => _parkedLocal.add(t.substring(6).trim())); await room.sendEvent({'call_id': callId, 'text': t.substring(6).trim(), 'body': '🅿️ Parking lot: ${t.substring(6).trim()}'}, type: _parkType); _snack('Added to the parking lot'); return; }
+    if (t.toLowerCase().startsWith('/park ')) { await _park(t.substring(6)); return; }
     await room.sendTextEvent(t);
   }
 }

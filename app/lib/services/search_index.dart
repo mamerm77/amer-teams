@@ -31,8 +31,9 @@ class SearchIndex {
   /// index for the same signed-in client, it stays open (the old screen's dispose runs after the new one's start).
   void stop([Client? client]) { if (client != null && identical(client, _owner) && client.isLogged()) return; _sub?.cancel(); _db?.close(); _db = null; c = null; }
 
-  Future<void> _index(Event e) async {
-    final db = _db; if (db == null || e.roomId == null) return;
+  Future<void> _index(Event e) async { final db = _db; if (db != null) await _indexIn(db, e); }
+  Future<void> _indexIn(DatabaseExecutor db, Event e) async {
+    if (e.roomId == null) return;
     if (e.type == EventTypes.Redaction && e.redacts != null) { await db.delete('msgs', where: 'event_id = ?', whereArgs: [e.redacts]); return; }
     if (e.type != EventTypes.Message || e.redacted) return;
     final kind = switch (e.messageType) { MessageTypes.Image => 'image', MessageTypes.File => 'file', MessageTypes.Video => 'video', MessageTypes.Audio => 'voice', _ => 'text' };
@@ -44,16 +45,20 @@ class SearchIndex {
   }
 
   Future<void> _backfill() async {
-    backfilling = true;
-    for (final r in c?.rooms.where((r) => r.membership == Membership.join).toList() ?? const <Room>[]) {
-      try {
-        final tl = await r.getTimeline(limit: 300);
-        for (final e in tl.events) { await _index(e); }
-        tl.cancelSubscriptions();
-      } catch (_) {}
-      if (_db == null) break;
-    }
-    backfilling = false;
+    if (backfilling) return; backfilling = true;
+    try {
+      final rooms = c?.rooms.where((r) => r.membership == Membership.join && !r.isSpace).toList() ?? const <Room>[];
+      // all chats at once; each chat's messages written in one batch (was: one chat and one row at a time)
+      await Future.wait(rooms.map((r) async {
+        try {
+          final tl = await r.getTimeline(limit: 300);
+          final evs = tl.events.where((e) => e.type == EventTypes.Message || e.type == EventTypes.Redaction).toList();
+          tl.cancelSubscriptions();
+          final db = _db; if (db == null) return;
+          await db.transaction((txn) async { for (final e in evs) { await _indexIn(txn, e); } });
+        } catch (_) {}
+      }));
+    } finally { backfilling = false; }
   }
 
   /// When I sent messages (times only), for wellbeing signals on this device (docs/WELLBEING.md).
@@ -88,7 +93,10 @@ class SearchIndex {
     var r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
     // Messages that arrived still encrypted are indexed once decrypted: on a miss, catch up from the decrypted
     // timelines and ask again (bounded: the recent history of each chat).
-    if (r.isEmpty && q.trim().isNotEmpty && !backfilling) { await _backfill(); r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since); }
+    if (r.isEmpty && q.trim().isNotEmpty) {
+      await _backfill().timeout(const Duration(seconds: 12), onTimeout: () {});
+      r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
+    }
     return r;
   }
 

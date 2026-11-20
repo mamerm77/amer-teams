@@ -39,6 +39,19 @@ def _generate_emoji(self, extra_info):
     return [self.emoji[i] for i in idx]
 Sas._generate_emoji = _generate_emoji
 
+# Same library, the MAC: "hkdf-hmac-sha256" is the legacy method whose MACs use libolm's historical (invalid) base64,
+# which matrix-dart-sdk, Element and every other client still use for it; nio sends the corrected base64, so its MAC
+# never matches and the app (rightly) refuses to mark the device verified. Use the legacy encoding for that method.
+class _LegacyMac:
+    def __init__(self, est): self._e = est
+    def calculate_mac(self, message, info): return self._e.calculate_mac_invalid_base64(message, info)
+    def __getattr__(self, k): return getattr(self._e, k)
+_orig_establish = Sas.establish_sas
+def _establish(self, their_public_key):
+    _orig_establish(self, their_public_key)
+    if self.chosen_mac_method in ("", "hkdf-hmac-sha256"): self.established_sas = _LegacyMac(self.established_sas)
+Sas.establish_sas = _establish
+
 HS = os.getenv("HS", "http://localhost"); SERVER = os.getenv("SERVER_NAME", "amer.test")
 ME = f"@moh:{SERVER}"; OUT = os.getenv("OUT", "moh2.json")
 state = {"stage": "start", "emoji": [], "verified": False}

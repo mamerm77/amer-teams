@@ -231,7 +231,7 @@ void main() {
     await step('Meeting: agenda with timer, parking lot, next item', () async {
       await tap(find.byTooltip('More'), 'More'); await tap(find.text('Agenda and timer'), 'Agenda and timer'); await tap(find.text('Weekly sync'), 'Weekly sync');
       expectFound(await waitFor(find.textContaining('Item 1 of 3: Updates'), secs: 20), 'current agenda item with time left');
-      await t.enterText(field('Message everyone (encrypted)'), '/park Pricing model'); await tap(find.descendant(of: find.ancestor(of: field('Message everyone (encrypted)'), matching: find.byType(Row)).first, matching: find.byIcon(Icons.send)), 'send'); await wait(2);
+      await tap(find.text('Parking lot (0)'), 'Parking lot'); await t.enterText(field('New topic for the parking lot'), 'Pricing model'); await tap(find.text('Add topic'), 'Add topic'); await wait(2);
       expectFound(await waitFor(find.text('Parking lot (1)'), secs: 20), 'parked topic counted');
       await tap(find.text('Next item'), 'Next item');
       expectFound(await waitFor(find.textContaining('Item 2 of 3: Blockers'), secs: 20), 'moved to the next item');
@@ -373,14 +373,14 @@ void main() {
       await sendText('We agreed to go with Ciena for the Dubai ring');
       await tap(find.text('Looks like a decision · propose it'), 'decision hint');
       await tap(find.text('Propose'), 'Propose');
-      await tap(find.text('Confirm').last, 'Confirm (owner)');
+      await tap(find.text('Confirm').first, 'Confirm (owner)');   // the newest decision card
       expectFound(await waitFor(find.textContaining('Still needs'), secs: 20), 'quorum not yet reached');
       await sendText('bob: confirm decision');
       expectFound(await waitFor(find.textContaining('in the ledger'), secs: 45), 'decision in the ledger');
     });
     await step('Task from a message, then marked done', () async {
       await home(); await openChat(); await sendText('Send the vendor comparison');
-      await tap(find.byTooltip('Reply, react, forward, edit, delete…').last, 'options');     // the newest message (just sent)
+      await tap(find.byTooltip('Reply, react, forward, edit, delete…').first, 'options');     // the newest message (just sent): the list is reversed, so it is built first
       await tap(find.text('Create task'), 'Create task'); await tap(find.text('Save'), 'Save');
       expectFound(await waitFor(find.byTooltip('Task options'), secs: 20), 'task card');
       await tap(find.byTooltip('Task options').first, 'task options'); await tap(find.text('Mark done'), 'Mark done');
