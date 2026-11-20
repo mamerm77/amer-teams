@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'dart:async';
 import 'dart:io';
 import 'package:matrix/matrix.dart';
@@ -89,15 +90,44 @@ class SearchIndex {
 
   /// Full-text search with optional filters. Words are matched as prefixes ("vend" finds "vendor").
   Future<List<Map<String, Object?>>> search(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
-    if (_db == null && _owner != null && _owner!.isLogged()) await start(_owner!);
-    var r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
-    // Messages that arrived still encrypted are indexed once decrypted: on a miss, catch up from the decrypted
-    // timelines and ask again (bounded: the recent history of each chat).
+    final sw = Stopwatch()..start();
+    var r = <Map<String, Object?>>[];
+    try { r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since).timeout(const Duration(seconds: 5)); } catch (e) { debugPrint('SEARCH index query failed: $e'); }
+    debugPrint('SEARCH "$q" index: ${r.length} hits in ${sw.elapsedMilliseconds} ms (db open: ${_db != null}, indexed this session: $indexed)');
     if (r.isEmpty && q.trim().isNotEmpty) {
-      await _backfill().timeout(const Duration(seconds: 12), onTimeout: () {});
-      r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
+      // Messages that arrived still encrypted are indexed once decrypted: on a miss, read the decrypted recent history
+      // of every chat directly (in parallel, time-boxed), return what matches, and index it for next time.
+      r = await _scan(q, roomId: roomId, sender: sender, kind: kind, since: since).timeout(const Duration(seconds: 12), onTimeout: () => <Map<String, Object?>>[]);
+      debugPrint('SEARCH "$q" scan: ${r.length} hits in ${sw.elapsedMilliseconds} ms');
     }
     return r;
+  }
+
+  Future<List<Map<String, Object?>>> _scan(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
+    final words = q.toLowerCase().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    bool hit(String text) { final toks = text.toLowerCase().split(RegExp(r'[^\p{L}\p{N}]+', unicode: true)); return words.every((w) => toks.any((t) => t.startsWith(w))); }
+    final rooms = (c?.rooms ?? const <Room>[]).where((r) => r.membership == Membership.join && !r.isSpace && (roomId == null || r.id == roomId)).toList();
+    final out = <Map<String, Object?>>[];
+    await Future.wait(rooms.map((room) async {
+      try {
+        final tl = await room.getTimeline(limit: 300);
+        final evs = tl.events.where((e) => e.type == EventTypes.Message && !e.redacted).toList();
+        tl.cancelSubscriptions();
+        for (final e in evs) {
+          final isText = e.messageType == MessageTypes.Text || e.messageType == MessageTypes.Notice || e.messageType == MessageTypes.Emote;
+          final k = isText ? 'text' : switch (e.messageType) { MessageTypes.Image => 'image', MessageTypes.Video => 'video', MessageTypes.Audio => 'voice', _ => 'file' };
+          if (sender != null && e.senderId != sender) continue;
+          if (kind != null && (kind == 'files' ? k == 'text' : k != kind)) continue;
+          if (since != null && e.originServerTs.isBefore(since)) continue;
+          if (!hit('${e.body} ${e.senderFromMemoryOrFallback.calcDisplayname()}')) continue;
+          out.add({'body': isText ? e.body : '', 'sender_name': e.senderFromMemoryOrFallback.calcDisplayname(), 'file_name': isText ? '' : e.body,
+            'event_id': e.eventId, 'room_id': room.id, 'sender': e.senderId, 'ts': '${e.originServerTs.millisecondsSinceEpoch}', 'kind': k});
+          unawaited(_index(e).catchError((_) {}));
+        }
+      } catch (_) {}
+    }));
+    out.sort((a, b) => int.parse('${b['ts']}').compareTo(int.parse('${a['ts']}')));
+    return out.take(200).toList();
   }
 
   Future<List<Map<String, Object?>>> _query(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {

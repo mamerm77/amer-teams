@@ -81,7 +81,8 @@ async def main():
     async def on_mac(ev):
         sas = c.key_verifications[ev.transaction_id]
         try:
-            for m in sas.get_mac():
+            macs = sas.get_mac(); macs = macs if isinstance(macs, (list, tuple)) else [macs]   # nio returns one message
+            for m in macs:
                 r = await c.to_device(m)
                 if isinstance(r, ToDeviceError): save(stage="error", error=str(r))
         except Exception as e: save(stage="error", error=str(e)); return

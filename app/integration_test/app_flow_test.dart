@@ -373,7 +373,9 @@ void main() {
       await sendText('We agreed to go with Ciena for the Dubai ring');
       await tap(find.text('Looks like a decision · propose it'), 'decision hint');
       await tap(find.text('Propose'), 'Propose');
-      await tap(find.text('Confirm').first, 'Confirm (owner)');   // the newest decision card
+      final card = find.ancestor(of: find.text('Proposed decision').first, matching: find.byType(Card)).first;   // the newest decision card
+      final confirm = find.descendant(of: card, matching: find.text('Confirm'));
+      await t.ensureVisible(confirm); await t.pumpAndSettle(); await tap(confirm, 'Confirm (owner)');
       expectFound(await waitFor(find.textContaining('Still needs'), secs: 20), 'quorum not yet reached');
       await sendText('bob: confirm decision');
       expectFound(await waitFor(find.textContaining('in the ledger'), secs: 45), 'decision in the ledger');
