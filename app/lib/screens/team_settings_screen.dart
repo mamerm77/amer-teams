@@ -27,7 +27,7 @@ class _S extends State<TeamSettingsScreen> {
   MatrixService get m => context.read<MatrixService>();
   Room get team => m.client.getRoomById(widget.teamId)!;
   @override void initState() { super.initState(); o = teamSettingsOf(context.read<MatrixService>().client.getRoomById(widget.teamId)!); }
-  bool get owner => team.getPowerLevelByUserId(m.userId).level >= 100 || team.ownPowerLevel >= 100;
+  bool get owner => team.getPowerLevelByUserId(m.userId).level >= 100;
 
   Future<void> _pl(Room r, void Function(Map<String, Object?> pl) edit) async {
     final pl = Map<String, Object?>.from(r.getState(EventTypes.RoomPowerLevels)?.content ?? {});
@@ -58,10 +58,10 @@ class _S extends State<TeamSettingsScreen> {
   }
 
   Future<void> _picture() async {
-    final f = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-    final bytes = f?.files.single.bytes; if (bytes == null) return;
+    final files = await FilePicker.pickFiles(); if (files.isEmpty) return;
+    final f = files.first; final bytes = await f.xFile.readAsBytes();
     setState(() => status = 'Uploading picture…');
-    try { await team.setAvatar(MatrixImageFile(bytes: Uint8List.fromList(bytes), name: f!.files.single.name)); if (mounted) setState(() => status = 'Team picture changed'); }
+    try { await team.setAvatar(MatrixImageFile(bytes: Uint8List.fromList(bytes), name: f.name)); if (mounted) setState(() => status = 'Team picture changed'); }
     catch (e) { if (mounted) setState(() => status = 'Could not change the picture: $e'); }
   }
 
