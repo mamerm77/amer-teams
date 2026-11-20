@@ -385,7 +385,7 @@ void main() {
       await tap(find.byTooltip('Reply, react, forward, edit, delete…').first, 'options');     // the newest message (just sent): the list is reversed, so it is built first
       await tap(find.text('Create task'), 'Create task'); await tap(find.text('Save'), 'Save');
       expectFound(await waitFor(find.byTooltip('Task options'), secs: 20), 'task card');
-      await tap(find.byTooltip('Task options').first, 'task options'); await tap(find.text('Mark done'), 'Mark done');
+      await tap(find.byTooltip('Task options').first, 'task options'); await tap(find.text('Mark done').last, 'Mark done');   // the open menu (the decision card above has its own Mark done)
       expectFound(await waitFor(find.byIcon(Icons.check_circle), secs: 20), 'task done');
     });
     await step('Encryption details: key types, honest about message keys, rotation', () async {
@@ -507,7 +507,7 @@ void main() {
       expectFound(await waitFor(find.textContaining('Verified.'), secs: 60), 'Verified');
       for (var i = 0; i < 30 && moh2()['stage'] != 'done'; i++) { await wait(1); }
       if (moh2()['verified'] != true) throw StateError('second device did not mark the app verified: ${moh2()}');
-      if (find.text('Done').evaluate().isNotEmpty) await tap(find.text('Done'), 'Done');   // the dialog may already have closed once both sides finished
+      try { if (find.text('Done').evaluate().isNotEmpty) await tap(find.text('Done'), 'Done'); } catch (_) {}   // the dialog may close on its own as both sides finish
     });
     String? recoveryKey;
     await step('Set up encrypted key backup', () async {
