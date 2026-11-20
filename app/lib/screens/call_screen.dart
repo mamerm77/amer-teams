@@ -1,3 +1,4 @@
+import 'package:flutter_tts/flutter_tts.dart';
 import 'meeting_options_screen.dart';
 import '../services/locale.dart';
 import '../services/labels.dart';
@@ -556,6 +557,16 @@ class _S extends State<CallScreen> {
   void _say(String text) => SemanticsService.announce(text, Directionality.of(context));
 
   // ---------- live translated captions (docs/TRANSLATED_CAPTIONS.md) ----------
+  // Interpreter (Teams parity): speak each translated caption aloud in the listener's language, on this device only.
+  bool speakTr = false; final _tts = FlutterTts();
+  static String _ttsCode(String l) => l.startsWith('English') ? 'en-GB' : l.contains('Arabic') ? 'ar' : l.contains('French') ? 'fr-FR' : l.contains('Hindi') ? 'hi-IN'
+      : l.contains('Urdu') ? 'ur-PK' : l.contains('Bengali') ? 'bn-IN' : l.startsWith('Tagalog') ? 'fil-PH' : l.contains('Spanish') ? 'es-ES' : l.contains('Chinese') ? 'zh-CN' : 'en-GB';
+  Future<void> _interpreter() async {
+    if (capLang == null) { await _pickCapLang(); if (capLang == null) return; }
+    setState(() => speakTr = !speakTr);
+    if (speakTr) { try { await _tts.setLanguage(_ttsCode(capLang!)); await _tts.awaitSpeakCompletion(true); } catch (_) { setState(() => speakTr = false); _snack('This device has no voice for spoken interpretation; captions still show'); return; } }
+    _snack(speakTr ? 'Interpreter on: others are spoken to you in $capLang' : 'Interpreter off');
+  }
   String? capLang; final tCaps = <(String, String)>[]; final _tq = <(String, String)>[]; bool _tBusy = false;
   static const capLangs = ['English', 'العربية (Arabic)', 'Français (French)', 'हिन्दी (Hindi)', 'اردو (Urdu)', 'বাংলা (Bengali)', 'Tagalog', 'Español (Spanish)', '中文 (Chinese)', 'Русский (Russian)'];
   void _translateLine(String who, String text) {
@@ -573,6 +584,7 @@ class _S extends State<CallScreen> {
         if (!mounted) return;
         if (r['blocked'] == true) { setState(() { capLang = null; }); _snack('${r['answer']}'); return; }
         setState(() { tCaps.add((who, '${r['answer']}'.trim())); if (tCaps.length > 3) tCaps.removeAt(0); });
+        if (speakTr && who != 'Me') { try { await _tts.speak('${r['answer']}'.trim()); } catch (_) {} }
       }
     } catch (e) { _snack('Translation stopped: $e'); } finally { _tBusy = false; }
   }
@@ -845,6 +857,7 @@ class _S extends State<CallScreen> {
               case 'tcap': _pickCapLang();
               case 'net': _netDialog();
               case 'end': _host('end');
+              case 'interp': _interpreter();
               case 'options': Navigator.push(context, MaterialPageRoute(builder: (_) => MeetingOptionsScreen(roomId: widget.roomId))).then((_) => setState(() {}));
             }
           }, itemBuilder: (_) => [
@@ -865,6 +878,7 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
             PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),
             PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
+            PopupMenuItem(value: 'interp', child: ListTile(leading: const Icon(Icons.record_voice_over), title: Text(speakTr ? 'Interpreter: on' : 'Interpreter (hear others in your language)'))),
             if (widget.meeting) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),

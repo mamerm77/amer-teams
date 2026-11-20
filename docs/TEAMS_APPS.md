@@ -30,3 +30,9 @@ Already in Amer Teams before this: Approvals, Shifts, Walkie-talkie, Whiteboard,
 - **Moderation**: the owner or an admin can switch it on. Then only moderators start new posts, and everyone can still reply. This is enforced in the app (the posting box is hidden for everyone else), not by the server.
 - **Channel meetings**: the channel menu has "Schedule a channel meeting". The meeting is posted in the channel and appears in every member's calendar.
 - **Tabs**: "+" adds Planner, Lists, Notes, Forms, Milestones, Goals, Updates or Praise as a tab next to Posts and Files, for everyone in the channel.
+
+## Video, Immersive Reader and Interpreter (Teams parity)
+- **Video playback**: videos in Stream and in chats play inside the app, using `media_kit`. The video is decrypted on your device into a temporary file, which is deleted when the player closes.
+- **Immersive Reader**: in a message's menu. It shows large text with adjustable size, line spacing and reading speed, plus line focus and a dark page. Read aloud highlights each word as it is spoken. Arabic is shown right to left and read with an Arabic voice. Speech uses the device's own voices, so nothing leaves the device.
+- **Interpreter**: in a meeting's More menu. It speaks other people's translated captions aloud in your language, on your device only. The translation itself is the existing translated-captions path, so the same AI rules and labels apply. Unlike Microsoft's Interpreter, it does not lower the speaker's original audio.
+- **Read-aloud on Linux**: the speech package has no Linux voices. On Linux, read-aloud and the Interpreter say so plainly, and captions and text still work.

@@ -1,3 +1,4 @@
+import 'package:media_kit/media_kit.dart';
 import 'ui/depth.dart';
 import 'services/accessibility.dart';
 import 'dart:async';
@@ -18,6 +19,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();                                  // Stream video playback
   final matrix = MatrixService();
   await matrix.init();
   await AppLocale.instance.load();

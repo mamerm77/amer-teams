@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:matrix/matrix.dart';
 import '../services/app_store.dart';
 import '../services/decisions_tasks.dart';
+import 'video_player_screen.dart';
 
 /// The built-in Microsoft Teams apps, rebuilt on encrypted chat storage (docs/TEAMS_APPS.md).
 /// Each opens in a chat or channel, like a Teams tab, and everyone there shares it.
@@ -592,9 +593,7 @@ class StreamApp extends StatelessWidget {
     final vids = s.data!.events.where((e) => e.type == EventTypes.Message && (e.messageType == MessageTypes.Video || (e.messageType == MessageTypes.File && RegExp(r'\.(mp4|mov|webm|mkv)$', caseSensitive: false).hasMatch(e.body)))).toList();
     if (vids.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No videos in this chat yet. Meeting recordings and videos shared here appear in this library, encrypted.')));
     return GridView.extent(maxCrossAxisExtent: 260, padding: const EdgeInsets.all(8), mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.2, children: [
-      for (final e in vids) Card(clipBehavior: Clip.antiAlias, child: InkWell(onTap: () async {
-          try { final f = await e.downloadAndDecryptAttachment(); if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Decrypted ${f.name} (${(f.bytes.length / 1048576).toStringAsFixed(1)} MB). Open it from the chat to play.'))); }
-          catch (err) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Could not open: $err'))); } },
+      for (final e in vids) Card(clipBehavior: Clip.antiAlias, child: InkWell(onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => VideoPlayerScreen(event: e))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(child: Container(color: Colors.black87, child: const Icon(Icons.play_circle_outline, color: Colors.white, size: 48))),
           Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

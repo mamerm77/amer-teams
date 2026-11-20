@@ -1,3 +1,5 @@
+import 'immersive_reader.dart';
+import 'video_player_screen.dart';
 import 'meeting_options_screen.dart';
 import '../services/availability.dart';
 import 'connectors_screen.dart';
@@ -527,6 +529,7 @@ class _S extends State<ChatScreen> {
       ListTile(leading: const Icon(Icons.checklist), title: const Text('Select messages (forward several)'), onTap: () => Navigator.pop(s, 'select')),
       ListTile(leading: Icon(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? Icons.bookmark_remove : Icons.bookmark_add_outlined),
         title: Text(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? 'Remove from saved' : 'Save'), onTap: () => Navigator.pop(s, 'star')),
+      if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.chrome_reader_mode_outlined), title: const Text('Immersive Reader'), onTap: () => Navigator.pop(s, 'reader')),
       if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
       if (!mine && e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.auto_awesome), title: const Text('Suggest a reply (Amer)'), onTap: () => Navigator.pop(s, 'suggest')),
       ListTile(leading: const Icon(Icons.alarm_add_outlined), title: const Text('Remind me'), onTap: () => Navigator.pop(s, 'remind')),
@@ -556,6 +559,7 @@ class _S extends State<ChatScreen> {
     if (a == 'thread' && mounted) _openThread(e.eventId);
     if (a == 'star' && mounted) { await StarService(context.read<MatrixService>()).toggle(room.id, e.eventId); _snack('Saved messages updated'); }
     if (a == 'select') { setState(() => selected.add(e.eventId)); return; }
+    if (a == 'reader' && mounted) { Navigator.push(context, MaterialPageRoute(builder: (_) => ImmersiveReader(text: _text(e), from: e.senderFromMemoryOrFallback.calcDisplayname()))); return; }
     if (a == 'forward' && mounted) { await _forwardMany([e]); return; }
     if (a == '_old_forward' && mounted) {
       final rooms = context.read<MatrixService>().chats;
@@ -1041,7 +1045,11 @@ class _S extends State<ChatScreen> {
         IconButton(icon: Icon(_playing == e.eventId ? Icons.stop_circle : Icons.play_circle, size: 34), onPressed: () => _play(e)),
         const Icon(Icons.graphic_eq), const SizedBox(width: 8),
         Text(ms > 0 ? '${ms ~/ 60000}:${((ms ~/ 1000) % 60).toString().padLeft(2, '0')}' : 'Voice message')]);
-    } else if (e.messageType == MessageTypes.File || e.messageType == MessageTypes.Video) {
+    } else if (e.messageType == MessageTypes.Video || (e.messageType == MessageTypes.File && RegExp(r'\.(mp4|mov|webm|mkv)$', caseSensitive: false).hasMatch(e.body))) {
+      body = InkWell(onTap: () => Navigator.push(c, MaterialPageRoute(builder: (_) => VideoPlayerScreen(event: e))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.play_circle_outline, size: 32), const SizedBox(width: 8), Flexible(child: Text(e.body)), const SizedBox(width: 8),
+          IconButton(tooltip: 'Download', visualDensity: VisualDensity.compact, icon: const Icon(Icons.download, size: 18), onPressed: () => download(e))]));
+    } else if (e.messageType == MessageTypes.File) {
       final canPreview = e.messageType == MessageTypes.File && OfficeText.canPreview(e.body);
       body = InkWell(onTap: () => canPreview ? Navigator.push(c, MaterialPageRoute(builder: (_) => FilePreviewScreen(room: room, event: e, onDownload: () => download(e)))) : download(e),
         child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(canPreview ? Icons.description : Icons.insert_drive_file), const SizedBox(width: 8),
