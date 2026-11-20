@@ -52,7 +52,7 @@ class _S extends State<LoginScreen> {
       SegmentedButton<bool>(segments: const [ButtonSegment(value: false, label: Text('Sign in')), ButtonSegment(value: true, label: Text('Create account'))],
         selected: {signup}, onSelectionChanged: (v) => setState(() { signup = v.first; err = null; })),
       const SizedBox(height: 12),
-      TextField(controller: server, decoration: const InputDecoration(labelText: 'Server')),
+      TextField(controller: server, keyboardType: TextInputType.url, autocorrect: false, decoration: const InputDecoration(labelText: 'Server', helperText: 'On the same Wi-Fi: the PC address, e.g. 192.168.1.20')),
       TextField(controller: user, decoration: const InputDecoration(labelText: 'Username'), autocorrect: false),
       if (signup) TextField(controller: name, decoration: const InputDecoration(labelText: 'Display name')),
       TextField(controller: pass, obscureText: true, decoration: InputDecoration(labelText: 'Password',
@@ -84,6 +84,9 @@ String friendlyAuthError(Object e) {
     }
   }
   final t = e.toString().replaceFirst('Exception: ', '');
-  if (t.contains('SocketException') || t.contains('Failed host lookup') || t.contains('Connection refused')) return 'Cannot reach the server. Check the server address and your connection.';
+  if (t.contains('SocketException') || t.contains('Failed host lookup') || t.contains('Connection refused') || t.contains('timed out') || t.contains('ClientException')) {
+    return 'Cannot reach the server. On the same Wi-Fi, type the PC address shown by setup, e.g. 192.168.1.20 (no https). '
+        'On the PC: Docker must be running, and Windows Firewall must allow TCP 80 (run setup-local.ps1 as Administrator; if Wi-Fi is a "Public" network, the setup now opens it too).';
+  }
   return t;
 }

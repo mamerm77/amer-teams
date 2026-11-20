@@ -1,7 +1,10 @@
 # Amer Teams — local LAN test setup for Windows (Docker Desktop required)
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
-$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq "Dhcp" -and $_.InterfaceAlias -notmatch "vEthernet|WSL|Loopback" } | Select-Object -First 1).IPAddress
+# The adapter that carries the default route is the one phones on the same Wi-Fi can reach (not Hyper-V, WSL, VPN or Docker)
+$route = Get-NetRoute -DestinationPrefix "0.0.0.0/0" -ErrorAction SilentlyContinue | Sort-Object RouteMetric, InterfaceMetric | Select-Object -First 1
+if ($route) { $ip = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notmatch "^169\.254\." } | Select-Object -First 1).IPAddress }
+if (-not $ip) { $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq "Dhcp" -and $_.InterfaceAlias -notmatch "vEthernet|WSL|Loopback" } | Select-Object -First 1).IPAddress }
 if (-not $ip) { $ip = Read-Host "Enter this PC's Wi-Fi IP address (ipconfig)" }
 Write-Host "Using LAN IP $ip"
 function Rand($n){ -join ((1..$n) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }) }
@@ -27,6 +30,18 @@ if (-not (Select-String -Path .env -Pattern "^AMER_BOT_SECRET=" -Quiet)) {
 if (-not (Select-String -Path .env -Pattern "^AMER_ALERT_SECRET=" -Quiet)) { Add-Content -Encoding ascii .env "AMER_ALERT_SECRET=$(Rand 48)" }
 ((Select-String -Path .env -Pattern "^AMER_ALERT_SECRET=(.*)$").Matches[0].Groups[1].Value) | Set-Content -NoNewline -Encoding ascii monitoring\amer_alert_secret
 if (-not (Select-String -Path .env -Pattern "^AMER_FEDERATION_SECRET=" -Quiet)) { Add-Content -Encoding ascii .env "AMER_FEDERATION_SECRET=$(Rand 48)" }
+# The PC's address can change (DHCP): keep the phone-facing addresses current. SERVER_NAME stays, because accounts are named after it.
+$envText = Get-Content .env -Raw
+$envText = $envText -replace "(?m)^LAN_IP=.*$", "LAN_IP=$ip" -replace "(?m)^DOMAIN=.*$", "DOMAIN=$ip"
+Set-Content -NoNewline -Encoding ascii .env $envText
+if (Test-Path synapse/homeserver.yaml) {
+  $h = Get-Content synapse/homeserver.yaml -Raw
+  if ($h -match "(?m)^public_baseurl:") { $h = $h -replace "(?m)^public_baseurl:.*$", "public_baseurl: http://$ip/" } else { $h = $h.TrimEnd() + "`npublic_baseurl: http://$ip/`n" }
+  Set-Content -NoNewline -Encoding ascii synapse/homeserver.yaml $h
+}
+# Port 80 must be free for the server (IIS / "World Wide Web Publishing Service" or Skype often take it)
+$busy = Get-NetTCPConnection -LocalPort 80 -State Listen -ErrorAction SilentlyContinue | Where-Object { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -notmatch "com.docker|docker|wslrelay|vpnkit" }
+if ($busy) { $pn = (Get-Process -Id $busy[0].OwningProcess -ErrorAction SilentlyContinue).ProcessName; Write-Host "Port 80 is used by '$pn'. Stop it (for IIS: 'net stop w3svc' as Administrator), then run this again." -ForegroundColor Red; exit 1 }
 $envs = @{}; Get-Content .env | ForEach-Object { if ($_ -match "^(\w+)=(.*)$") { $envs[$matches[1]] = $matches[2] } }
 (Get-Content livekit.yaml -Raw) -replace "keys:\r?\n(  #.*\r?\n)?  .*", "keys:`n  $($envs.LIVEKIT_API_KEY): $($envs.LIVEKIT_API_SECRET)" -replace "api_key: LK_API_KEY", "api_key: $($envs.LIVEKIT_API_KEY)" | Set-Content -Encoding ascii livekit.yaml
 if (-not (Test-Path synapse/homeserver.yaml)) {
@@ -99,15 +114,19 @@ try {
   Write-Host "`nFirst invite code (10 sign-ups, valid 30 days):  $($inv.token)" -ForegroundColor Green
 } catch { Write-Host "Could not create an invite code yet; sign in as admin and use Users > New invite code." }
 Write-Host "Admin created. Sign in to the app as 'admin'. More invite codes: Users > New invite code."
-Write-Host "`nServer ready. In the app, sign in with server  http://$ip"
+Write-Host "`nServer ready. On phones on the same Wi-Fi, type the server as:  $ip   (or http://$ip, not https)" -ForegroundColor Green
 # Phones on the same Wi-Fi must reach the server (TCP 80), and calls need the media ports (TCP 7881, UDP 50000-50100).
 try {
   foreach ($r in @(@{n="Amer Teams web"; p="TCP"; l="80"}, @{n="Amer Teams media TCP"; p="TCP"; l="7881"}, @{n="Amer Teams media UDP"; p="UDP"; l="50000-50100"})) {
-    if (-not (Get-NetFirewallRule -DisplayName $r.n -ErrorAction SilentlyContinue)) {
-      New-NetFirewallRule -DisplayName $r.n -Direction Inbound -Protocol $r.p -LocalPort $r.l -Action Allow -Profile Private,Domain | Out-Null
+    $old = Get-NetFirewallRule -DisplayName $r.n -ErrorAction SilentlyContinue
+    if ($old) { $old | Set-NetFirewallRule -Profile Any }   # earlier versions opened only Private and Domain: phones failed when Windows marked the Wi-Fi "Public"
+    else {
+      New-NetFirewallRule -DisplayName $r.n -Direction Inbound -Protocol $r.p -LocalPort $r.l -Action Allow -Profile Any | Out-Null
     }
   }
-  Write-Host "Windows Firewall: opened TCP 80, 7881 and UDP 50000-50100 for private networks."
+  Write-Host "Windows Firewall: opened TCP 80, 7881 and UDP 50000-50100 (all network profiles)."
+  try { Invoke-RestMethod "http://${ip}/_matrix/client/versions" -TimeoutSec 5 | Out-Null; Write-Host "Checked: the server answers on http://$ip (what phones use)." -ForegroundColor Green }
+  catch { Write-Host "The server does not answer on http://$ip. Check Docker Desktop is running and that the Wi-Fi is not a guest network that isolates devices." -ForegroundColor Yellow }
 } catch {
   Write-Host "Could not add firewall rules (run PowerShell as Administrator). Calls from phones need TCP 80, 7881 and UDP 50000-50100 open."
 }

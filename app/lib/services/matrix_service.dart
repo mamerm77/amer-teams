@@ -38,19 +38,42 @@ class MatrixService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// What people type in the Server box → a URL the phone can reach.
+  /// "192.168.1.20" or "192.168.1.20:80" → http://192.168.1.20 (LAN test server is plain HTTP on port 80);
+  /// names without a scheme get https. If https to a private address fails, retry over http.
+  static Uri serverUri(String raw) {
+    var t = raw.trim().replaceAll(RegExp(r'/+$'), '');
+    if (!t.contains('://')) {
+      final host = t.split(':').first;
+      final local = RegExp(r'^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|localhost$)').hasMatch(host) || RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(host);
+      t = '${local ? 'http' : 'https'}://$t';
+    }
+    return Uri.parse(t);
+  }
+
+  Future<void> _connect(String server) async {
+    final u = serverUri(server);
+    try { await client.checkHomeserver(u); }
+    catch (e) {
+      final private = RegExp(r'^(10\.|192\.168\.|172\.)').hasMatch(u.host);
+      if (u.scheme == 'https' && private) { await client.checkHomeserver(u.replace(scheme: 'http', port: u.hasPort && u.port != 443 ? u.port : 80)); }
+      else { rethrow; }
+    }
+  }
+
   Future<void> login(String server, String user, String password) async {
-    await client.checkHomeserver(Uri.parse(server));
+    await _connect(server);
     await client.login(LoginType.mLoginPassword,
         identifier: AuthenticationUserIdentifier(user: user), password: password,
         initialDeviceDisplayName: 'Amer Teams ${Platform.operatingSystem}');
-    await PushService.register(client, gateway: Uri.parse(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
+    await PushService.register(client, gateway: client.homeserver ?? serverUri(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
     notifyListeners();
   }
 
   /// Self-registration with an invite code (Matrix User-Interactive Auth,
   /// stage m.login.registration_token). Server enforces the password policy.
   Future<void> register(String server, String username, String password, String inviteCode, {String? displayName}) async {
-    await client.checkHomeserver(Uri.parse(server));
+    await _connect(server);
     final avail = await client.checkUsernameAvailability(username);
     if (avail != true) throw Exception('That username is already taken');
     // Matrix User-Interactive Auth: complete each stage the server requires,
@@ -76,7 +99,7 @@ class MatrixService extends ChangeNotifier {
     if (displayName != null && displayName.isNotEmpty) {
       await client.setProfileField(client.userID!, 'displayname', {'displayname': displayName});
     }
-    await PushService.register(client, gateway: Uri.parse(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
+    await PushService.register(client, gateway: client.homeserver ?? serverUri(server), registerKey: (k) => ApiService(this).notifyAddDevice(k));
     notifyListeners();
   }
 

@@ -1,7 +1,7 @@
 name: amer_teams
 description: Amer Teams — end-to-end encrypted collaboration with an AI agent engine.
 publish_to: none
-version: 0.5.0+5
+version: 0.5.1+6
 environment:
   sdk: ">=3.11.0 <4.0.0"
 dependencies:
