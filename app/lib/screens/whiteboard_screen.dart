@@ -101,7 +101,7 @@ class _S extends State<WhiteboardScreen> {
           onPanStart: (d) => setState(() => current = [d.localPosition]),
           onPanUpdate: (d) => setState(() => current.add(d.localPosition)),
           onPanEnd: (_) => _send(Size(box.maxWidth - 16, box.maxHeight - 16)),
-          child: CustomPaint(size: Size.infinite, painter: _Board(strokes, current, eraser ? Colors.white : colour, eraser ? 24 : width, texts)))))),
+          child: CustomPaint(key: const ValueKey('whiteboard-canvas'), size: Size.infinite, painter: _Board(strokes, current, eraser ? Colors.white : colour, eraser ? 24 : width, texts)))))),
     ]));
 }
 

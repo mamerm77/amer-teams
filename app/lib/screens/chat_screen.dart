@@ -59,6 +59,7 @@ class ChatScreen extends StatefulWidget {
   @override State<ChatScreen> createState() => _S();
 }
 class _S extends State<ChatScreen> {
+  final _list = ScrollController();
   final _meetLive = <String, (Future<int>, DateTime)>{};
   final _translated = <String, String>{};          // translation cache per message, this session
   Future<int> _live(String callId) {
@@ -293,6 +294,7 @@ class _S extends State<ChatScreen> {
       }
     }
     input.clear();
+    if (_list.hasClients && _list.offset > 0) _list.jumpTo(0);   // sending takes you back to the newest messages
     typing = false; _safeTyping(false);
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
     var text = t;
@@ -630,7 +632,7 @@ class _S extends State<ChatScreen> {
             if (_peerInvitedOnly) Padding(padding: const EdgeInsets.only(top: 8), child: Text('${peerName(room)} hasn\'t signed in yet. They will get your messages (✓✓) once they do.', textAlign: TextAlign.center, style: TextStyle(color: cs.primary))),
             if (evs.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: ActionChip(avatar: const Text('👋'), label: Text(L.t(context, 'Say hello')), onPressed: () { input.text = 'Hello 👋'; send(); })),
           ])))),
-        Expanded(child: ListView.builder(reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
+        Expanded(child: ListView.builder(controller: _list, reverse: true, itemCount: evs.length, itemBuilder: (_, i) {
           final e = evs[i];
           // a read receipt on a message means everything before it has been read too (newest-first list)
           final readIdx = evs.indexWhere((x) => x.receipts.any((r) => r.user.id != me));

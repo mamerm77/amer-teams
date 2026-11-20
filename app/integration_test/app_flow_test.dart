@@ -231,7 +231,7 @@ void main() {
     await step('Meeting: agenda with timer, parking lot, next item', () async {
       await tap(find.byTooltip('More'), 'More'); await tap(find.text('Agenda and timer'), 'Agenda and timer'); await tap(find.text('Weekly sync'), 'Weekly sync');
       expectFound(await waitFor(find.textContaining('Item 1 of 3: Updates'), secs: 20), 'current agenda item with time left');
-      await t.enterText(field('Message everyone (encrypted)'), '/park Pricing model'); await t.testTextInput.receiveAction(TextInputAction.done); await wait(2);
+      await t.enterText(field('Message everyone (encrypted)'), '/park Pricing model'); await tap(find.descendant(of: find.ancestor(of: field('Message everyone (encrypted)'), matching: find.byType(Row)).first, matching: find.byIcon(Icons.send)), 'send'); await wait(2);
       expectFound(await waitFor(find.text('Parking lot (1)'), secs: 20), 'parked topic counted');
       await tap(find.text('Next item'), 'Next item');
       expectFound(await waitFor(find.textContaining('Item 2 of 3: Blockers'), secs: 20), 'moved to the next item');
@@ -241,7 +241,7 @@ void main() {
       await tap(find.text('Whiteboard'), 'Whiteboard'); await wait(3);
       await tap(find.byTooltip('Templates'), 'Templates'); await tap(find.text('Network sketch (optical and IP)'), 'network template');
       await tap(find.text('Use template'), 'Use template'); await wait(3);
-      await tap(find.byTooltip('Text'), 'Text tool'); await t.tapAt(t.getCenter(find.byType(CustomPaint).last)); await wait(1);
+      await tap(find.byTooltip('Text'), 'Text tool'); await t.tapAt(t.getCenter(find.byKey(const ValueKey('whiteboard-canvas')))); await wait(1);
       await t.enterText(find.byType(TextField).last, 'Core site'); await tap(find.text('Add'), 'Add label'); await wait(2);
       await t.pageBack(); await wait(1);
     });
@@ -373,7 +373,7 @@ void main() {
       await sendText('We agreed to go with Ciena for the Dubai ring');
       await tap(find.text('Looks like a decision · propose it'), 'decision hint');
       await tap(find.text('Propose'), 'Propose');
-      await tap(find.widgetWithText(FilledButton, 'Confirm').last, 'Confirm (owner)');
+      await tap(find.text('Confirm').last, 'Confirm (owner)');
       expectFound(await waitFor(find.textContaining('Still needs'), secs: 20), 'quorum not yet reached');
       await sendText('bob: confirm decision');
       expectFound(await waitFor(find.textContaining('in the ledger'), secs: 45), 'decision in the ledger');
