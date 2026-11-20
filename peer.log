@@ -1,0 +1,73 @@
+20:47:29 freebusy 200
+20:47:29 ready !AnjSBWgmpnKpYAbPnC:amer.test OXJWVNPICR
+20:49:52 text 'ping'
+20:49:57 event com.amerteams.reaction {}
+20:50:01 text '> <@bob:amer.test> pong from Bob\n\nthis is a reply'
+20:50:05 text '* this is an edited reply'
+20:50:08 text 'message to delete'
+20:50:31 event com.amerteams.checklist {}
+20:50:43 event com.amerteams.pq.device {}
+20:50:43 event com.amerteams.call.invite {'call_id': 'cmwpgecvb4pmjop', 'media': 'audio'}
+20:50:47 event com.amerteams.call.key {'call_id': 'cmwpgecvb4pmjop', 'key_index': 0}
+20:50:47 got call key index 0
+20:50:47 joined media cmwpgecvb4pmjop participants 0
+20:50:55 event com.amerteams.call.hangup {'call_id': 'cmwpgecvb4pmjop', 'reason': 'user_hangup'}
+20:50:55 left cmwpgecvb4pmjop
+20:50:56 event com.amerteams.call.end {'call_id': 'cmwpgecvb4pmjop', 'outcome': 'completed', 'media': 'audio'}
+20:50:56 event com.amerteams.call.key {'call_id': 'cmwpgecvb4pmjop', 'key_index': 1}
+20:50:58 text 'bob: decline next'
+20:51:02 event com.amerteams.pq.device {}
+20:51:02 event com.amerteams.call.invite {'call_id': 'cmwpgerky71wtao', 'media': 'audio'}
+20:51:05 event com.amerteams.call.end {'call_id': 'cmwpgerky71wtao', 'outcome': 'declined', 'media': 'audio'}
+20:51:12 text 'bob: busy next'
+20:51:15 event com.amerteams.pq.device {}
+20:51:16 event com.amerteams.call.invite {'call_id': 'cmwpgf21iysbnt', 'media': 'audio'}
+20:51:16 event com.amerteams.call.end {'call_id': 'cmwpgf21iysbnt', 'outcome': 'busy', 'media': 'audio'}
+20:51:23 text 'bob: ignore next'
+20:51:26 event com.amerteams.pq.device {}
+20:51:27 event com.amerteams.call.invite {'call_id': 'cmwpgfai0341z6s', 'media': 'audio'}
+20:51:27 event com.amerteams.call.hangup {'call_id': 'cmwpgfai0341z6s', 'reason': 'cancelled'}
+20:51:28 event com.amerteams.call.end {'call_id': 'cmwpgfai0341z6s', 'outcome': 'cancelled', 'media': 'audio'}
+20:51:35 text 'bob: call me'
+20:51:35 calling moh bob1795207895
+20:51:35 event com.amerteams.call.ringing {'call_id': 'bob1795207895'}
+20:51:37 event com.amerteams.pq.device {}
+20:51:37 event com.amerteams.call.answer {'call_id': 'bob1795207895'}
+20:51:37 shared key for ['@moh:amer.test|VTKLWGQODP', '@bob:amer.test|OXJWVNPICR']
+20:51:37 joined media bob1795207895 participants 0
+20:51:43 event com.amerteams.call.hangup {'call_id': 'bob1795207895', 'reason': 'user_hangup'}
+20:51:43 left bob1795207895
+20:51:43 event com.amerteams.call.end {'call_id': 'bob1795207895', 'outcome': 'completed', 'media': 'audio'}
+20:56:34 text 'bob: type'
+20:57:00 text 'bob: type'
+20:57:10 text 'bob: mention me'
+20:57:14 text 'bob: in 8s post updates'
+20:57:46 text 'please approve the budget'
+20:57:46 text '✅ Approval request: moh, please approve or reject.'
+20:57:46 text '✅ Approval request: moh, please approve or reject.'
+20:57:47 event com.amerteams.workflow.response {}
+20:57:47 text 'Approved by @moh:amer.test'
+20:57:51 canvas cvhocjalqs1n []
+20:57:52 canvas cvhocjalqs1n ['']
+20:57:53 canvas cvhocjalqs1n ['Ring ready']
+20:58:00 text 'bob: canvas add  for traffic'
+20:58:14 text 'bob: agent asks to send'
+20:58:52 text 'Hello from your agent team'
+20:58:54 announcement $izKpiu0yYZITNAwNqgSO_Fl3enEtezyb2CCH2dqYOSM
+20:58:56 text 'bob: ack'
+20:59:12 text 'Weekly report attached'
+20:59:16 glassbox GLASSBOX done: sent
+20:59:16 event com.amerteams.meeting {}
+20:59:22 text 'We agreed to go with Ciena for the Dubai ring'
+20:59:24 proposal dechocjc4yrih
+20:59:25 event com.amerteams.decision.confirm {}
+20:59:30 text 'bob: confirm decision'
+20:59:30 decision confirm 200 {"status":"confirmed","seq":1,"confirmed_by":["@bob:amer.test","@moh:amer.test"]}
+20:59:35 text 'Send the vendor comparison'
+20:59:37 event com.amerteams.task {}
+20:59:39 event com.amerteams.task {'reason': None}
+21:00:03 text 'bob: in 8s post updates'
+21:00:50 text 'sent while the server was down'
+21:00:57 text 'bob: in 20s say hi'
+21:00:59 text 'bob: in 20s call me'
+21:01:19 calling moh bob1795208479

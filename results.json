@@ -1,0 +1,527 @@
+[
+ {
+  "step": "Sign-in screen",
+  "pass": true,
+  "error": null,
+  "ms": 1033,
+  "shot": 1
+ },
+ {
+  "step": "Sign in as moh",
+  "pass": true,
+  "error": null,
+  "ms": 4800,
+  "shot": 2
+ },
+ {
+  "step": "About shows build number",
+  "pass": true,
+  "error": null,
+  "ms": 3136,
+  "shot": 3
+ },
+ {
+  "step": "Chat list shows Bob",
+  "pass": true,
+  "error": null,
+  "ms": 1784,
+  "shot": 4
+ },
+ {
+  "step": "Open chat with Bob (encrypted)",
+  "pass": true,
+  "error": null,
+  "ms": 2746,
+  "shot": 5
+ },
+ {
+  "step": "Send message and get reply",
+  "pass": true,
+  "error": null,
+  "ms": 2915,
+  "shot": 6
+ },
+ {
+  "step": "Read receipt ticks (✓✓)",
+  "pass": true,
+  "error": null,
+  "ms": 845,
+  "shot": 7
+ },
+ {
+  "step": "Message options visible on each message",
+  "pass": true,
+  "error": null,
+  "ms": 838,
+  "shot": 8
+ },
+ {
+  "step": "React to Bob's message",
+  "pass": true,
+  "error": null,
+  "ms": 2733,
+  "shot": 9
+ },
+ {
+  "step": "Reply to a message",
+  "pass": true,
+  "error": null,
+  "ms": 4415,
+  "shot": 10
+ },
+ {
+  "step": "Edit my message",
+  "pass": true,
+  "error": null,
+  "ms": 4395,
+  "shot": 11
+ },
+ {
+  "step": "Delete my message",
+  "pass": true,
+  "error": null,
+  "ms": 8863,
+  "shot": 12
+ },
+ {
+  "step": "Save (star) a message",
+  "pass": true,
+  "error": null,
+  "ms": 2480,
+  "shot": 13
+ },
+ {
+  "step": "Create a poll",
+  "pass": true,
+  "error": null,
+  "ms": 8594,
+  "shot": 14
+ },
+ {
+  "step": "Create a checklist",
+  "pass": true,
+  "error": null,
+  "ms": 6094,
+  "shot": 15
+ },
+ {
+  "step": "Search in chat",
+  "pass": true,
+  "error": null,
+  "ms": 3781,
+  "shot": 16
+ },
+ {
+  "step": "Chat info",
+  "pass": true,
+  "error": null,
+  "ms": 5986,
+  "shot": 17
+ },
+ {
+  "step": "Voice call: Calling then Ringing",
+  "pass": true,
+  "error": null,
+  "ms": 2168,
+  "shot": 18
+ },
+ {
+  "step": "Voice call: answered and connected (timer runs)",
+  "pass": true,
+  "error": null,
+  "ms": 10552,
+  "shot": 19
+ },
+ {
+  "step": "Voice call: hang up, chat shows duration",
+  "pass": true,
+  "error": null,
+  "ms": 2143,
+  "shot": 20
+ },
+ {
+  "step": "Call declined",
+  "pass": true,
+  "error": null,
+  "ms": 13591,
+  "shot": 21
+ },
+ {
+  "step": "Callee busy",
+  "pass": true,
+  "error": null,
+  "ms": 10881,
+  "shot": 22
+ },
+ {
+  "step": "Cancel while ringing",
+  "pass": true,
+  "error": null,
+  "ms": 11967,
+  "shot": 23
+ },
+ {
+  "step": "Incoming call rings and can be answered",
+  "pass": true,
+  "error": null,
+  "ms": 15762,
+  "shot": 25
+ },
+ {
+  "step": "Call history in Calls tab",
+  "pass": true,
+  "error": null,
+  "ms": 2278,
+  "shot": 26
+ },
+ {
+  "step": "Meet now",
+  "pass": true,
+  "error": null,
+  "ms": 4704,
+  "shot": 28
+ },
+ {
+  "step": "Meeting: raise hand",
+  "pass": true,
+  "error": null,
+  "ms": 8861,
+  "shot": 29
+ },
+ {
+  "step": "Meeting: participants panel",
+  "pass": true,
+  "error": null,
+  "ms": 1686,
+  "shot": 30
+ },
+ {
+  "step": "Meeting: chat panel",
+  "pass": true,
+  "error": null,
+  "ms": 1715,
+  "shot": 31
+ },
+ {
+  "step": "Meeting: host switches Amer on, everyone sees AI listening",
+  "pass": true,
+  "error": null,
+  "ms": 2616,
+  "shot": 32
+ },
+ {
+  "step": "Meeting: /ask answers privately",
+  "pass": true,
+  "error": null,
+  "ms": 2948,
+  "shot": 33
+ },
+ {
+  "step": "Meeting: agenda with timer, parking lot, next item",
+  "pass": true,
+  "error": null,
+  "ms": 8986,
+  "shot": 34
+ },
+ {
+  "step": "Meeting: whiteboard",
+  "pass": true,
+  "error": null,
+  "ms": 18768,
+  "shot": 35
+ },
+ {
+  "step": "Meeting: leave",
+  "pass": true,
+  "error": null,
+  "ms": 5138,
+  "shot": 36
+ },
+ {
+  "step": "Activity screen",
+  "pass": true,
+  "error": null,
+  "ms": 5059,
+  "shot": 37
+ },
+ {
+  "step": "Teams screen",
+  "pass": true,
+  "error": null,
+  "ms": 5084,
+  "shot": 38
+ },
+ {
+  "step": "Calendar screen",
+  "pass": true,
+  "error": null,
+  "ms": 5220,
+  "shot": 39
+ },
+ {
+  "step": "Amer screen",
+  "pass": true,
+  "error": null,
+  "ms": 5172,
+  "shot": 40
+ },
+ {
+  "step": "Apps screen",
+  "pass": true,
+  "error": null,
+  "ms": 5146,
+  "shot": 41
+ },
+ {
+  "step": "Apps lists every feature with what it does",
+  "pass": true,
+  "error": null,
+  "ms": 1446,
+  "shot": 42
+ },
+ {
+  "step": "Control centre screen",
+  "pass": true,
+  "error": null,
+  "ms": 30734,
+  "shot": 43
+ },
+ {
+  "step": "Health screen",
+  "pass": true,
+  "error": null,
+  "ms": 30543,
+  "shot": 44
+ },
+ {
+  "step": "Security and devices screen",
+  "pass": true,
+  "error": null,
+  "ms": 30548,
+  "shot": 45
+ },
+ {
+  "step": "Users (admin)",
+  "pass": true,
+  "error": null,
+  "ms": 25948,
+  "shot": 46
+ },
+ {
+  "step": "Admin: create invite code",
+  "pass": true,
+  "error": null,
+  "ms": 2615,
+  "shot": 47
+ },
+ {
+  "step": "Admin: call trace list",
+  "pass": true,
+  "error": null,
+  "ms": 1703,
+  "shot": 48
+ },
+ {
+  "step": "Admin: one call's full trace",
+  "pass": true,
+  "error": null,
+  "ms": 4131,
+  "shot": 49
+ },
+ {
+  "step": "Admin: feature flag off hides the feature, on brings it back",
+  "pass": true,
+  "error": null,
+  "ms": 69584,
+  "shot": 50
+ },
+ {
+  "step": "Typing indicator",
+  "pass": true,
+  "error": null,
+  "ms": 30950,
+  "shot": 51
+ },
+ {
+  "step": "Mention reaches Activity",
+  "pass": true,
+  "error": null,
+  "ms": 10502,
+  "shot": 52
+ },
+ {
+  "step": "Catch me up: unread chats ranked, mention counted",
+  "pass": true,
+  "error": null,
+  "ms": 25378,
+  "shot": 53
+ },
+ {
+  "step": "Workflows: create from a template and save",
+  "pass": true,
+  "error": null,
+  "ms": 5050,
+  "shot": 54
+ },
+ {
+  "step": "Workflows: a message triggers an approval card; approving continues the run",
+  "pass": true,
+  "error": null,
+  "ms": 6843,
+  "shot": 55
+ },
+ {
+  "step": "Canvas: create, write, and converge with Bob's edit (independent CRDT)",
+  "pass": true,
+  "error": null,
+  "ms": 24010,
+  "shot": 56
+ },
+ {
+  "step": "Glass box: an agent's message waits for approval, then the app sends exactly that",
+  "pass": true,
+  "error": null,
+  "ms": 39555,
+  "shot": 57
+ },
+ {
+  "step": "Slash command /announce, Bob acknowledges, sender sees the count",
+  "pass": true,
+  "error": null,
+  "ms": 4737,
+  "shot": 58
+ },
+ {
+  "step": "Scheduled message is listed and can be sent now",
+  "pass": true,
+  "error": null,
+  "ms": 15525,
+  "shot": 59
+ },
+ {
+  "step": "Find a time with Bob: 3 slots, Bob's calendar checked, book one",
+  "pass": true,
+  "error": null,
+  "ms": 4562,
+  "shot": 60
+ },
+ {
+  "step": "Decision: detected, proposed, quorum of owner + Bob, enters the ledger",
+  "pass": true,
+  "error": null,
+  "ms": 16115,
+  "shot": 61
+ },
+ {
+  "step": "Task from a message, then marked done",
+  "pass": true,
+  "error": null,
+  "ms": 7382,
+  "shot": 62
+ },
+ {
+  "step": "Encryption details: key types, honest about message keys, rotation",
+  "pass": true,
+  "error": null,
+  "ms": 2921,
+  "shot": 63
+ },
+ {
+  "step": "Chat notifications: Mentions only",
+  "pass": true,
+  "error": null,
+  "ms": 5476,
+  "shot": 64
+ },
+ {
+  "step": "Quiet hours saved on the server",
+  "pass": true,
+  "error": null,
+  "ms": 5408,
+  "shot": 65
+ },
+ {
+  "step": "Out of office: automatic reply to Bob, once",
+  "pass": true,
+  "error": null,
+  "ms": 21367,
+  "shot": 66
+ },
+ {
+  "step": "Search everywhere finds a message by a word prefix, on this device",
+  "pass": true,
+  "error": null,
+  "ms": 6193,
+  "shot": 67
+ },
+ {
+  "step": "Forward a message",
+  "pass": true,
+  "error": null,
+  "ms": 3530,
+  "shot": 68
+ },
+ {
+  "step": "Failed send shows ⚠ and Retry delivers it",
+  "pass": true,
+  "error": null,
+  "ms": 30450,
+  "shot": 70
+ },
+ {
+  "step": "Block: no messages or calls from Bob",
+  "pass": true,
+  "error": null,
+  "ms": 55073,
+  "shot": 71
+ },
+ {
+  "step": "Unblock",
+  "pass": true,
+  "error": null,
+  "ms": 4582,
+  "shot": 72
+ },
+ {
+  "step": "App lock: set PIN",
+  "pass": true,
+  "error": null,
+  "ms": 29290,
+  "shot": 73
+ },
+ {
+  "step": "App lock: wrong PIN cannot turn it off",
+  "pass": true,
+  "error": null,
+  "ms": 8051,
+  "shot": 74
+ },
+ {
+  "step": "App lock: correct PIN turns it off",
+  "pass": true,
+  "error": null,
+  "ms": 8051,
+  "shot": 75
+ },
+ {
+  "step": "Arabic: the layout mirrors right to left, then back to English",
+  "pass": true,
+  "error": null,
+  "ms": 35207,
+  "shot": 76
+ },
+ {
+  "step": "Verify a new device with emoji (SAS)",
+  "pass": true,
+  "error": null,
+  "ms": 49935,
+  "shot": 78
+ },
+ {
+  "step": "People: my contact details, add a contact, a contact group, invite someone new",
+  "pass": false,
+  "error": "Bad state: Not shown on screen: My contact details  ON SCREEN: Activity | Chat | Teams | Calendar | Calls | Amer | Apps | Find a feature | Team apps (like Microsoft Teams) | People | Everyone in the organisation with the org chart, your contacts and contact groups, invitations, and your contact card | Planner | A board of a chat's tasks: To do, In progress, Blocked, Done; assign and set due dates | Lists | Track issues, assets or risks in a shared table with typed columns, filters and sorting | Forms | Surveys and quizzes with choice, text and rating questions; live results | Notes | A shared notebook for a chat (like OneNote or a wiki): sections, pages and to-dos | Updates | Recurring check-ins (weekly status, stand-up) and who has submitted | Praise | Thank a colleague with a badge and a note, posted in the chat | Goals | Objectives and key results with progress check-ins (like Viva Goals) | Bookings | Bookable services with free time slots: consultations, reviews, office hours | Communities | A community feed: discussions, questions with a best answer, announcements (like Viva Engage) | Stream | The video library of a chat: recordings and shared videos | Places | Plan office days and book desks; see who is in | Milestones | A project timeline with dates and status | Your work | Catch me up | What happened while you were away, per chat, with what needs you | Tasks | Your tasks from every chat: due dates, overdue first | Saved messages | Messages you saved, in your own folders | Followed threads | Threads you follow, newest replies first | Focus and wellbeing | Hold notifications for a while; see your week (only you) | Find an expert | Find colleagues by topic; publish what you know | Notifications | Quiet hours, per-chat levels, priority people | Meetings and calls | Find a time | Free slots for everyone, with prayer times and Ramadan hours | Meeting rooms | Book a room; check in; room display tablets | In-person notes | Transcribe a meeting in a room; Amer writes the minutes | Phone | Call phone numbers; answer the company line | In a meeting",
+  "ms": 49157,
+  "shot": 79
+ }
+]

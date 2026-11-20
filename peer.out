@@ -1,0 +1,128 @@
+[peer] freebusy 200
+[peer] ready !AnjSBWgmpnKpYAbPnC:amer.test OXJWVNPICR
+[peer] text 'ping'
+[peer] event com.amerteams.reaction {}
+[peer] text '> <@bob:amer.test> pong from Bob\n\nthis is a reply'
+[peer] text '* this is an edited reply'
+[peer] text 'message to delete'
+[peer] event com.amerteams.checklist {}
+[peer] event com.amerteams.pq.device {}
+[peer] event com.amerteams.call.invite {'call_id': 'cmwpgecvb4pmjop', 'media': 'audio'}
+[peer] event com.amerteams.call.key {'call_id': 'cmwpgecvb4pmjop', 'key_index': 0}
+[peer] got call key index 0
+/home/runner/work/amer-teams/amer-teams/tests/ui_peer.py:205: DeprecationWarning: options.e2ee is deprecated, use options.encryption instead
+  self.lk = rtc.Room(); await self.lk.connect(t["url"], t["token"], options=opts)
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (nvidia_encoder_factory.cpp:121): CUDA is not available, NVENC disabled.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (vaapi_display_drm.cpp:123): Failed to open VA drm display. Maybe the AMD video driver or libva-dev/libdrm-dev is not installed?
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (vaapi_encoder_factory.cpp:61): Failed to open VAAPI display.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (nvidia_decoder_factory.cpp:149): Cuda Context is not available.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (input_volume_stats_reporter.cc:95): Will not log any `WebRTC.Audio.Apm.AppliedInputVolume.*` histogram stats.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (input_volume_stats_reporter.cc:95): Will not log any `WebRTC.Audio.Apm.RecommendedInputVolume.*` histogram stats.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+livekit_signaling:646:livekit_signaling - signal connection failed on v1 path: Handshake { status: 404 }
+livekit_signaling:664:livekit_signaling - v1 path not found (404), falling back to v0 path
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_munging_detector.cc:141): SDP munging: Opus stereo enabled.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+[peer] joined media cmwpgecvb4pmjop participants 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_munging_detector.cc:141): SDP munging: Opus stereo enabled.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_offer_answer.cc:575): A BUNDLE group contains a codec collision between {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, usedtx: 1, useinbandfec: 1}}} and {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, useinbandfec: 1}}}. All codecs must share the same type, encoding name, clock rate and parameters. (INVALID_PARAMETER)
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_offer_answer.cc:4170): Bundled payload type collision: A BUNDLE group contains a codec collision between {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, usedtx: 1, useinbandfec: 1}}} and {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, useinbandfec: 1}}}. All codecs must share the same type, encoding name, clock rate and parameters.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50050:host::0:wTIrtxaeThxdHryt:ZlCYeijQRlitjYilLWXqrdteExYusxsL:0:0:0] for mid 7
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:wTIrtxaeThxdHryt:ZlCYeijQRlitjYilLWXqrdteExYusxsL:0:0:0] for mid 7
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50062:host::0:ShYuAKtNMtIYRqIR:ftOmPdsnWnBCPVrQOLVBgzZLWhcDAbao:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:ShYuAKtNMtIYRqIR:ftOmPdsnWnBCPVrQOLVBgzZLWhcDAbao:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50062:host::0:ShYuAKtNMtIYRqIR:ftOmPdsnWnBCPVrQOLVBgzZLWhcDAbao:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:ShYuAKtNMtIYRqIR:ftOmPdsnWnBCPVrQOLVBgzZLWhcDAbao:0:0:0] for mid 0
+[peer] event com.amerteams.call.hangup {'call_id': 'cmwpgecvb4pmjop', 'reason': 'user_hangup'}
+[peer] left cmwpgecvb4pmjop
+[peer] event com.amerteams.call.end {'call_id': 'cmwpgecvb4pmjop', 'outcome': 'completed', 'media': 'audio'}
+[peer] event com.amerteams.call.key {'call_id': 'cmwpgecvb4pmjop', 'key_index': 1}
+[peer] text 'bob: decline next'
+[peer] event com.amerteams.pq.device {}
+[peer] event com.amerteams.call.invite {'call_id': 'cmwpgerky71wtao', 'media': 'audio'}
+[peer] event com.amerteams.call.end {'call_id': 'cmwpgerky71wtao', 'outcome': 'declined', 'media': 'audio'}
+[peer] text 'bob: busy next'
+[peer] event com.amerteams.pq.device {}
+[peer] event com.amerteams.call.invite {'call_id': 'cmwpgf21iysbnt', 'media': 'audio'}
+[peer] event com.amerteams.call.end {'call_id': 'cmwpgf21iysbnt', 'outcome': 'busy', 'media': 'audio'}
+[peer] text 'bob: ignore next'
+[peer] event com.amerteams.pq.device {}
+[peer] event com.amerteams.call.invite {'call_id': 'cmwpgfai0341z6s', 'media': 'audio'}
+[peer] event com.amerteams.call.hangup {'call_id': 'cmwpgfai0341z6s', 'reason': 'cancelled'}
+[peer] event com.amerteams.call.end {'call_id': 'cmwpgfai0341z6s', 'outcome': 'cancelled', 'media': 'audio'}
+[peer] text 'bob: call me'
+[peer] calling moh bob1795207895
+[peer] event com.amerteams.call.ringing {'call_id': 'bob1795207895'}
+[peer] event com.amerteams.pq.device {}
+[peer] event com.amerteams.call.answer {'call_id': 'bob1795207895'}
+[peer] shared key for ['@moh:amer.test|VTKLWGQODP', '@bob:amer.test|OXJWVNPICR']
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (vaapi_display_drm.cpp:123): Failed to open VA drm display. Maybe the AMD video driver or libva-dev/libdrm-dev is not installed?
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (vaapi_encoder_factory.cpp:61): Failed to open VAAPI display.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (nvidia_decoder_factory.cpp:149): Cuda Context is not available.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (input_volume_stats_reporter.cc:95): Will not log any `WebRTC.Audio.Apm.AppliedInputVolume.*` histogram stats.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (input_volume_stats_reporter.cc:95): Will not log any `WebRTC.Audio.Apm.RecommendedInputVolume.*` histogram stats.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+livekit_signaling:646:livekit_signaling - signal connection failed on v1 path: Handshake { status: 404 }
+livekit_signaling:664:livekit_signaling - v1 path not found (404), falling back to v0 path
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_munging_detector.cc:141): SDP munging: Opus stereo enabled.
+[peer] joined media bob1795207895 participants 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sctp_data_channel.cc:342): DataChannelObserver - adapter needed
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_munging_detector.cc:141): SDP munging: Opus stereo enabled.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_offer_answer.cc:575): A BUNDLE group contains a codec collision between {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, usedtx: 1, useinbandfec: 1}}} and {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, useinbandfec: 1}}}. All codecs must share the same type, encoding name, clock rate and parameters. (INVALID_PARAMETER)
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (sdp_offer_answer.cc:4170): Bundled payload type collision: A BUNDLE group contains a codec collision between {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, usedtx: 1, useinbandfec: 1}}} and {payload_type: 111, codec: {mime_type: audio/opus, clock_rate: 48000, num_channels: 2, parameters: {minptime: 10, stereo: 1, useinbandfec: 1}}}. All codecs must share the same type, encoding name, clock rate and parameters.
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50051:host::0:jQEMlelwWGhHmCwd:qeORmpIZtNRsaycgasRrxzGrpLdaqcAV:0:0:0] for mid 7
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:jQEMlelwWGhHmCwd:qeORmpIZtNRsaycgasRrxzGrpLdaqcAV:0:0:0] for mid 7
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50000:host::0:gNuoNZNrEXMtYBiY:pHMPPkawXDPHjXxMohlgXpMOlRyixoMR:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:gNuoNZNrEXMtYBiY:pHMPPkawXDPHjXxMohlgXpMOlRyixoMR:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:1585688626:2:udp:2130706431:172.171.126.x:50000:host::0:gNuoNZNrEXMtYBiY:pHMPPkawXDPHjXxMohlgXpMOlRyixoMR:0:0:0] for mid 0
+libwebrtc:67:libwebrtc::imp::peer_connection_factory - (peer_connection.cc:2801): Candidate has an unknown component: Cand[:3815817682:2:tcp:1671430143:172.171.126.x:7881:host::0:gNuoNZNrEXMtYBiY:pHMPPkawXDPHjXxMohlgXpMOlRyixoMR:0:0:0] for mid 0
+[peer] event com.amerteams.call.hangup {'call_id': 'bob1795207895', 'reason': 'user_hangup'}
+livekit_ffi::room_apis::server:279:livekit_ffi::room_apis::server - Attempted to drop unknown FFI handle: 2274
+[peer] left bob1795207895
+[peer] event com.amerteams.call.end {'call_id': 'bob1795207895', 'outcome': 'completed', 'media': 'audio'}
+[peer] text 'bob: type'
+[peer] text 'bob: type'
+[peer] text 'bob: mention me'
+[peer] text 'bob: in 8s post updates'
+[peer] text 'please approve the budget'
+[peer] text '✅ Approval request: moh, please approve or reject.'
+[peer] text '✅ Approval request: moh, please approve or reject.'
+[peer] event com.amerteams.workflow.response {}
+[peer] text 'Approved by @moh:amer.test'
+[peer] canvas cvhocjalqs1n []
+[peer] canvas cvhocjalqs1n ['']
+[peer] canvas cvhocjalqs1n ['Ring ready']
+[peer] text 'bob: canvas add  for traffic'
+[peer] text 'bob: agent asks to send'
+[peer] text 'Hello from your agent team'
+[peer] announcement $izKpiu0yYZITNAwNqgSO_Fl3enEtezyb2CCH2dqYOSM
+[peer] text 'bob: ack'
+[peer] text 'Weekly report attached'
+[peer] glassbox GLASSBOX done: sent
+[peer] event com.amerteams.meeting {}
+[peer] text 'We agreed to go with Ciena for the Dubai ring'
+[peer] proposal dechocjc4yrih
+[peer] event com.amerteams.decision.confirm {}
+[peer] text 'bob: confirm decision'
+[peer] decision confirm 200 {"status":"confirmed","seq":1,"confirmed_by":["@bob:amer.test","@moh:amer.test"]}
+[peer] text 'Send the vendor comparison'
+[peer] event com.amerteams.task {}
+[peer] event com.amerteams.task {'reason': None}
+[peer] text 'bob: in 8s post updates'
+Timed out, sleeping for 0s
+[peer] text 'sent while the server was down'
+[peer] text 'bob: in 20s say hi'
+[peer] text 'bob: in 20s call me'
+[peer] calling moh bob1795208479
