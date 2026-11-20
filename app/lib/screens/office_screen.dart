@@ -3,6 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import 'package:matrix/matrix.dart' show Room;
+import '../services/matrix_service.dart';
+import '../services/office_actions.dart';
 
 /// Virtual office (docs/VIRTUAL_OFFICE.md): your own agent team at their desks. Give the Chief of Staff a request
 /// and watch it plan, hand parts to specialists, who work in parallel and hand back; the team room shows every
@@ -26,9 +29,22 @@ class _S extends State<OfficeScreen> {
   Future<void> _ask({String? agent}) async {
     final text = ask.text.trim(); if (text.isEmpty) return;
     setState(() => sending = true);
-    try { await context.read<ApiService>().postMap('/v1/office/requests', {'request': text, if (agent != null) 'agent': agent}); ask.clear(); await _load(); }
+    try {
+      final cx = ctxRoom == null ? null : await OfficeContext.of(ctxRoom!);
+      if (!mounted) return;
+      await context.read<ApiService>().postMap('/v1/office/requests', {'request': text, if (agent != null) 'agent': agent,
+        if (cx != null) 'context': cx.text, if (cx != null) 'rooms': [cx.room.id], if (cx?.label != null) 'labels': [cx!.label]});
+      ask.clear(); await _load();
+    }
     catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'.replaceFirst('Exception: ', '')))); }
     if (mounted) setState(() => sending = false);
+  }
+  Room? ctxRoom;
+  Future<void> _pickContext() async {
+    final rooms = context.read<MatrixService>().chats;
+    final r = await showDialog<Room>(context: context, builder: (d) => SimpleDialog(title: const Text('Which chat should the team work on?'), children: [
+      for (final r in rooms) SimpleDialogOption(onPressed: () => Navigator.pop(d, r), child: Text(r.getLocalizedDisplayname()))]));
+    if (r != null) setState(() => ctxRoom = r);
   }
   List<dynamic> get agents => (o?['agents'] as List? ?? const []).where((a) => dept == null || a['dept'] == dept).toList();
   String nameOf(String id) => id == 'you' ? 'You' : ((o?['agents'] as List? ?? const []).firstWhere((a) => a['id'] == id, orElse: () => {'name': id})['name'] as String);
@@ -55,6 +71,14 @@ class _S extends State<OfficeScreen> {
               Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 4), child: Wrap(spacing: 14, children: [
                 for (final (k, l) in [('working', 'Working'), ('needs_approval', 'Needs your approval'), ('assigned', 'Assigned'), ('available', 'Available')])
                   Row(mainAxisSize: MainAxisSize.min, children: [CircleAvatar(radius: 5, backgroundColor: statusColour(k)), const SizedBox(width: 4), Text(l, style: const TextStyle(fontSize: 12))])])),
+              Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Row(children: [
+                ActionChip(avatar: Icon(ctxRoom == null ? Icons.add_link : Icons.forum, size: 16),
+                  label: Text(ctxRoom == null ? 'Work on a chat (context)' : 'Context: ${ctxRoom!.getLocalizedDisplayname()}'),
+                  onPressed: _pickContext),
+                if (ctxRoom != null) IconButton(tooltip: 'Remove context', icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => ctxRoom = null)),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('The team reads that chat on your device, proposes tasks, messages or meetings, and runs them only when you approve.', style: TextStyle(fontSize: 11), overflow: TextOverflow.ellipsis)),
+              ])),
               Padding(padding: const EdgeInsets.all(12), child: Row(children: [
                 Expanded(child: TextField(controller: ask, minLines: 1, maxLines: 3, onSubmitted: (_) => _ask(),
                   decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true, hintText: 'Ask your Chief of Staff, e.g. "Prepare me for Monday\'s vendor review: agenda, risks, budget"'))),
@@ -195,8 +219,18 @@ class _AgentPanel extends StatelessWidget {
           await showModalBottomSheet(context: c, isScrollControlled: true, builder: (s) => DraggableScrollableSheet(expand: false, initialChildSize: 0.8, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
             Text('${d['title']}', style: Theme.of(s).textTheme.titleMedium), Text('${d['status']}'.replaceAll('_', ' ')), const SizedBox(height: 8),
             if (d['result'] != null) SelectableText('${d['result']}'),
+            if ((d['actions'] as List? ?? const []).isNotEmpty) ...[
+              const SizedBox(height: 10), Text(d['needs_approval'] == true ? 'Proposed actions (run on your device when you approve)' : 'Actions', style: Theme.of(s).textTheme.titleSmall),
+              for (final a in (d['actions'] as List).whereType<Map>()) ListTile(dense: true, leading: Icon(switch (a['type']) { 'post' => Icons.chat_bubble_outline, 'task' => Icons.task_alt, _ => Icons.event }),
+                title: Text(describeAction(a, s.read<MatrixService>().client))),
+            ],
             if (d['needs_approval'] == true) Wrap(spacing: 8, children: [
-              FilledButton(onPressed: () async { await api.postMap('/v1/office/tasks/${d['id']}/decide', {'approve': true}); if (s.mounted) Navigator.pop(s); onChanged(); }, child: const Text('Approve')),
+              FilledButton(onPressed: () async {
+                final r = await api.postMap('/v1/office/tasks/${d['id']}/decide', {'approve': true});
+                final acts = r['actions'] as List? ?? const [];
+                final msg = acts.isEmpty ? 'Approved' : 'Approved · ${await runOfficeActions(s.read<MatrixService>(), acts)}';
+                if (s.mounted) { ScaffoldMessenger.of(s).showSnackBar(SnackBar(content: Text(msg))); Navigator.pop(s); }
+                onChanged(); }, child: const Text('Approve')),
               OutlinedButton(onPressed: () async { await api.postMap('/v1/office/tasks/${d['id']}/decide', {'approve': false}); if (s.mounted) Navigator.pop(s); onChanged(); }, child: const Text('Reject'))]),
             const Divider(), const Text('How the team worked on it'),
             for (final m in d['conversation'] as List) ListTile(dense: true, title: Text('${nameOf(m['sender'])} → ${nameOf(m['recipient'])}'), subtitle: Text('${m['body']}')),

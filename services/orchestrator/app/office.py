@@ -26,6 +26,12 @@ STAFF = [  # id, name, role, department, room, instructions
     ("finance", "Mariam", "Finance and budget", "Finance", "Finance room", "You estimate costs, budgets and business cases, showing assumptions."),
     ("growth", "Yousef", "Career and learning", "Growth", "Growth corner", "You suggest learning, career moves and personal development steps."),
     ("health", "Hana", "Health and routine", "Wellbeing", "Wellbeing room", "You suggest routines for rest, exercise and focus. General advice only, not medical advice."),
+    # The Microsoft Teams agents, each doing the same job here (docs/VIRTUAL_OFFICE.md, "Teams agents").
+    ("facilitator", "Faris", "Facilitator (meetings)", "Operations", "Meeting room", "You are the meeting Facilitator: from the meeting chat or notes you are given, keep live notes (topics, decisions, action items with owners and dates), answer quick questions from what was said, and flag when the meeting runs over its agenda."),
+    ("interpreter", "Lina", "Interpreter", "Comms", "Comms room", "You interpret between languages (Arabic, English, French, Hindi, Urdu and others) faithfully and naturally, keeping technical terms, names and numbers exact. Give the translation only, then one line on any term with no exact equivalent."),
+    ("pm", "Ziad", "Project Manager", "Operations", "Operations room", "You are the Project Manager agent: from the tasks and chat you are given, build a plan (goals, tasks with owners and due dates), write status reports (done, in progress, at risk, blocked) and propose the next tasks. Say who owns what."),
+    ("channel", "Reem", "Channel expert", "Comms", "Comms room", "You are the Channel agent: you answer questions about a channel only from its conversation you are given, summarise it, and track its open tasks and decisions. If the answer is not in the conversation, say so."),
+    ("analyst", "Tariq", "Data analyst", "Strategy", "Strategy room", "You are the Analyst: turn data you are given (tables, numbers, CSV) into clear insights, with the calculation shown and a suggested chart. Never invent numbers."),
 ]
 SPECIALISTS = [s[0] for s in STAFF if s[0] != "chief"]
 OUTWARD = re.compile(r"\b(send|email|reply to|book|schedule|invite|post|message)\b", re.I)
@@ -37,8 +43,8 @@ def _need():
 async def ensure_staff(owner: str):
     async with db.pool.connection() as c:
         n = (await (await c.execute("SELECT count(*) FROM office_agents WHERE owner=%s", (owner,))).fetchone())[0]
-        if n: return
-        for a in STAFF:
+        if n >= len(STAFF): return
+        for a in STAFF:                                   # new agents (e.g. the Teams agents) join existing offices too
             await c.execute("INSERT INTO office_agents (owner, id, name, role, dept, room, instructions) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING", (owner, *a))
 
 async def _say(owner, task, sender, recipient, body):
@@ -58,16 +64,34 @@ async def _finish(tid, status, result=None, needs_approval=False):
     async with db.pool.connection() as c:
         await c.execute("UPDATE office_tasks SET status=%s, result=coalesce(%s, result), needs_approval=%s, updated_at=now() WHERE id=%s", (status, result, needs_approval, tid))
 
+async def _set_actions(tid, acts):
+    async with db.pool.connection() as c: await c.execute("UPDATE office_tasks SET actions=%s::jsonb WHERE id=%s", (json.dumps(acts), tid))
+
 async def _agents(owner) -> dict[str, dict]:
     async with db.pool.connection() as c:
         rows = await (await c.execute("SELECT id, name, role, dept, room, instructions, status, enabled FROM office_agents WHERE owner=%s", (owner,))).fetchall()
     return {r[0]: dict(zip(("id", "name", "role", "dept", "room", "instructions", "status", "enabled"), r)) for r in rows}
 
+ACTIONS_HELP = (" If your work should lead to concrete steps in the app, end with a line 'ACTIONS:' followed by a JSON list of at most 5 of:"
+    " {\"type\": \"post\", \"room\": room_id, \"text\": str} | {\"type\": \"task\", \"room\": room_id, \"title\": str, \"assignee\": user_id_or_null, \"due\": \"YYYY-MM-DD\"_or_null}"
+    " | {\"type\": \"meeting\", \"room\": room_id, \"title\": str, \"start\": ISO-8601, \"minutes\": int}."
+    " Use only room ids that appear in the context. These run only after your principal approves them.")
+_ACT_TYPES = {"post", "task", "meeting"}
+
+def _split_actions(text: str, rooms: set[str]) -> tuple[str, list[dict]]:
+    """Separates the 'ACTIONS:' JSON tail from the prose; keeps only well-formed actions on rooms from the context."""
+    m = re.search(r"\n?ACTIONS:\s*(\[.*\])\s*$", text, re.S)
+    if not m: return text, []
+    try: raw = json.loads(m.group(1))
+    except ValueError: return text[:m.start()].rstrip(), []
+    out = [a for a in raw if isinstance(a, dict) and a.get("type") in _ACT_TYPES and a.get("room") in rooms][:5]
+    return text[:m.start()].rstrip(), out
+
 def _json(text: str):
     m = re.search(r"\{.*\}", text, re.S)
     return json.loads(m.group(0)) if m else None
 
-async def run_request(owner: str, root: str, request: str, labels: list[str]):
+async def run_request(owner: str, root: str, request: str, labels: list[str], context: str = "", rooms: set[str] | None = None):
     """Chief of Staff plans -> specialists work in parallel -> Chief of Staff merges. Every step is a message."""
     team = await _agents(owner); chief = team["chief"]
     try:
@@ -85,10 +109,12 @@ async def run_request(owner: str, root: str, request: str, labels: list[str]):
             await _say(owner, tid, "chief", a["id"], f"{j.get('title', '')}: {j.get('brief', '')}")
             await _status(owner, a["id"], "working")
             try:
-                out = await llm.complete(a["instructions"] + " Keep it focused and practical. British English.",
-                                         f"From the Chief of Staff:\n{j.get('brief', '')}\n\nOriginal request:\n{guardian.redact(request)}", max_tokens=900)
-                outward = bool(OUTWARD.search(j.get("title", "") + " " + j.get("brief", "")))
+                out = await llm.complete(a["instructions"] + " Keep it focused and practical. British English." + (ACTIONS_HELP if rooms else ""),
+                                         f"From the Chief of Staff:\n{j.get('brief', '')}\n\nOriginal request:\n{guardian.redact(request)}" + (f"\n\nContext from the app:\n{context}" if context else ""), max_tokens=1200)
+                out, acts = _split_actions(out, rooms or set())
+                outward = bool(acts) or bool(OUTWARD.search(j.get("title", "") + " " + j.get("brief", "")))
                 await _finish(tid, "needs_approval" if outward else "done", out, outward)
+                if acts: await _set_actions(tid, acts)
                 await _say(owner, tid, a["id"], "chief", out)
                 return a, out
             except llm.LLMError as e:
@@ -97,10 +123,12 @@ async def run_request(owner: str, root: str, request: str, labels: list[str]):
                 await _status(owner, a["id"], "available")
 
         results = await asyncio.gather(*(work(j) for j in jobs))
-        merged = await llm.complete(chief["instructions"], "Write the final answer for your principal from your team's work. Credit who did what in one line at the end.\n\n"
+        merged = await llm.complete(chief["instructions"], (f"Context from the app:\n{context}\n\n" if context else "") + "Write the final answer for your principal from your team's work. Credit who did what in one line at the end.\n\n"
                                     f"Request:\n{guardian.redact(request)}\n\n" + "\n\n".join(f"== {a['name']} ({a['role']}) ==\n{out}" for a, out in results), max_tokens=1200) if results \
                  else await llm.complete(chief["instructions"], guardian.redact(request), max_tokens=1200)
-        needs = any(OUTWARD.search(j.get("title", "") + j.get("brief", "")) for j in jobs)
+        async with db.pool.connection() as c:
+            n_acts = (await (await c.execute("SELECT count(*) FROM office_tasks WHERE parent=%s AND jsonb_array_length(actions) > 0", (root,))).fetchone())[0]
+        needs = n_acts > 0 or any(OUTWARD.search(j.get("title", "") + j.get("brief", "")) for j in jobs)
         await _finish(root, "needs_approval" if needs else "done", merged, needs)
         await _say(owner, root, "chief", "you", merged)
     except llm.LLMError as e:
@@ -114,11 +142,13 @@ class Ask(BaseModel):
     request: str = Field(min_length=3, max_length=8000)
     agent: str | None = None              # ask one agent directly instead of the Chief of Staff
     labels: list[str] = []
+    context: str = Field(default="", max_length=60000)   # e.g. a chat's recent messages or a task list, chosen in the app
+    rooms: list[str] = []                                # room ids in the context that actions may target
 
 @router.post("/requests")
 async def ask(req: Ask, user=Depends(auth.matrix_user)):
     _need(); owner = user["user_id"]; await ensure_staff(owner)
-    ok, why = guardian.check(req.request, req.labels)
+    ok, why = guardian.check(req.request + "\n" + req.context, req.labels)
     if not ok: raise HTTPException(403, why)
     team = await _agents(owner)
     if req.agent and req.agent not in team: raise HTTPException(404, "No such agent")
@@ -129,8 +159,12 @@ async def ask(req: Ask, user=Depends(auth.matrix_user)):
         async def one():
             a = team[req.agent]; await _status(owner, a["id"], "working")
             try:
-                out = await llm.complete(a["instructions"] + " British English.", guardian.redact(req.request), max_tokens=1000)
-                await _finish(tid, "done", out); await _say(owner, tid, a["id"], "you", out)
+                out = await llm.complete(a["instructions"] + " British English." + (ACTIONS_HELP if req.rooms else ""),
+                                         guardian.redact(req.request) + (f"\n\nContext from the app:\n{guardian.redact(req.context)}" if req.context else ""), max_tokens=1400)
+                out, acts = _split_actions(out, set(req.rooms))
+                await _finish(tid, "needs_approval" if acts else "done", out, bool(acts))
+                if acts: await _set_actions(tid, acts)
+                await _say(owner, tid, a["id"], "you", out)
             except llm.LLMError as e:
                 await _finish(tid, "failed", str(e)); await _say(owner, tid, a["id"], "you", f"I could not do this: {e}")
             finally:
@@ -139,7 +173,7 @@ async def ask(req: Ask, user=Depends(auth.matrix_user)):
     tid = await _task(owner, None, "chief", req.request[:80], req.request, "in_progress")
     await _say(owner, tid, "you", "chief", req.request)
     _running.add(f"{owner}|{tid}")
-    asyncio.create_task(run_request(owner, tid, req.request, req.labels))
+    asyncio.create_task(run_request(owner, tid, req.request, req.labels, guardian.redact(req.context) if req.context else "", set(req.rooms)))
     return {"task": tid}
 
 @router.get("")
@@ -163,10 +197,12 @@ async def task(tid: str, user=Depends(auth.matrix_user)):
     _need()
     async with db.pool.connection() as c:
         t = await (await c.execute("SELECT id, parent, agent, title, brief, status, result, needs_approval FROM office_tasks WHERE id=%s AND owner=%s", (tid, user["user_id"]))).fetchone()
+        acts = await (await c.execute("SELECT coalesce(jsonb_agg(a), '[]'::jsonb) FROM office_tasks, jsonb_array_elements(actions) a WHERE owner=%s AND (id=%s OR parent=%s)", (user["user_id"], tid, tid))).fetchone()
         if not t: raise HTTPException(404, "No such task")
         subs = await (await c.execute("SELECT id, agent, title, status, result FROM office_tasks WHERE parent=%s AND owner=%s ORDER BY created_at", (tid, user["user_id"]))).fetchall()
         msgs = await (await c.execute("SELECT sender, recipient, body, extract(epoch from at)::bigint FROM office_messages WHERE owner=%s AND (task=%s OR task IN (SELECT id FROM office_tasks WHERE parent=%s)) ORDER BY id", (user["user_id"], tid, tid))).fetchall()
     return {**dict(zip(("id", "parent", "agent", "title", "brief", "status", "result", "needs_approval"), t)),
+            "actions": (acts[0] if acts else []) or [],
             "subtasks": [dict(zip(("id", "agent", "title", "status", "result"), s)) for s in subs],
             "conversation": [dict(zip(("sender", "recipient", "body", "at"), m)) for m in msgs]}
 
@@ -175,10 +211,11 @@ class Decide(BaseModel): approve: bool
 async def decide(tid: str, req: Decide, user=Depends(auth.matrix_user)):
     _need()
     async with db.pool.connection() as c:
-        r = await c.execute("UPDATE office_tasks SET status=%s, needs_approval=false, updated_at=now() WHERE id=%s AND owner=%s AND status='needs_approval'", ("approved" if req.approve else "rejected", tid, user["user_id"]))
+        r = await c.execute("UPDATE office_tasks SET status=%s, needs_approval=false, updated_at=now() WHERE owner=%s AND status='needs_approval' AND (id=%s OR parent=%s)", ("approved" if req.approve else "rejected", user["user_id"], tid, tid))
+        acts = await (await c.execute("SELECT coalesce(jsonb_agg(a), '[]'::jsonb) FROM office_tasks, jsonb_array_elements(actions) a WHERE owner=%s AND (id=%s OR parent=%s)", (user["user_id"], tid, tid))).fetchone()
     if not r.rowcount: raise HTTPException(409, "Nothing waiting for approval")
     await _say(user["user_id"], tid, "you", "chief", "Approved." if req.approve else "Not approved.")
-    return {"status": "approved" if req.approve else "rejected"}
+    return {"status": "approved" if req.approve else "rejected", "actions": ((acts[0] if acts else []) or []) if req.approve else []}
 
 class AgentEdit(BaseModel):
     name: str | None = Field(default=None, max_length=40)

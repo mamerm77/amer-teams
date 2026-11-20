@@ -16,7 +16,7 @@ async def main():
         t = (await h.post(f"{HS}/_matrix/client/v3/login", json={"type": "m.login.password", "identifier": {"type": "m.id.user", "user": u}, "password": "Office-Pass-1!"})).json()["access_token"]
         H = {"Authorization": f"Bearer {t}"}
         o = (await h.get(f"{ORCH}/v1/office", headers=H)).json()
-        check("1. Your staff is ready: a Chief of Staff and nine specialists, all available", len(o["agents"]) == 10 and o["agents"][0]["role"] == "Chief of Staff" and all(a["status"] == "available" for a in o["agents"]), [a["name"] for a in o["agents"]])
+        check("1. Your staff is ready: a Chief of Staff, nine specialists and the five Teams agents, all available", len(o["agents"]) == 15 and o["agents"][0]["role"] == "Chief of Staff" and all(a["status"] == "available" for a in o["agents"]), [a["name"] for a in o["agents"]])
         b = await h.post(f"{ORCH}/v1/office/requests", headers=H, json={"request": "Summarise the vendor pricing", "labels": ["confidential"]})
         check("2. Guardian blocks a Confidential request before any agent sees it", b.status_code == 403, b.text[:100])
         r = (await h.post(f"{ORCH}/v1/office/requests", headers=H, json={"request": "Prepare me for Monday's DWDM vendor review: agenda, key risks, a budget view."})).json()
