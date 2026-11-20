@@ -421,3 +421,259 @@ class _GoalsState extends State<GoalsApp> {
       ]))),
     ])));
 }
+
+// ============================== Bookings (appointments with a team) ==============================
+class BookingsApp extends StatefulWidget { const BookingsApp({super.key, required this.room}); final Room room; @override State<BookingsApp> createState() => _BookingsState(); }
+class _BookingsState extends State<BookingsApp> {
+  List<StoreItem> services = [], bookings = []; Room get room => widget.room;
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    final s = await AppStore.items(room, 'bookings', kind: 'service'); final b = await AppStore.items(room, 'bookings', kind: 'booking');
+    if (mounted) setState(() { services = s; bookings = b; });
+  }
+  Future<void> _newService() async {
+    final name = await askText(context, 'Service', hint: 'e.g. Design review (30 min)'); if (name == null || !mounted) return;
+    final mins = int.tryParse(await askText(context, 'Length in minutes', initial: '30') ?? '') ?? 30; if (!mounted) return;
+    final hours = await askText(context, 'Hours (weekdays)', initial: '09:00-15:00') ?? '09:00-15:00';
+    await AppStore.save(room, 'bookings', {'title': name, 'minutes': mins, 'hours': hours, 'staff': room.client.userID}, kind: 'service');
+    await _load();
+  }
+  List<DateTime> _slots(StoreItem s, DateTime day) {
+    final h = s.s('hours').split('-'); if (h.length != 2) return [];
+    DateTime at(String hm) { final p = hm.trim().split(':'); return DateTime(day.year, day.month, day.day, int.tryParse(p[0]) ?? 9, p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0); }
+    final mins = (s['minutes'] as num?)?.toInt() ?? 30; final out = <DateTime>[];
+    for (var t = at(h[0]); !t.add(Duration(minutes: mins)).isAfter(at(h[1])); t = t.add(Duration(minutes: mins))) {
+      final taken = bookings.any((b) => b['service'] == s.id && b['start'] == t.toIso8601String() && b['cancelled'] != true);
+      if (!taken && t.isAfter(DateTime.now())) out.add(t);
+    }
+    return out;
+  }
+  Future<void> _book(StoreItem s) async {
+    var day = DateTime.now(); while (day.weekday > 5) { day = day.add(const Duration(days: 1)); }
+    final picked = await showDialog<DateTime>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: Text('Book: ${s.s('title')}'),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => set(() => day = day.subtract(const Duration(days: 1)))),
+          Expanded(child: Center(child: Text(DateFormat('EEEE d MMM').format(day)))), IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => set(() => day = day.add(const Duration(days: 1))))]),
+        Wrap(spacing: 6, runSpacing: 6, children: [for (final t in _slots(s, day)) ActionChip(label: Text(DateFormat('HH:mm').format(t)), onPressed: () => Navigator.pop(d, t))]),
+        if (_slots(s, day).isEmpty) const Padding(padding: EdgeInsets.all(12), child: Text('No free times this day.')),
+      ])))));
+    if (picked == null) return;
+    await AppStore.save(room, 'bookings', {'service': s.id, 'start': picked.toIso8601String(), 'minutes': s['minutes'], 'title': s.s('title')}, kind: 'booking',
+        summary: '[bookings] ${s.s('title')} ${DateFormat('d MMM HH:mm').format(picked)}');
+    await room.sendTextEvent('📅 Booked: ${s.s('title')} on ${DateFormat('EEE d MMM, HH:mm').format(picked)} with ${nameIn(room, s.s('staff'))}');
+    await _load();
+  }
+  @override Widget build(BuildContext c) {
+    final me = room.client.userID; final upcoming = bookings.where((b) => b['cancelled'] != true && (DateTime.tryParse(b.s('start'))?.isAfter(DateTime.now()) ?? false)).toList()
+      ..sort((a, b) => a.s('start').compareTo(b.s('start')));
+    return Scaffold(floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: const Text('New service'), onPressed: _newService),
+      body: RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(8), children: [
+        Text('Services', style: Theme.of(c).textTheme.titleMedium),
+        if (services.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Offer bookable times (consultations, reviews, office hours); people pick a free slot.')),
+        for (final s in services) Card(child: ListTile(leading: const Icon(Icons.event_available), title: Text(s.s('title')), subtitle: Text('${s['minutes']} min · ${s.s('hours')} · with ${nameIn(room, s.s('staff'))}'),
+          trailing: FilledButton.tonal(onPressed: () => _book(s), child: const Text('Book')))),
+        const SizedBox(height: 12), Text('Upcoming bookings', style: Theme.of(c).textTheme.titleMedium),
+        for (final b in upcoming) ListTile(leading: const Icon(Icons.schedule), title: Text('${b.s('title')} · ${DateFormat('EEE d MMM HH:mm').format(DateTime.parse(b.s('start')))}'), subtitle: Text('Booked by ${nameIn(room, b.by)}'),
+          trailing: (b.by == me || services.any((s) => s.id == b['service'] && s.s('staff') == me)) ? TextButton(onPressed: () async {
+            await AppStore.save(room, 'bookings', {'item_id': b.id, 'service': b['service'], 'start': b['start'], 'title': b['title'], 'cancelled': true}, kind: 'booking', summary: '[bookings] cancelled'); _load(); }, child: const Text('Cancel')) : null),
+        if (upcoming.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No bookings.')),
+      ])));
+  }
+}
+
+// ============================== Communities (Viva Engage) ==============================
+class CommunityApp extends StatefulWidget { const CommunityApp({super.key, required this.room}); final Room room; @override State<CommunityApp> createState() => _CommunityState(); }
+class _CommunityState extends State<CommunityApp> {
+  List<StoreItem> posts = [], replies = [], likes = []; Room get room => widget.room;
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    final p = await AppStore.items(room, 'engage', kind: 'post'); final r = await AppStore.items(room, 'engage', kind: 'reply'); final l = await AppStore.items(room, 'engage', kind: 'like');
+    if (mounted) setState(() { posts = p; replies = r; likes = l; });
+  }
+  Future<void> _post({bool question = false, bool announce = false}) async {
+    final t = await askText(context, question ? 'Ask the community' : announce ? 'Announcement' : 'Start a conversation', lines: 5); if (t == null) return;
+    await AppStore.save(room, 'engage', {'text': t, 'type': question ? 'question' : announce ? 'announcement' : 'discussion'}, kind: 'post', summary: '[engage] post');
+    if (announce) await room.sendTextEvent('📣 Community announcement: $t');
+    await _load();
+  }
+  Future<void> _reply(StoreItem p) async {
+    final t = await askText(context, 'Reply', lines: 3); if (t == null) return;
+    await AppStore.save(room, 'engage', {'post': p.id, 'text': t}, kind: 'reply', summary: '[engage] reply'); await _load();
+  }
+  Future<void> _like(StoreItem p) async {
+    final id = '${p.id}-like-${room.client.userID}'; final mine = likes.any((l) => l.id == id);
+    if (mine) { await AppStore.delete(room, 'engage', id); } else { await AppStore.save(room, 'engage', {'item_id': id, 'post': p.id}, kind: 'like', summary: '[engage] like'); }
+    await _load();
+  }
+  Future<void> _best(StoreItem p, StoreItem r) async {
+    await AppStore.save(room, 'engage', {'item_id': p.id, 'text': p.s('text'), 'type': p.s('type'), 'best': r.id}, kind: 'post', summary: '[engage] best answer'); await _load();
+  }
+  @override Widget build(BuildContext c) {
+    final me = room.client.userID;
+    return Scaffold(
+      floatingActionButton: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
+        FloatingActionButton.small(heroTag: 'q', tooltip: 'Ask a question', onPressed: () => _post(question: true), child: const Icon(Icons.help_outline)), const SizedBox(height: 8),
+        FloatingActionButton.small(heroTag: 'a', tooltip: 'Announcement', onPressed: () => _post(announce: true), child: const Icon(Icons.campaign_outlined)), const SizedBox(height: 8),
+        FloatingActionButton.extended(heroTag: 'd', icon: const Icon(Icons.edit), label: const Text('Post'), onPressed: () => _post())]),
+      body: RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(8), children: [
+        if (posts.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('A community feed: discussions, questions with a best answer, announcements, likes.')),
+        for (final p in posts) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Icon(p.s('type') == 'question' ? Icons.help_outline : p.s('type') == 'announcement' ? Icons.campaign_outlined : Icons.forum_outlined, size: 18), const SizedBox(width: 6),
+            Text('${nameIn(room, p.by)} · ${DateFormat('d MMM HH:mm').format(p.at)}', style: Theme.of(c).textTheme.labelSmall)]),
+          const SizedBox(height: 6), Text(p.s('text')),
+          Row(children: [
+            TextButton.icon(icon: Icon(likes.any((l) => l.id == '${p.id}-like-$me') ? Icons.thumb_up : Icons.thumb_up_outlined, size: 16), label: Text('${likes.where((l) => l['post'] == p.id).length}'), onPressed: () => _like(p)),
+            TextButton.icon(icon: const Icon(Icons.reply, size: 16), label: Text('Reply (${replies.where((r) => r['post'] == p.id).length})'), onPressed: () => _reply(p)),
+          ]),
+          for (final r in replies.where((r) => r['post'] == p.id).toList().reversed) ListTile(dense: true,
+            leading: p['best'] == r.id ? const Icon(Icons.verified, color: Colors.green) : const Icon(Icons.subdirectory_arrow_right),
+            title: Text(r.s('text')), subtitle: Text(nameIn(room, r.by) + (p['best'] == r.id ? ' · best answer' : '')),
+            trailing: p.s('type') == 'question' && p.by == me && p['best'] != r.id ? TextButton(onPressed: () => _best(p, r), child: const Text('Mark best answer')) : null),
+        ]))),
+      ])));
+  }
+}
+
+// ============================== Who (people directory and org chart) ==============================
+class WhoApp extends StatefulWidget { const WhoApp({super.key, required this.room}); final Room room; @override State<WhoApp> createState() => _WhoState(); }
+class _WhoState extends State<WhoApp> {
+  List<StoreItem> cards = []; String q = ''; Room get room => widget.room;
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async { final p = await AppStore.items(room, 'who'); if (mounted) setState(() => cards = p); }
+  StoreItem? cardOf(String id) => cards.where((x) => x.id == 'who-$id').firstOrNull;
+  Future<void> _editMine() async {
+    final me = room.client.userID!; final cur = cardOf(me);
+    final title = TextEditingController(text: cur?.s('title') ?? ''), dept = TextEditingController(text: cur?.s('dept') ?? ''), loc = TextEditingController(text: cur?.s('location') ?? ''),
+        skills = TextEditingController(text: cur?.s('skills') ?? ''); String? manager = cur?['manager'] as String?;
+    final people = room.getParticipants().where((u) => u.id != me).toList();
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Your profile card'),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, decoration: const InputDecoration(labelText: 'Job title')), TextField(controller: dept, decoration: const InputDecoration(labelText: 'Department')),
+        TextField(controller: loc, decoration: const InputDecoration(labelText: 'Office / location')), TextField(controller: skills, decoration: const InputDecoration(labelText: 'Skills (comma separated)')),
+        DropdownButtonFormField<String>(value: people.any((u) => u.id == manager) ? manager : null, decoration: const InputDecoration(labelText: 'Manager'),
+          items: [for (final u in people) DropdownMenuItem(value: u.id, child: Text(u.calcDisplayname()))], onChanged: (v) => set(() => manager = v)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
+    if (ok != true) return;
+    await AppStore.save(room, 'who', {'item_id': 'who-$me', 'title': title.text.trim(), 'dept': dept.text.trim(), 'location': loc.text.trim(), 'skills': skills.text.trim(), 'manager': manager}, summary: '[who] profile');
+    await _load();
+  }
+  void _org(String id) {
+    final chain = <String>[]; var cur = id; for (var i = 0; i < 8; i++) { final m = cardOf(cur)?['manager']; if (m is! String || chain.contains(m)) break; chain.insert(0, m); cur = m; }
+    final reports = cards.where((x) => x['manager'] == id).map((x) => x.id.substring(4)).toList();
+    showModalBottomSheet(context: context, builder: (s) => ListView(padding: const EdgeInsets.all(16), children: [
+      Text('Organisation', style: Theme.of(s).textTheme.titleMedium),
+      for (final m in chain) ListTile(dense: true, leading: const Icon(Icons.arrow_upward, size: 16), title: Text(nameIn(room, m)), subtitle: Text(cardOf(m)?.s('title') ?? '')),
+      ListTile(leading: const Icon(Icons.person), title: Text(nameIn(room, id), style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(cardOf(id)?.s('title') ?? '')),
+      if (reports.isNotEmpty) const Text('Direct reports'),
+      for (final r in reports) ListTile(dense: true, leading: const Icon(Icons.subdirectory_arrow_right, size: 16), title: Text(nameIn(room, r)), subtitle: Text(cardOf(r)?.s('title') ?? '')),
+    ]));
+  }
+  @override Widget build(BuildContext c) {
+    final people = room.getParticipants().where((u) => u.membership == Membership.join).where((u) {
+      final k = cardOf(u.id); return q.isEmpty || '${u.calcDisplayname()} ${u.id} ${k?.s('title')} ${k?.s('dept')} ${k?.s('skills')} ${k?.s('location')}'.toLowerCase().contains(q.toLowerCase()); }).toList();
+    return Scaffold(floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.badge_outlined), label: const Text('Edit my card'), onPressed: _editMine),
+      body: Column(children: [
+        Padding(padding: const EdgeInsets.all(8), child: TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search by name, title, department, skill or office', border: OutlineInputBorder(), isDense: true), onChanged: (v) => setState(() => q = v))),
+        Expanded(child: ListView(children: [for (final u in people) () { final k = cardOf(u.id);
+          return ListTile(leading: CircleAvatar(child: Text(u.calcDisplayname().isEmpty ? '?' : u.calcDisplayname().characters.first.toUpperCase())), title: Text(u.calcDisplayname()),
+            subtitle: Text([if (k?.s('title').isNotEmpty == true) k!.s('title'), if (k?.s('dept').isNotEmpty == true) k!.s('dept'), if (k?.s('location').isNotEmpty == true) k!.s('location'), if (k?.s('skills').isNotEmpty == true) 'Skills: ${k!.s('skills')}'].join(' · ')),
+            trailing: IconButton(tooltip: 'Organisation', icon: const Icon(Icons.account_tree_outlined), onPressed: () => _org(u.id)));
+        }()])),
+      ]));
+  }
+}
+
+// ============================== Stream (video library) ==============================
+class StreamApp extends StatelessWidget {
+  const StreamApp({super.key, required this.room}); final Room room;
+  @override Widget build(BuildContext c) => FutureBuilder<Timeline>(future: room.getTimeline(limit: 1500), builder: (_, s) {
+    if (!s.hasData) return const Center(child: CircularProgressIndicator());
+    final vids = s.data!.events.where((e) => e.type == EventTypes.Message && (e.messageType == MessageTypes.Video || (e.messageType == MessageTypes.File && RegExp(r'\.(mp4|mov|webm|mkv)$', caseSensitive: false).hasMatch(e.body)))).toList();
+    if (vids.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('No videos in this chat yet. Meeting recordings and videos shared here appear in this library, encrypted.')));
+    return GridView.extent(maxCrossAxisExtent: 260, padding: const EdgeInsets.all(8), mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.2, children: [
+      for (final e in vids) Card(clipBehavior: Clip.antiAlias, child: InkWell(onTap: () async {
+          try { final f = await e.downloadAndDecryptAttachment(); if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Decrypted ${f.name} (${(f.bytes.length / 1048576).toStringAsFixed(1)} MB). Open it from the chat to play.'))); }
+          catch (err) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Could not open: $err'))); } },
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(child: Container(color: Colors.black87, child: const Icon(Icons.play_circle_outline, color: Colors.white, size: 48))),
+          Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(e.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('${e.senderFromMemoryOrFallback.calcDisplayname()} · ${DateFormat('d MMM y').format(e.originServerTs)}', style: Theme.of(c).textTheme.labelSmall)])),
+        ]))),
+    ]);
+  });
+}
+
+// ============================== Places (desk and room booking) ==============================
+class PlacesApp extends StatefulWidget { const PlacesApp({super.key, required this.room}); final Room room; @override State<PlacesApp> createState() => _PlacesState(); }
+class _PlacesState extends State<PlacesApp> {
+  List<StoreItem> desks = [], plans = []; DateTime day = DateTime.now(); Room get room => widget.room;
+  String get dkey => DateFormat('yyyy-MM-dd').format(day);
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    final d = await AppStore.items(room, 'places', kind: 'desk'); final p = await AppStore.items(room, 'places', kind: 'plan');
+    if (mounted) setState(() { desks = d; plans = p; });
+  }
+  Future<void> _addDesk() async { final n = await askText(context, 'Desk or space name', hint: 'e.g. Floor 3 · Desk 12'); if (n == null) return; await AppStore.save(room, 'places', {'title': n}, kind: 'desk'); await _load(); }
+  Future<void> _plan(String where, {String? desk}) async {
+    await AppStore.save(room, 'places', {'item_id': 'plan-$dkey-${room.client.userID}', 'date': dkey, 'where': where, 'desk': desk}, kind: 'plan', summary: '[places] $where $dkey');
+    await _load();
+  }
+  @override Widget build(BuildContext c) {
+    final today = plans.where((p) => p['date'] == dkey).toList(); final me = room.client.userID;
+    final mine = today.where((p) => p.by == me).firstOrNull;
+    return Scaffold(floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: const Text('Add desk'), onPressed: _addDesk),
+      body: RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(8), children: [
+        Row(children: [IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => setState(() => day = day.subtract(const Duration(days: 1)))),
+          Expanded(child: Center(child: Text(DateFormat('EEEE d MMMM').format(day), style: Theme.of(c).textTheme.titleMedium))),
+          IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => setState(() => day = day.add(const Duration(days: 1))))]),
+        Wrap(spacing: 8, children: [
+          ChoiceChip(label: const Text('In the office'), selected: mine?['where'] == 'office', onSelected: (_) => _plan('office', desk: mine?['desk'] as String?)),
+          ChoiceChip(label: const Text('Remote'), selected: mine?['where'] == 'remote', onSelected: (_) => _plan('remote')),
+          ChoiceChip(label: const Text('Not working'), selected: mine?['where'] == 'off', onSelected: (_) => _plan('off'))]),
+        const SizedBox(height: 8),
+        Text('In the office: ${today.where((p) => p['where'] == 'office').map((p) => nameIn(room, p.by)).join(', ')}'),
+        const Divider(), Text('Desks', style: Theme.of(c).textTheme.titleMedium),
+        for (final d in desks) () { final taken = today.where((p) => p['desk'] == d.id && p['where'] == 'office').firstOrNull;
+          return ListTile(leading: Icon(Icons.chair_alt, color: taken == null ? Colors.green : Colors.grey), title: Text(d.s('title')),
+            subtitle: Text(taken == null ? 'Free' : 'Booked by ${nameIn(room, taken.by)}'),
+            trailing: taken == null ? FilledButton.tonal(onPressed: () => _plan('office', desk: d.id), child: const Text('Book')) : taken.by == me ? TextButton(onPressed: () => _plan('office'), child: const Text('Release')) : null); }(),
+        if (desks.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Add the desks or spaces people can book, then plan who is in the office each day.')),
+      ])));
+  }
+}
+
+// ============================== Milestones (project timeline) ==============================
+class MilestonesApp extends StatefulWidget { const MilestonesApp({super.key, required this.room}); final Room room; @override State<MilestonesApp> createState() => _MilestonesState(); }
+class _MilestonesState extends State<MilestonesApp> {
+  List<StoreItem> ms = []; Room get room => widget.room;
+  static const states = ['Not started', 'On track', 'At risk', 'Late', 'Done'];
+  @override void initState() { super.initState(); _load(); }
+  Future<void> _load() async { final m = await AppStore.items(room, 'milestones'); m.sort((a, b) => a.s('date').compareTo(b.s('date'))); if (mounted) setState(() => ms = m); }
+  Future<void> _edit([StoreItem? m]) async {
+    final title = TextEditingController(text: m?.s('title') ?? ''); var date = DateTime.tryParse(m?.s('date') ?? '') ?? DateTime.now().add(const Duration(days: 14)); var st = m?.s('state') ?? 'Not started';
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: Text(m == null ? 'New milestone' : 'Edit milestone'),
+      content: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Milestone')),
+        OutlinedButton.icon(icon: const Icon(Icons.event), label: Text(DateFormat('d MMM y').format(date)), onPressed: () async {
+          final p = await showDatePicker(context: d, initialDate: date, firstDate: DateTime(2020), lastDate: DateTime(2100)); if (p != null) set(() => date = p); }),
+        DropdownButtonFormField<String>(value: states.contains(st) ? st : states.first, decoration: const InputDecoration(labelText: 'Status'), items: [for (final s in states) DropdownMenuItem(value: s, child: Text(s))], onChanged: (v) => set(() => st = v!)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Save'))])));
+    if (ok != true || title.text.trim().isEmpty) return;
+    await AppStore.save(room, 'milestones', {if (m != null) 'item_id': m.id, 'title': title.text.trim(), 'date': DateFormat('yyyy-MM-dd').format(date), 'state': st});
+    await _load();
+  }
+  Color _col(String s) => switch (s) { 'Done' => Colors.green, 'On track' => Colors.blue, 'At risk' => Colors.orange, 'Late' => Colors.red, _ => Colors.grey };
+  @override Widget build(BuildContext c) => Scaffold(floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: const Text('New milestone'), onPressed: () => _edit()),
+    body: RefreshIndicator(onRefresh: _load, child: ListView(padding: const EdgeInsets.all(12), children: [
+      if (ms.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('A project timeline: milestones with dates and status.')),
+      for (var i = 0; i < ms.length; i++) IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SizedBox(width: 90, child: Padding(padding: const EdgeInsets.only(top: 14), child: Text(DateFormat('d MMM y').format(DateTime.parse(ms[i].s('date'))), style: Theme.of(c).textTheme.labelMedium))),
+        Column(children: [Container(width: 2, height: 14, color: i == 0 ? Colors.transparent : Colors.grey), Icon(Icons.circle, size: 14, color: _col(ms[i].s('state'))), Expanded(child: Container(width: 2, color: i == ms.length - 1 ? Colors.transparent : Colors.grey))]),
+        const SizedBox(width: 10),
+        Expanded(child: Card(child: ListTile(title: Text(ms[i].s('title')), subtitle: Text(ms[i].s('state'), style: TextStyle(color: _col(ms[i].s('state')))), onTap: () => _edit(ms[i])))),
+      ])),
+    ])));
+}

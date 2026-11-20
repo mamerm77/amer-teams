@@ -46,6 +46,12 @@ const _sections = <(String, List<AppItem>)>[
     AppItem(Icons.update, 'Updates', 'Recurring check-ins (weekly status, stand-up) and who has submitted', open: _updates),
     AppItem(Icons.celebration_outlined, 'Praise', 'Thank a colleague with a badge and a note, posted in the chat', open: _praise),
     AppItem(Icons.flag_outlined, 'Goals', 'Objectives and key results with progress check-ins (like Viva Goals)', open: _goals),
+    AppItem(Icons.event_available, 'Bookings', 'Bookable services with free time slots: consultations, reviews, office hours', open: _bookings),
+    AppItem(Icons.groups_2_outlined, 'Communities', 'A community feed: discussions, questions with a best answer, announcements (like Viva Engage)', open: _community),
+    AppItem(Icons.account_tree_outlined, 'Who', 'People directory with titles, departments, skills and the org chart', open: _who),
+    AppItem(Icons.video_library_outlined, 'Stream', 'The video library of a chat: recordings and shared videos', open: _stream),
+    AppItem(Icons.chair_alt_outlined, 'Places', 'Plan office days and book desks; see who is in', open: _places),
+    AppItem(Icons.timeline, 'Milestones', 'A project timeline with dates and status', open: _milestones),
   ]),
   ('Your work', [
     AppItem(Icons.auto_awesome, 'Catch me up', 'What happened while you were away, per chat, with what needs you', open: _catchUp),
@@ -102,6 +108,12 @@ Widget _forms() => AppHost(title: 'Forms', icon: Icons.assignment_outlined, abou
 Widget _notes() => AppHost(title: 'Notes', icon: Icons.menu_book_outlined, about: 'A shared notebook with sections and pages.', builder: (_, r) => NotesApp(room: r));
 Widget _updates() => AppHost(title: 'Updates', icon: Icons.update, about: 'Recurring check-ins and who has submitted this week.', builder: (_, r) => UpdatesApp(room: r));
 Widget _praise() => AppHost(title: 'Praise', icon: Icons.celebration_outlined, about: 'Recognise colleagues with badges.', builder: (_, r) => PraiseApp(room: r));
+Widget _bookings() => AppHost(title: 'Bookings', icon: Icons.event_available, about: 'Offer bookable times and let people pick a free slot.', builder: (_, r) => BookingsApp(room: r));
+Widget _community() => AppHost(title: 'Communities', icon: Icons.groups_2_outlined, about: 'A community feed for a large group or channel.', builder: (_, r) => CommunityApp(room: r));
+Widget _who() => AppHost(title: 'Who', icon: Icons.account_tree_outlined, about: 'Find people by name, title, department, skill or office, and see the org chart.', builder: (_, r) => WhoApp(room: r));
+Widget _stream() => AppHost(title: 'Stream', icon: Icons.video_library_outlined, about: 'All videos and recordings shared in a chat.', builder: (_, r) => StreamApp(room: r));
+Widget _places() => AppHost(title: 'Places', icon: Icons.chair_alt_outlined, about: 'Office days and desk booking for a team.', builder: (_, r) => PlacesApp(room: r));
+Widget _milestones() => AppHost(title: 'Milestones', icon: Icons.timeline, about: 'A project timeline.', builder: (_, r) => MilestonesApp(room: r));
 Widget _goals() => AppHost(title: 'Goals', icon: Icons.flag_outlined, about: 'Objectives and key results for a team.', builder: (_, r) => GoalsApp(room: r)); Widget _security() => const SecurityScreen(); Widget _a11y() => const A11yScreen();
 
 class AppsScreen extends StatefulWidget {
