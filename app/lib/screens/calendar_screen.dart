@@ -1,3 +1,4 @@
+import 'chat_screen.dart';
 import '../services/hijri.dart';
 import '../services/locale.dart';
 import 'meeting_rooms_screen.dart';
@@ -52,14 +53,167 @@ class _S extends State<CalendarScreen> {
     floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.auto_awesome), label: Text(L.t(context, 'Schedule with Amer')), onPressed: _new),
     body: FutureBuilder<List<Meeting>>(future: f, builder: (_, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
-      final up = s.data!.where((m) => m.start.add(Duration(minutes: m.minutes)).isAfter(DateTime.now())).toList();
-      final ar = Localizations.localeOf(c).languageCode == 'ar';
-      final today = ListTile(dense: true, leading: const Icon(Icons.nights_stay_outlined), title: Text(Hijri.of(DateTime.now()).format(arabic: ar)), subtitle: Text(DateFormat('EEEE d MMMM y').format(DateTime.now())));
-      if (up.isEmpty) return ListView(children: [today, const Center(child: Text('No upcoming meetings.'))]);
-      return ListView(children: [today, for (final m in up) ListTile(
-        leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(DateFormat('EEE').format(m.start)), Text(DateFormat('d MMM').format(m.start), style: Theme.of(c).textTheme.labelSmall), Text('${Hijri.of(m.start).day} ${(ar ? Hijri.monthsAr : Hijri.monthsEn)[Hijri.of(m.start).month - 1]}', style: const TextStyle(fontSize: 9))]),
-        title: Text(m.title), subtitle: Text('${DateFormat('HH:mm').format(m.start)} · ${m.minutes} min · ${m.room.getLocalizedDisplayname()}'),
-        trailing: FilledButton.tonal(child: Text(L.t(context, 'Join')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: m.room.id,
-          meeting: MeetingService(context.read<MatrixService>()).meetingIdOf(m.room) != null)))))]);
+      return Column(children: [_toolbar(c), const Divider(height: 1), Expanded(child: switch (view) {
+        CalView.list => _list(c, s.data!),
+        CalView.month => _month(c, s.data!),
+        _ => _grid(c, s.data!),
+      })]);
     }));
+
+  // ---- Teams-style views: Day, Work week, Week, Month, and the upcoming list ----
+  CalView view = CalView.workWeek; DateTime anchor = DateTime.now();
+  DateTime _d(DateTime t) => DateTime(t.year, t.month, t.day);
+  List<DateTime> get _days {
+    final a = _d(anchor);
+    switch (view) {
+      case CalView.day: return [a];
+      case CalView.workWeek:                 // UAE working week: Monday to Friday
+        final mon = a.subtract(Duration(days: a.weekday - 1)); return [for (var i = 0; i < 5; i++) mon.add(Duration(days: i))];
+      default:
+        final mon = a.subtract(Duration(days: a.weekday - 1)); return [for (var i = 0; i < 7; i++) mon.add(Duration(days: i))];
+    }
+  }
+  void _step(int dir) => setState(() {
+    anchor = switch (view) {
+      CalView.day => anchor.add(Duration(days: dir)),
+      CalView.month => DateTime(anchor.year, anchor.month + dir, 1),
+      CalView.list => anchor,
+      _ => anchor.add(Duration(days: 7 * dir)),
+    };
+  });
+  String get _range {
+    final d = _days;
+    return switch (view) {
+      CalView.day => DateFormat('EEEE d MMMM y').format(anchor),
+      CalView.month => DateFormat('MMMM y').format(anchor),
+      CalView.list => 'Upcoming',
+      _ => '${DateFormat('d MMM').format(d.first)} – ${DateFormat('d MMM y').format(d.last)}',
+    };
+  }
+
+  Widget _toolbar(BuildContext c) => Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 8), child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 8, runSpacing: 6, children: [
+    OutlinedButton(onPressed: () => setState(() => anchor = DateTime.now()), child: Text(L.t(context, 'Today'))),
+    IconButton(tooltip: 'Previous', icon: const Icon(Icons.chevron_left), onPressed: () => _step(-1)),
+    IconButton(tooltip: 'Next', icon: const Icon(Icons.chevron_right), onPressed: () => _step(1)),
+    Text(_range, style: Theme.of(c).textTheme.titleMedium),
+    const SizedBox(width: 12),
+    SegmentedButton<CalView>(showSelectedIcon: false, segments: const [
+      ButtonSegment(value: CalView.day, label: Text('Day')), ButtonSegment(value: CalView.workWeek, label: Text('Work week')),
+      ButtonSegment(value: CalView.week, label: Text('Week')), ButtonSegment(value: CalView.month, label: Text('Month')),
+      ButtonSegment(value: CalView.list, label: Text('List'))],
+      selected: {view}, onSelectionChanged: (v) => setState(() => view = v.first)),
+    FilledButton.icon(icon: const Icon(Icons.add), label: Text(L.t(context, 'New meeting')), onPressed: () => _newManual()),
+  ]));
+
+  List<Meeting> _on(List<Meeting> all, DateTime day) => all.where((m) => _d(m.start) == day).toList()..sort((a, b) => a.start.compareTo(b.start));
+
+  static const _hour = 56.0;
+  Widget _grid(BuildContext c, List<Meeting> all) {
+    final days = _days, now = DateTime.now(), cs = Theme.of(c).colorScheme;
+    return Column(children: [
+      Row(children: [const SizedBox(width: 52), for (final d in days) Expanded(child: InkWell(
+        onTap: () => setState(() { anchor = d; view = CalView.day; }),
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Column(children: [
+          Text(DateFormat('EEE').format(d), style: TextStyle(fontSize: 12, color: _d(now) == d ? cs.primary : null)),
+          Text('${d.day}', style: TextStyle(fontSize: 20, fontWeight: _d(now) == d ? FontWeight.bold : FontWeight.normal, color: _d(now) == d ? cs.primary : null)),
+        ]))))]),
+      const Divider(height: 1),
+      Expanded(child: SingleChildScrollView(controller: ScrollController(initialScrollOffset: _hour * 7), child: SizedBox(height: _hour * 24, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 52, child: Stack(children: [for (var h = 1; h < 24; h++) Positioned(top: h * _hour - 7, right: 6, child: Text('${h.toString().padLeft(2, '0')}:00', style: const TextStyle(fontSize: 10)))])),
+        for (final d in days) Expanded(child: GestureDetector(
+          onTapUp: (e) => _newManual(at: d.add(Duration(minutes: ((e.localPosition.dy / _hour) * 2).floor() * 30))),
+          child: Container(decoration: BoxDecoration(border: Border(left: BorderSide(color: cs.outlineVariant))), child: Stack(children: [
+            for (var h = 0; h < 24; h++) Positioned(top: h * _hour, left: 0, right: 0, child: Divider(height: 1, color: cs.outlineVariant.withValues(alpha: .5))),
+            if (_d(now) == d) Positioned(top: (now.hour + now.minute / 60) * _hour, left: 0, right: 0, child: Container(height: 2, color: Colors.red)),
+            for (final m in _on(all, d)) Positioned(
+              top: (m.start.hour + m.start.minute / 60) * _hour + 1, left: 2, right: 2, height: (m.minutes / 60 * _hour).clamp(22, _hour * 24) - 2,
+              child: _block(c, m)),
+          ])))),
+      ])))),
+    ]);
+  }
+
+  Widget _block(BuildContext c, Meeting m) {
+    final cs = Theme.of(c).colorScheme;
+    return Material(color: cs.primaryContainer, borderRadius: BorderRadius.circular(6), child: InkWell(borderRadius: BorderRadius.circular(6), onTap: () => _details(c, m),
+      child: Container(padding: const EdgeInsets.fromLTRB(6, 3, 4, 2), decoration: BoxDecoration(border: Border(left: BorderSide(color: cs.primary, width: 3))),
+        child: Text('${m.title}\n${DateFormat('HH:mm').format(m.start)} · ${m.room.getLocalizedDisplayname()}', overflow: TextOverflow.fade, style: TextStyle(fontSize: 11, color: cs.onPrimaryContainer)))));
+  }
+
+  Widget _month(BuildContext c, List<Meeting> all) {
+    final first = DateTime(anchor.year, anchor.month, 1), start = first.subtract(Duration(days: first.weekday - 1));
+    return Column(children: [
+      Row(children: [for (final n in const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) Expanded(child: Center(child: Padding(padding: const EdgeInsets.all(4), child: Text(n, style: const TextStyle(fontSize: 12)))))]),
+      Expanded(child: Column(children: [for (var w = 0; w < 6; w++) Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [for (var i = 0; i < 7; i++) _cell(c, start.add(Duration(days: w * 7 + i)), all)]))]))]);
+  }
+  Widget _cell(BuildContext c, DateTime d, List<Meeting> all) {
+    final cs = Theme.of(c).colorScheme, today = _d(DateTime.now());
+        final ms = _on(all, d);
+        return Expanded(child: InkWell(onTap: () => setState(() { anchor = d; view = CalView.day; }), child: Container(
+          decoration: BoxDecoration(border: Border.all(color: cs.outlineVariant, width: .5), color: d.month == anchor.month ? null : cs.surfaceContainerHighest.withValues(alpha: .4)),
+          padding: const EdgeInsets.all(3),
+          child: SingleChildScrollView(physics: const NeverScrollableScrollPhysics(), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${d.day}', style: TextStyle(fontSize: 12, fontWeight: d == today ? FontWeight.bold : null, color: d == today ? cs.primary : null)),
+            for (final m in ms.take(3)) Text('${DateFormat('HH:mm').format(m.start)} ${m.title}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10)),
+            if (ms.length > 3) Text('+${ms.length - 3} more', style: const TextStyle(fontSize: 10)),
+          ])))));
+  }
+
+  Widget _list(BuildContext c, List<Meeting> all) {
+    final up = all.where((m) => m.start.add(Duration(minutes: m.minutes)).isAfter(DateTime.now())).toList()..sort((a, b) => a.start.compareTo(b.start));
+    final ar = Localizations.localeOf(c).languageCode == 'ar';
+    final today = ListTile(dense: true, leading: const Icon(Icons.nights_stay_outlined), title: Text(Hijri.of(DateTime.now()).format(arabic: ar)), subtitle: Text(DateFormat('EEEE d MMMM y').format(DateTime.now())));
+    if (up.isEmpty) return ListView(children: [today, const Center(child: Text('No upcoming meetings.'))]);
+    return ListView(children: [today, for (final m in up) ListTile(
+      leading: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(DateFormat('EEE').format(m.start)), Text(DateFormat('d MMM').format(m.start), style: Theme.of(c).textTheme.labelSmall), Text('${Hijri.of(m.start).day} ${(ar ? Hijri.monthsAr : Hijri.monthsEn)[Hijri.of(m.start).month - 1]}', style: const TextStyle(fontSize: 9))]),
+      title: Text(m.title), subtitle: Text('${DateFormat('HH:mm').format(m.start)} · ${m.minutes} min · ${m.room.getLocalizedDisplayname()}'),
+      onTap: () => _details(c, m),
+      trailing: FilledButton.tonal(child: Text(L.t(context, 'Join')), onPressed: () => _join(c, m)))]);
+  }
+
+  void _join(BuildContext c, Meeting m) => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: m.room.id,
+    meeting: MeetingService(context.read<MatrixService>()).meetingIdOf(m.room) != null)));
+
+  void _details(BuildContext c, Meeting m) => showModalBottomSheet(context: c, showDragHandle: true, builder: (s) => Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(m.title, style: Theme.of(c).textTheme.titleLarge), const SizedBox(height: 6),
+    Text('${DateFormat('EEEE d MMMM y').format(m.start)} · ${DateFormat('HH:mm').format(m.start)}–${DateFormat('HH:mm').format(m.start.add(Duration(minutes: m.minutes)))}'),
+    Text('In ${m.room.getLocalizedDisplayname()} · ${m.room.summary.mJoinedMemberCount ?? 0} people'),
+    const SizedBox(height: 14),
+    Row(children: [FilledButton.icon(icon: const Icon(Icons.videocam), label: Text(L.t(context, 'Join')), onPressed: () { Navigator.pop(s); _join(c, m); }), const SizedBox(width: 8),
+      OutlinedButton.icon(icon: const Icon(Icons.chat_bubble_outline), label: const Text('Chat with participants'), onPressed: () { Navigator.pop(s); Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: m.room.id))); })]),
+  ])));
+
+  /// Teams' "New meeting" form: title, chat (attendees), date, start, duration. Sent as an encrypted meeting event.
+  Future<void> _newManual({DateTime? at}) async {
+    final mx = context.read<MatrixService>(); final rooms = mx.chats; if (rooms.isEmpty) return;
+    final title = TextEditingController(); var room = rooms.first;
+    var start = at ?? DateTime.now().add(Duration(minutes: 30 - DateTime.now().minute % 30)); var minutes = 30;
+    final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(
+      title: const Text('New meeting'),
+      content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Add title')),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(isExpanded: true, value: room.id, decoration: const InputDecoration(labelText: 'Attendees (chat)'),
+          items: [for (final r in rooms) DropdownMenuItem(value: r.id, child: Text(r.getLocalizedDisplayname()))], onChanged: (v) => set(() => room = rooms.firstWhere((r) => r.id == v))),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.event), label: Text(DateFormat('EEE d MMM').format(start)), onPressed: () async {
+            final p = await showDatePicker(context: d, initialDate: start, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730)));
+            if (p != null) set(() => start = DateTime(p.year, p.month, p.day, start.hour, start.minute)); })),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.schedule), label: Text(DateFormat('HH:mm').format(start)), onPressed: () async {
+            final p = await showTimePicker(context: d, initialTime: TimeOfDay.fromDateTime(start));
+            if (p != null) set(() => start = DateTime(start.year, start.month, start.day, p.hour, p.minute)); })),
+        ]),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(value: minutes, decoration: const InputDecoration(labelText: 'Duration'),
+          items: [for (final n in const [15, 30, 45, 60, 90, 120]) DropdownMenuItem(value: n, child: Text('$n min'))], onChanged: (v) => set(() => minutes = v ?? 30)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))])));
+    if (ok != true || title.text.trim().isEmpty) return;
+    await mx.sendMeeting(room, title: title.text.trim(), start: start, minutes: minutes);
+    _reload();
+  }
 }
+
+enum CalView { day, workWeek, week, month, list }
