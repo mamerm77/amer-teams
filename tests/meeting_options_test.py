@@ -28,6 +28,21 @@ async def main():
         check("2. 'Specific people': the chosen presenter can present, others cannot", rp == "presenter" and ra2 == "attendee", (rp, ra2))
         cheat = await h.put(f"{HS}/_matrix/client/v3/rooms/{rid}/state/com.amerteams.meeting.settings/", headers=A, json={"who_presents": "everyone"})
         check("3. An attendee cannot change the meeting options (the server refuses the change)", cheat.status_code == 403, cheat.status_code)
+        role = lambda X: h.get(f"{ORCH}/v1/meetings/role/{rid}", headers=X)
+        ctl = lambda X, a: h.post(f"{ORCH}/v1/meetings/control", headers=X, json={"room_id": rid, "call_id": "c1", "action": a, "identity": "@nobody:amer.test"})
+        await st({"who_presents": "everyone"})
+        roles = [(await role(X)).json()["role"] for X in (H, A)]
+        pm, pe = await ctl(A, "mute"), await ctl(A, "end")
+        check("5. Roles: everyone presents by default; a presenter may mute or remove (allowed, the person is simply not in the call) but may not end the meeting for everyone",
+              roles == ["organiser", "presenter"] and pm.status_code == 404 and pe.status_code == 403, (roles, pm.status_code, pe.status_code))
+        await st({"who_presents": "organisers", "co_organisers": [pid]})
+        await h.put(f"{HS}/_matrix/client/v3/rooms/{rid}/state/m.room.power_levels/", headers=H, json={**(await h.get(f"{HS}/_matrix/client/v3/rooms/{rid}/state/m.room.power_levels/", headers=H)).json(), "users": {hid: 100, pid: 50}})
+        ra, rp = (await role(A)).json()["role"], (await role(P)).json()["role"]
+        am = await ctl(A, "mute")
+        check("6. Co-organiser (given power 50) has organiser rights; an attendee cannot mute anyone", ra == "attendee" and rp == "coorganiser" and am.status_code == 403, (ra, rp, am.status_code))
+        await st({"attendance": False})
+        att = await h.get(f"{ORCH}/v1/meetings/attendance/{rid}", headers=H)
+        check("7. Attendance report can be turned off in the options", att.status_code == 403, att.text[:100])
         f = await h.post(f"{ORCH}/v1/notify/focus", headers=A, json={"minutes": 24 * 60})
         check("4. Do not disturb holds notifications for up to a week (a day here)", f.status_code == 200 and f.json()["focus_until"] > 0, f.text[:100])
     json.dump(R, open(os.getenv("OUT", "/opt/amer/meeting_options_test.json"), "w"), indent=1)

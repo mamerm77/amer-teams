@@ -141,7 +141,18 @@ class _S extends State<CallScreen> {
   Future<mx.Timeline>? _chatTl;   // loaded once, updates itself
   StreamSubscription? _roomEvents;
   String get me => room.client.userID!;
-  bool get isHost => room.getPowerLevelByUserId(me).level >= 50;
+  bool get isHost => room.getPowerLevelByUserId(me).level >= 50;     // organiser or co-organiser (co-organisers get power 50)
+  /// Teams roles: presenters can also mute, remove and admit people, and change roles; only organisers and
+  /// co-organisers change meeting options, run breakout rooms and end the meeting for everyone.
+  bool get isPresenterRole { final o = meetingOptionsOf(room); return o['mode'] != 'webinar' && (o['who_presents'] ?? 'everyone') == 'everyone' || isPresenter(room, me); }
+  /// Meeting option "Hide attendee names": attendees see other attendees as "Attendee"; organisers and presenters see names.
+  bool _hideName(Participant p) {
+    if (p is LocalParticipant || canModerate || meetingOptionsOf(room)['hide_names'] != true) return false;
+    final o = meetingOptionsOf(room);
+    return !(room.getPowerLevelByUserId(p.identity).level >= 50 || ((o['presenters'] as List?) ?? const []).contains(p.identity) || ((o['co_organisers'] as List?) ?? const []).contains(p.identity));
+  }
+  bool get canModerate => isHost || isPresenterRole;
+  bool get canRecord { final w = meetingOptionsOf(room)['who_records'] ?? 'organisers_presenters'; return w == 'nobody' ? false : (isHost || (w == 'organisers_presenters' && isPresenterRole)); }
   bool get attendee => call?.role == 'attendee';
   String get callId => widget.meeting ? _meetId : (call?.callId ?? '');
   String get _meetId => widget.ambient ? 'meet-ambient-${widget.roomId}' : 'meet-${widget.roomId}';
@@ -251,6 +262,7 @@ class _S extends State<CallScreen> {
       call = widget.meeting ? await SecureCall.joinOrStart(api, room, id!, video: _pre?.cam ?? widget.video)
           : widget.callId == null ? await SecureCall.start(api, room, video: widget.video)
           : await SecureCall.join(api, room, widget.callId!, video: widget.video); Availability.instance.activity(widget.meeting ? 'meeting' : 'call');
+      if (widget.meeting && meetingOptionsOf(room)['record_auto'] == true && canRecord && DeviceRecorder.supported) { Future.delayed(const Duration(seconds: 4), () { if (mounted && !rec.recording && rec.id == null) _askRecord(); }); }
       call!.lk.addListener(_refresh);
       ev = call!.lk.createListener()..on<DataReceivedEvent>(_onData)..on<RoomDisconnectedEvent>(_onDisconnected)..on<ParticipantConnectionQualityUpdatedEvent>(_onQuality);
       _roomEvents = room.client.onTimelineEvent.stream.listen(_onRoomEvent);
@@ -439,7 +451,7 @@ class _S extends State<CallScreen> {
 
   Future<void> _leave() async {
     unawaited(Handoff.clear(room.client));
-    if (rec.recording && isHost) await _stopRec('host left');
+    if (rec.recording && canRecord) await _stopRec('host left');
     if (ctl != null) {                         // 1:1: signalling sends hangup + end and tears media down
       await stt.stop(); await ev?.dispose(); ev = null; await ctl!.hangup(); return;
     }
@@ -702,7 +714,7 @@ class _S extends State<CallScreen> {
   }
   /// Host side: start when everyone present agreed; ask late joiners; stop if anyone present has not agreed.
   void _recTick() {
-    if (!isHost || rec.id == null || call == null) return;
+    if (!canRecord || rec.id == null || call == null) return;
     for (final p in _present.where((p) => !_asked.contains(p))) { _asked.add(p); _send({'t': 'rec', 'op': rec.recording ? 'ask-late' : 'ask', 'id': rec.id}); }
     if (!rec.recording && rec.allAgreed(_present)) { _startRec(); }
     else if (rec.recording && rec.declined.isNotEmpty) { _stopRec('${rec.declined.first} declined'); }
@@ -753,7 +765,7 @@ class _S extends State<CallScreen> {
     if (op == 'ask' || op == 'ask-late') { if (!_recPrompt) _consentDialog(id!, who, op == 'ask-late'); return; }
     if (op == 'started') { rec.id = id; rec.recording = true; _say('Recording started'); return; }
     if (op == 'stopped') { rec.reset(); _snack('Recording stopped${j['why'] != null ? ' (${j['why']})' : ''}'); return; }
-    if (!isHost || id != rec.id) return;
+    if (!canRecord || id != rec.id) return;
     if (op == 'yes') { rec.agreed.add(from); _recTick(); }
     if (op == 'no' || op == 'withdraw') { rec.agreed.remove(from); rec.declined.add(who); _recTick(); if (!rec.recording) { _snack('$who declined: not recording'); rec.reset(); } }
   }
@@ -867,12 +879,12 @@ class _S extends State<CallScreen> {
             if (isHost) const PopupMenuItem(value: 'options', child: ListTile(leading: Icon(Icons.tune), title: Text('Meeting options'))),
             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share), title: Text('Copy invitation'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'breakout', child: ListTile(leading: Icon(Icons.call_split), title: Text('Breakout rooms'))),
-            if (isHost) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
+            if (canModerate) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'lock', child: ListTile(leading: Icon(locked ? Icons.lock_open : Icons.lock), title: Text(locked ? 'Unlock meeting' : 'Lock meeting'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'webinar', child: ListTile(leading: const Icon(Icons.campaign), title: Text(webinar ? 'Turn off webinar mode' : 'Webinar mode'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'agenda', child: ListTile(leading: Icon(Icons.list_alt), title: Text('Agenda and timer'))),
             if (isHost && widget.meeting) PopupMenuItem(value: 'amer', child: ListTile(leading: const Icon(Icons.auto_awesome), title: Text(aiOn ? 'Turn off Amer in this meeting' : 'Amer in this meeting'))),
-            if (isHost && widget.meeting) PopupMenuItem(value: 'rec', child: ListTile(leading: Icon(rec.recording ? Icons.stop : Icons.fiber_manual_record, color: Colors.red), title: Text(rec.recording ? 'Stop recording' : 'Record (with consent)'))),
+            if (canRecord && widget.meeting) PopupMenuItem(value: 'rec', child: ListTile(leading: Icon(rec.recording ? Icons.stop : Icons.fiber_manual_record, color: Colors.red), title: Text(rec.recording ? 'Stop recording' : 'Record (with consent)'))),
             if (!isHost && rec.recording) const PopupMenuItem(value: 'withdraw', child: ListTile(leading: Icon(Icons.do_not_disturb), title: Text('Withdraw consent'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'dialin', child: ListTile(leading: Icon(Icons.dialpad), title: Text('Phone dial-in'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'guest', child: ListTile(leading: Icon(Icons.public), title: Text('Guest link (browser)'))),
@@ -880,12 +892,12 @@ class _S extends State<CallScreen> {
             PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),
             PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
             PopupMenuItem(value: 'interp', child: ListTile(leading: const Icon(Icons.record_voice_over), title: Text(speakTr ? 'Interpreter: on' : 'Interpreter (hear others in your language)'))),
-            if (widget.meeting) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
+            if (widget.meeting && meetingOptionsOf(room)['qa'] != false) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
           ]),
         ]),
       body: Column(children: [
-        if (isHost) for (final g in lobby.entries) MaterialBanner(leading: const Icon(Icons.public), content: Text('${g.value.$2} is waiting in the lobby (browser guest)'),
+        if (canModerate && meetingOptionsOf(room)['who_admits'] != 'organisers' || isHost) for (final g in lobby.entries) MaterialBanner(leading: const Icon(Icons.public), content: Text('${g.value.$2} is waiting in the lobby (browser guest)'),
           actions: [TextButton(onPressed: () { lobby.remove(g.key); _host('remove', identity: g.key); setState(() {}); }, child: Text(L.t(context, 'Remove'))), FilledButton(onPressed: () => _admit(g.key), child: Text(L.t(context, 'Let in')))]),
         if (attendee) MaterialBanner(content: const Text('You are an attendee in this webinar. Raise your hand to ask to speak.'), actions: [TextButton(onPressed: _toggleHand, child: Text(myHand ? 'Lower hand' : 'Raise hand'))]),
         if (widget.meeting && call!.lk.remoteParticipants.isEmpty) MaterialBanner(leading: const Icon(Icons.groups_outlined),
@@ -963,7 +975,7 @@ class _S extends State<CallScreen> {
             if (p is! LocalParticipant) () { final (ic, col, tip) = _idBadge(p); return Tooltip(message: idChecked.contains(p.identity) ? 'Passed a live check in this call' : tip, child: Icon(idChecked.contains(p.identity) ? Icons.how_to_reg : ic, size: 14, color: idChecked.contains(p.identity) ? Colors.green : col, semanticLabel: tip)); }(),
             const SizedBox(width: 4),
             if (p.isMuted) const Icon(Icons.mic_off, size: 14), const SizedBox(width: 4),
-            Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
+            Text(p is LocalParticipant ? 'You' : _hideName(p) ? 'Attendee' : (p.name.isEmpty ? p.identity : p.name)),
             if (spotlightId == p.identity) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.highlight, size: 14)),
             if (pinnedId == p.identity) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.push_pin, size: 14)),
           ]))),
@@ -996,15 +1008,15 @@ class _S extends State<CallScreen> {
       return Material(child: ListView(padding: const EdgeInsets.all(12), children: [head,
         if (waiting.isNotEmpty) ...[const Text('Waiting room'), for (final u in waiting) ListTile(title: Text(u.calcDisplayname()),
           trailing: FilledButton(onPressed: () async { await meetings.admit(room, u.id); setState(() {}); }, child: Text(L.t(context, 'Admit'))))],
-        for (final p in people) ListTile(leading: CircleAvatar(child: Text(_initials(p.name.isEmpty ? p.identity : p.name))),
-          title: Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
+        for (final p in people) ListTile(leading: CircleAvatar(child: Text(_hideName(p) ? 'A' : _initials(p.name.isEmpty ? p.identity : p.name))),
+          title: Text(p is LocalParticipant ? 'You' : _hideName(p) ? 'Attendee' : (p.name.isEmpty ? p.identity : p.name)),
           subtitle: p is LocalParticipant ? null : Text(idChecked.contains(p.identity) ? 'Passed a live check' : _idBadge(p).$3, style: const TextStyle(fontSize: 11)),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
             if (p is! LocalParticipant && !p.identity.startsWith('guest-')) IconButton(tooltip: 'Live identity check', icon: const Icon(Icons.shield_outlined, size: 18), onPressed: () => _liveCheck(p)),
             if (hands.contains(p.name)) const Text('✋ '),
             Icon(p.isMuted ? Icons.mic_off : Icons.mic, size: 18), const SizedBox(width: 6),
             Icon(p.isCameraEnabled() ? Icons.videocam : Icons.videocam_off, size: 18),
-            if (isHost && p is! LocalParticipant) PopupMenuButton<String>(onSelected: (a) => a == 'presenter' ? _makePresenter(p.identity) : _host(a, identity: p.identity),
+            if (canModerate && p is! LocalParticipant) PopupMenuButton<String>(onSelected: (a) => a == 'presenter' ? _makePresenter(p.identity) : _host(a, identity: p.identity),
               itemBuilder: (_) => [
                 const PopupMenuItem(value: 'mute', child: Text('Mute')),
                 const PopupMenuItem(value: 'stop_video', child: Text('Stop video')),

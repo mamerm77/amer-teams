@@ -41,6 +41,19 @@ async def power_level(user, room_id) -> int:
 async def settings(user, room_id) -> dict:
     return await _state(user, room_id, "com.amerteams.meeting.settings")
 
+async def meeting_role(user, room_id) -> str:
+    """organiser (power 100+), coorganiser (power 50+ or listed), presenter (listed, or everyone presents) or attendee."""
+    pl = await power_level(user, room_id); s = await settings(user, room_id); me = user["user_id"]
+    if pl >= 100: return "organiser"
+    if pl >= HOST_LEVEL or me in s.get("co_organisers", []): return "coorganiser"
+    if me in s.get("presenters", []) or (s.get("mode") != "webinar" and s.get("who_presents", "everyone") == "everyone"): return "presenter"
+    return "attendee"
+
+@router.get("/role/{room_id}")
+async def my_role(room_id: str, user=Depends(auth.matrix_user)):
+    await auth.assert_room_member(user, room_id)
+    return {"role": await meeting_role(user, room_id)}
+
 async def publish_allowed(user, room_id) -> bool:
     s = await settings(user, room_id)
     # Meeting options (Teams parity): "Who can present" = organisers only, or specific people, restricts sending media
@@ -58,8 +71,11 @@ class Control(BaseModel):
 @router.post("/control")
 async def control(req: Control, user=Depends(auth.matrix_user)):
     await auth.assert_room_member(user, req.room_id)
-    if await power_level(user, req.room_id) < HOST_LEVEL:
-        raise HTTPException(403, "Only the meeting host can do this")
+    # Teams roles: organisers and co-organisers (power level 50+) can do everything here; presenters can mute and
+    # remove people but cannot end the meeting for everyone.
+    role = await meeting_role(user, req.room_id)
+    if role == "attendee" or (req.action == "end" and role == "presenter"):
+        raise HTTPException(403, "Only organisers and co-organisers can end the meeting for everyone" if req.action == "end" else "Only organisers, co-organisers and presenters can do this")
     room = livekit_token.room_name(req.room_id, req.call_id)
     done = 0
     async with lkapi.LiveKitAPI(config.LIVEKIT_HTTP_URL, config.LIVEKIT_API_KEY, config.LIVEKIT_API_SECRET) as lk:
@@ -128,6 +144,7 @@ async def attendance(room_id: str, user=Depends(auth.matrix_user)):
     """Who attended the meetings of this chat, when they joined and left, and for how long. Organisers (hosts) only,
     as in Teams. Built from LiveKit's signed webhooks, so it records presence in the call, never content."""
     if await power_level(user, room_id) < HOST_LEVEL: raise HTTPException(403, "Only meeting organisers see the attendance report")
+    if (await settings(user, room_id)).get("attendance") is False: raise HTTPException(403, "The attendance report is turned off in this meeting's options")
     import hashlib as _h
     rh = _h.sha256(room_id.encode()).hexdigest()
     async with db.pool.connection() as c:

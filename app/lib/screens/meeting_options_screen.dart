@@ -30,6 +30,9 @@ class _S extends State<MeetingOptionsScreen> {
     setState(() => saving = true);
     try {
       await room.client.setRoomStateWithKey(room.id, kMeetingSettings, '', o);
+      for (final u in ((o['co_organisers'] as List?) ?? const []).map((x) => '$x')) {   // co-organisers: organiser rights, enforced by the server
+        if (room.getPowerLevelByUserId(u).level < 50) { try { await room.setPower(u, 50); } catch (_) {} }
+      }
       final lobby = '${o['lobby'] ?? 'invited'}';
       final want = lobby == 'everyone' ? JoinRules.knock : JoinRules.invite;  // invited people go straight in; others ask (knock) only when allowed
       if (room.joinRules != want) { try { await room.setJoinRules(want); } catch (_) {} }
@@ -46,6 +49,7 @@ class _S extends State<MeetingOptionsScreen> {
 
   @override Widget build(BuildContext c) {
     final presenters = ((o['presenters'] as List?) ?? const []).map((x) => '$x').toList();
+    final coorgs = ((o['co_organisers'] as List?) ?? const []).map((x) => '$x').toList();
     return Scaffold(
       appBar: AppBar(title: const Text('Meeting options'), actions: [if (canEdit) Padding(padding: const EdgeInsets.only(right: 8), child: FilledButton(onPressed: saving ? null : _save, child: const Text('Save')))]),
       body: ListView(children: [
@@ -53,6 +57,11 @@ class _S extends State<MeetingOptionsScreen> {
         const _H('Joining'),
         _choice('lobby', 'Who can bypass the lobby', 'Others wait until an organiser admits them',
           const [('invited', 'People in this chat'), ('everyone', 'Anyone with the meeting ID can ask to join'), ('organisers', 'Only organisers')], 'invited'),
+        _choice('who_admits', 'Who can admit from the lobby', 'Teams default: organisers, co-organisers and presenters',
+          const [('presenters', 'Organisers, co-organisers and presenters'), ('organisers', 'Only organisers and co-organisers')], 'presenters'),
+        const _H('Roles'),
+        ListTile(title: const Text('Co-organisers'), subtitle: Text(coorgs.isEmpty ? 'They get the organiser\'s rights: options, breakout rooms, ending the meeting' : coorgs.map((u) => room.unsafeGetUserFromMemoryOrFallback(u).calcDisplayname()).join(', ')),
+          trailing: canEdit ? TextButton(onPressed: () async { final p = await pickPeople(c, multiple: true, title: 'Co-organisers'); if (p != null) setState(() => o['co_organisers'] = {...coorgs, ...p.map((x) => x.userId)}.toList()); }, child: const Text('Choose')) : null),
         const _H('Presenting'),
         _choice('who_presents', 'Who can present', 'Presenters can talk, turn on video and share their screen. Enforced by the server',
           const [('everyone', 'Everyone'), ('organisers', 'Only organisers'), ('specific', 'Specific people')], 'everyone'),
@@ -67,6 +76,15 @@ class _S extends State<MeetingOptionsScreen> {
         _switch('allow_camera', 'Allow camera for attendees', 'When off, only organisers and presenters can turn on video'),
         _choice('chat', 'Meeting chat', 'Messages in the meeting', const [('on', 'On'), ('organisers', 'Only organisers can send'), ('off', 'Off')], 'on'),
         _switch('reactions', 'Allow reactions', 'Live emoji reactions during the meeting'),
+        _switch('qa', 'Q&A', 'Attendees can ask questions; organisers mark them answered'),
+        SwitchListTile(title: const Text('Hide attendee names'), subtitle: const Text('Attendees see each other as "Attendee"; organisers and presenters still see names'),
+          value: o['hide_names'] == true, onChanged: canEdit ? (v) => setState(() => o['hide_names'] = v) : null),
+        _switch('attendance', 'Allow attendance report', 'Organisers can see who joined, when and for how long'),
+        const _H('Recording'),
+        SwitchListTile(title: const Text('Record automatically'), subtitle: const Text('Asks everyone present for consent as soon as an organiser joins'),
+          value: o['record_auto'] == true, onChanged: canEdit ? (v) => setState(() => o['record_auto'] = v) : null),
+        _choice('who_records', 'Who can record', 'Recording always needs everyone\'s consent',
+          const [('organisers_presenters', 'Organisers, co-organisers and presenters'), ('organisers', 'Organisers and co-organisers'), ('nobody', 'Nobody')], 'organisers_presenters'),
         const _H('Amer'),
         _switch('ai_allowed', 'Allow Amer minutes and captions', 'When off, nobody can turn on Amer in this chat\'s meetings'),
         const Padding(padding: EdgeInsets.all(16), child: Text('These options apply to every meeting in this chat. Changes reach people already in the meeting straight away.', style: TextStyle(fontSize: 12))),
