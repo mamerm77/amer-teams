@@ -1,3 +1,4 @@
+import 'meeting_options_screen.dart';
 import '../services/locale.dart';
 import '../services/labels.dart';
 import 'dart:math' show min, Random;
@@ -370,6 +371,7 @@ class _S extends State<CallScreen> {
   // ---------- Amer in the meeting (ask-the-meeting agent) ----------
   Future<void> _toggleAi() async {
     final on = !aiOn;
+    if (on && meetingOptionsOf(room)['ai_allowed'] == false) { _snack('The organiser has turned off Amer for meetings in this chat (Meeting options)'); return; }
     try {
       await room.client.setRoomStateWithKey(room.id, _aiState, '', {'enabled': on, 'call_id': callId, 'by': me});
       _snack(on ? 'Amer is on for this meeting. Everyone sees that AI is listening.' : 'Amer is off for this meeting');
@@ -843,10 +845,12 @@ class _S extends State<CallScreen> {
               case 'tcap': _pickCapLang();
               case 'net': _netDialog();
               case 'end': _host('end');
+              case 'options': Navigator.push(context, MaterialPageRoute(builder: (_) => MeetingOptionsScreen(roomId: widget.roomId))).then((_) => setState(() {}));
             }
           }, itemBuilder: (_) => [
             const PopupMenuItem(value: 'devices', child: ListTile(leading: Icon(Icons.settings_voice), title: Text('Audio and video settings'))),
             const PopupMenuItem(value: 'wb', child: ListTile(leading: Icon(Icons.draw), title: Text('Whiteboard'))),
+            if (isHost) const PopupMenuItem(value: 'options', child: ListTile(leading: Icon(Icons.tune), title: Text('Meeting options'))),
             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share), title: Text('Copy invitation'))),
             if (isHost && widget.meeting) const PopupMenuItem(value: 'breakout', child: ListTile(leading: Icon(Icons.call_split), title: Text('Breakout rooms'))),
             if (isHost) const PopupMenuItem(value: 'muteall', child: ListTile(leading: Icon(Icons.mic_off), title: Text('Mute everyone'))),
@@ -894,11 +898,11 @@ class _S extends State<CallScreen> {
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), child: Row(children: [
           const Spacer(),
           Flexible(flex: 8, child: Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 8, children: [
-          if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
-          if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
+          if (!attendee) _btn(mic ? Icons.mic : Icons.mic_off, mic ? 'Mute' : 'Unmute', () { if (!mic && !optAllowMic(room, me)) { _snack('The organiser has turned off mics for attendees'); return; } mic = !mic; lk.localParticipant?.setMicrophoneEnabled(mic); setState(() {}); }, off: !mic),
+          if (!attendee) _btn(cam ? Icons.videocam : Icons.videocam_off, cam ? 'Stop video' : 'Start video', () { if (!cam && !optAllowCamera(room, me)) { _snack('The organiser has turned off cameras for attendees'); return; } cam = !cam; lk.localParticipant?.setCameraEnabled(cam); setState(() {}); }, off: !cam),
           if (!attendee) _btn(Icons.screen_share, sharing ? 'Stop sharing' : 'Share screen', () { sharing = !sharing; lk.localParticipant?.setScreenShareEnabled(sharing); setState(() {}); }, off: sharing),
           _btn(Icons.back_hand, myHand ? 'Lower hand' : 'Raise hand', _toggleHand, off: myHand),
-          PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
+          if (optReactions(room)) PopupMenuButton<String>(tooltip: 'React', onSelected: _react, icon: const CircleAvatar(child: Text('😀')),
             itemBuilder: (_) => [for (final e in ['👍', '👏', '❤️', '😂', '😮', '🎉']) PopupMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 22)))]),
           if (aiOn) _btn(Icons.question_answer_outlined, 'Ask Amer', () => _askDialog()),
           SizedBox(width: 76, child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -1006,7 +1010,8 @@ class _S extends State<CallScreen> {
             Text(e.senderFromMemoryOrFallback.calcDisplayname(), style: Theme.of(context).textTheme.labelSmall), Text(e.body)]));
         });
       })),
-      SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
+      if (!optChat(room, me)) const SafeArea(top: false, child: Padding(padding: EdgeInsets.all(12), child: Text('The organiser has limited the meeting chat.', style: TextStyle(fontSize: 12))))
+      else SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
         Expanded(child: TextField(controller: chatInput, decoration: const InputDecoration(hintText: 'Message everyone (encrypted)', border: OutlineInputBorder(), isDense: true),
           onSubmitted: (_) => _sendChat())),
         IconButton(icon: const Icon(Icons.send), onPressed: _sendChat)]))),

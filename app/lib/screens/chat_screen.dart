@@ -1,3 +1,4 @@
+import 'meeting_options_screen.dart';
 import '../services/availability.dart';
 import 'connectors_screen.dart';
 import '../services/locale.dart';
@@ -652,12 +653,14 @@ class _S extends State<ChatScreen> {
             if (v == 'twin') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingTwinScreen(room: room)));
             if (v == 'shifts') Navigator.push(c, MaterialPageRoute(builder: (_) => ShiftsScreen(room: room)));
             if (v == 'attendance') _attendance();
+            if (v == 'meetopts') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingOptionsScreen(roomId: room.id)));
             if (v == 'ptt') Navigator.push(c, MaterialPageRoute(builder: (_) => WalkieTalkieScreen(room: room)));
           }, itemBuilder: (_) => [
             const PopupMenuItem(value: 'twin', child: Text('Meeting twin')),
             if (room.encrypted) const PopupMenuItem(value: 'connectors', child: Text('Connectors')),
             const PopupMenuItem(value: 'shifts', child: Text('Shifts')),
             if (room.getPowerLevelByUserId(me).level >= 50) const PopupMenuItem(value: 'attendance', child: Text('Meeting attendance report')),
+            if (room.getPowerLevelByUserId(me).level >= 50) const PopupMenuItem(value: 'meetopts', child: Text('Meeting options')),
             if (room.encrypted) const PopupMenuItem(value: 'ptt', child: Text('Walkie-talkie')),
             if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),
             if (Flags.instance.on('find_time')) const PopupMenuItem(value: 'time', child: Text('Find a time')),

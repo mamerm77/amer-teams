@@ -74,7 +74,7 @@ async def _owner(pushkey: str) -> tuple[str, Settings] | None:
     return (r[0], Settings(**(r[1] if isinstance(r[1], dict) else json.loads(r[1])))) if r else None
 
 class Focus(BaseModel):
-    minutes: int = Field(ge=0, le=480)                  # 0 ends the session
+    minutes: int = Field(ge=0, le=10080)                # 0 ends the session; up to a week (Do not disturb until changed)
 
 @router.post("/v1/notify/focus")
 async def focus(req: Focus, user=Depends(flags.require("quiet_hours"))):

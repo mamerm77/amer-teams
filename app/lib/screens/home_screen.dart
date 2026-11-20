@@ -55,7 +55,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
-    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client); Urgent.instance.start(m.client);
+    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client, api: ApiService(m)); Urgent.instance.start(m.client);
     _people = Timer.periodic(const Duration(minutes: 2), (_) => _invitees()); Future.delayed(const Duration(seconds: 5), _invitees);
     Future.delayed(const Duration(seconds: 2), () async {          // first launch on this account: the welcome tour, once
       if (!mounted) return; final cl = context.read<MatrixService>().client;

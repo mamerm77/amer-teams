@@ -43,7 +43,9 @@ async def settings(user, room_id) -> dict:
 
 async def publish_allowed(user, room_id) -> bool:
     s = await settings(user, room_id)
-    if s.get("mode") != "webinar": return True
+    # Meeting options (Teams parity): "Who can present" = organisers only, or specific people, restricts sending media
+    # the same way as a webinar; the media server enforces it through the token.
+    if s.get("mode") != "webinar" and s.get("who_presents", "everyone") == "everyone": return True
     if user["user_id"] in s.get("presenters", []): return True
     return await power_level(user, room_id) >= HOST_LEVEL
 

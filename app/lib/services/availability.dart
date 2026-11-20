@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
+import 'api_service.dart';
 
 /// Teams-style availability: Available, Busy, Do not disturb, Be right back, Appear away, Appear offline, plus a
 /// status message that clears itself after a chosen time. Matrix presence only knows online / unavailable / offline,
@@ -13,7 +14,7 @@ class Availability {
   static final instance = Availability._();
   static const _key = 'com.amerteams.availability';
   final state = ValueNotifier<(Avail, String)>((Avail.available, ''));
-  Client? _c; Timer? _t;
+  Client? _c; Timer? _t; ApiService? api;
 
   static String label(Avail a) => const {Avail.available: 'Available', Avail.busy: 'Busy', Avail.dnd: 'Do not disturb', Avail.brb: 'Be right back', Avail.away: 'Appear away', Avail.offline: 'Appear offline'}[a]!;
   static Color colour(Avail a) => switch (a) { Avail.available => Colors.green, Avail.busy || Avail.dnd => Colors.red, Avail.brb || Avail.away => Colors.amber, Avail.offline => Colors.grey };
@@ -28,8 +29,8 @@ class Availability {
     return (a, raw);
   }
 
-  Future<void> start(Client c) async {
-    _c = c; _t?.cancel();
+  Future<void> start(Client c, {ApiService? api}) async {
+    _c = c; this.api = api ?? this.api; _t?.cancel();
     _t = Timer.periodic(const Duration(minutes: 1), (_) => _expire());
     await _expire();
   }
@@ -52,6 +53,12 @@ class Availability {
     await c.setPresence(c.userID!, presence, statusMsg: '$tag$msg'.trim());
     await c.setAccountData(c.userID!, _key, {'state': finalA.name, 'msg': msg, if (until != null) 'until': until.millisecondsSinceEpoch});
     state.value = (finalA, msg);
+    // Do not disturb really silences: the server holds push notifications (only priority people get through) until
+    // you leave Do not disturb or the status clears (docs/FOCUS.md).
+    try {
+      final mins = finalA == Avail.dnd ? (until == null ? 24 * 60 : until.difference(DateTime.now()).inMinutes.clamp(1, 7 * 24 * 60)) : 0;
+      await api?.postMap('/v1/notify/focus', {'minutes': mins});
+    } catch (_) {}
   }
 
   bool get doNotDisturb => state.value.$1 == Avail.dnd;
