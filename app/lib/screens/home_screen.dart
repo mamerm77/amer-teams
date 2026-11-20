@@ -1,3 +1,4 @@
+import '../services/availability.dart';
 import 'package:matrix/matrix.dart' show Client;
 import '../services/accessibility.dart';
 import 'notifications_screen.dart';
@@ -51,7 +52,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
-    _searchClient = m.client; SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
+    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
@@ -130,9 +131,12 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
             if (v == 'a11y') Navigator.push(c, MaterialPageRoute(builder: (_) => const A11yScreen()));
             if (v == 'notify') Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
             if (v == 'out') confirmSignOut(c);
+            if (v == 'status') showAvailability(c);
           },
           itemBuilder: (_) => [
             PopupMenuItem(enabled: false, child: Text(me)),
+            PopupMenuItem(value: 'status', child: ValueListenableBuilder(valueListenable: Availability.instance.state, builder: (_, v, __) => ListTile(
+              leading: Icon(Availability.icon(v.$1), color: Availability.colour(v.$1)), title: Text(Availability.label(v.$1)), subtitle: Text(v.$2.isEmpty ? 'Set status message' : v.$2)))),
             PopupMenuItem(value: 'notify', child: ListTile(leading: const Icon(Icons.notifications_active_outlined), title: Text(L.t(c, 'Notifications')))),
             PopupMenuItem(value: 'security', child: ListTile(leading: const Icon(Icons.security), title: Text(L.t(c, 'Security')))),
             PopupMenuItem(value: 'a11y', child: ListTile(leading: const Icon(Icons.accessibility_new), title: Text(L.t(c, 'Accessibility')))),

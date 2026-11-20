@@ -1,3 +1,4 @@
+import '../services/availability.dart';
 import 'connectors_screen.dart';
 import '../services/locale.dart';
 import '../services/labels.dart';
@@ -562,12 +563,12 @@ class _S extends State<ChatScreen> {
                 Text(widget.threadRootId != null ? 'Thread' : widget.filesOnly ? 'Files and media' : peerName(room), overflow: TextOverflow.ellipsis),
                 FutureBuilder<CachedPresence>(future: _presence, builder: (_, p) {
                   final online = p.data?.currentlyActive == true || p.data?.presence == PresenceType.online;
-                  final status = p.data?.statusMsg;
+                  final (av, status) = Availability.parse(p.data);
                   final seen = p.data?.lastActiveTimestamp;
-                  final away = seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}';
+                  final away = switch (av) { Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
                   final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
                       : room.isDirectChat && _peerInvitedOnly ? 'Invited · hasn\'t signed in yet · 🔒 encrypted'
-                      : room.isDirectChat ? '${online ? 'Online' : away}${status != null && status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
+                      : room.isDirectChat ? '${online && av == Avail.available ? 'Online' : away}${status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
                       : '🔒 End-to-end encrypted · $members member${members == 1 ? '' : 's'}';
                   return Text(line, style: Theme.of(c).textTheme.labelSmall?.copyWith(color: typers.isNotEmpty || online ? cs.primary : null));
                 }),

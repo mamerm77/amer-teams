@@ -1,3 +1,4 @@
+import '../services/availability.dart';
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
 import 'package:provider/provider.dart';
@@ -68,13 +69,8 @@ class _RS extends State<RoomsScreen> {
         IconButton(tooltip: 'Search everywhere', icon: const Icon(Icons.manage_search), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const SearchScreen()))),
         IconButton(tooltip: 'New shared channel (partner organisation)', icon: const Icon(Icons.handshake_outlined), onPressed: () => newSharedChannel(c)),
         IconButton(tooltip: 'Notifications', icon: const Icon(Icons.notifications_outlined), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()))),
-        IconButton(tooltip: 'Set your status', icon: const Icon(Icons.emoji_emotions_outlined), onPressed: () async {
-          final ctl = TextEditingController();
-          final ok = await showDialog<bool>(context: c, builder: (d) => AlertDialog(title: const Text('Your status'),
-            content: TextField(controller: ctl, autofocus: true, decoration: const InputDecoration(hintText: 'e.g. In a meeting until 3 pm')),
-            actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Set'))]));
-          if (ok == true) await m.client.setPresence(m.userId, PresenceType.online, statusMsg: ctl.text.trim());
-        })]),
+        IconButton(tooltip: 'Set your status', icon: const Icon(Icons.emoji_emotions_outlined), onPressed: () => showAvailability(c)),
+        ]),
       floatingActionButton: FloatingActionButton.extended(icon: const Icon(Icons.add), label: Text(t(c, 'New encrypted chat')), onPressed: () => _new(c, m)),
       body: Builder(builder: (_) {
         final cs = Theme.of(c).colorScheme; final me = m.userId;
