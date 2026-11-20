@@ -349,6 +349,8 @@ class _S extends State<CallScreen> {
     try {
       final j = jsonDecode(utf8.decode(e.data)); final who = e.participant?.name ?? 'Someone';
       setState(() {
+        if (j['t'] == 'ann' && j['op'] == 'clear') strokes.clear();
+        if (j['t'] == 'ann' && j['op'] == 'stroke' && j['p'] is List) strokes.add(([for (final q in (j['p'] as List)) Offset((q[0] as num).toDouble(), (q[1] as num).toDouble())], Color((j['c'] as num?)?.toInt() ?? 0xFFF44336)));
         if (j['t'] == 'hand') { j['up'] == true ? hands.add(who) : hands.remove(who); if (j['up'] == true) _say('$who raised their hand'); }
         if (j['t'] == 'gk-hello' && (e.participant?.identity ?? '').startsWith('guest-') && j['pk'] is String) lobby[e.participant!.identity] = (j['pk'] as String, who);
         if (j['t'] == 'qa') _onQa(j, who);
@@ -578,7 +580,17 @@ class _S extends State<CallScreen> {
     if (capLang == null) { await _pickCapLang(); if (capLang == null) return; }
     setState(() => speakTr = !speakTr);
     if (speakTr) { try { await _tts.setLanguage(_ttsCode(capLang!)); await _tts.awaitSpeakCompletion(true); } catch (_) { setState(() => speakTr = false); _snack('This device has no voice for spoken interpretation; captions still show'); return; } }
-    _snack(speakTr ? 'Interpreter on: others are spoken to you in $capLang' : 'Interpreter off');
+    _duckOthers(speakTr);
+    _snack(speakTr ? 'Interpreter on: others are spoken to you in $capLang, their own voices turned down' : 'Interpreter off');
+  }
+  /// Interpreter: turn the original speakers down (as Teams does) while their translation is spoken; restore after.
+  void _duckOthers(bool on) {
+    for (final p in call?.lk.remoteParticipants.values ?? const <RemoteParticipant>[]) {
+      for (final pub in p.audioTrackPublications) {
+        final t = pub.track; if (t == null) continue;
+        try { (t as dynamic).setVolume(on ? 0.2 : 1.0); } catch (_) {}      // not every platform supports per-track volume
+      }
+    }
   }
   String? capLang; final tCaps = <(String, String)>[]; final _tq = <(String, String)>[]; bool _tBusy = false;
   static const capLangs = ['English', 'العربية (Arabic)', 'Français (French)', 'हिन्दी (Hindi)', 'اردو (Urdu)', 'বাংলা (Bengali)', 'Tagalog', 'Español (Spanish)', '中文 (Chinese)', 'Русский (Russian)'];
@@ -871,6 +883,7 @@ class _S extends State<CallScreen> {
               case 'net': _netDialog();
               case 'end': _host('end');
               case 'interp': _interpreter();
+              case 'annotate': setState(() => annotating = true);
               case 'options': Navigator.push(context, MaterialPageRoute(builder: (_) => MeetingOptionsScreen(roomId: widget.roomId))).then((_) => setState(() {}));
             }
           }, itemBuilder: (_) => [
@@ -891,6 +904,7 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
             PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),
             PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
+            const PopupMenuItem(value: 'annotate', child: ListTile(leading: Icon(Icons.draw_outlined), title: Text('Annotate the shared screen'))),
             PopupMenuItem(value: 'interp', child: ListTile(leading: const Icon(Icons.record_voice_over), title: Text(speakTr ? 'Interpreter: on' : 'Interpreter (hear others in your language)'))),
             if (widget.meeting && meetingOptionsOf(room)['qa'] != false) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
             if (isHost) const PopupMenuItem(value: 'end', child: ListTile(leading: Icon(Icons.stop_circle, color: Colors.red), title: Text('End for everyone'))),
@@ -960,7 +974,8 @@ class _S extends State<CallScreen> {
     ExcludeSemantics(child: Text(tip, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelSmall))]));   // the tooltip already gives the spoken label
 
   Widget _tile(Participant p) {
-    final vt = p.videoTrackPublications.where((x) => !x.muted).map((x) => x.track).whereType<VideoTrack>().firstOrNull;
+    final pubs = p.videoTrackPublications.where((x) => !x.muted).toList()..sort((a, b) => (b.source == TrackSource.screenShareVideo ? 1 : 0) - (a.source == TrackSource.screenShareVideo ? 1 : 0));
+    final vt = pubs.map((x) => x.track).whereType<VideoTrack>().firstOrNull;   // the shared screen first
     final cs = Theme.of(context).colorScheme;
     return GestureDetector(onLongPress: () => _tileMenu(p), onSecondaryTap: () => _tileMenu(p), child: AnimatedContainer(duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(14),
@@ -985,12 +1000,31 @@ class _S extends State<CallScreen> {
   }
   static String _initials(String n) => n.replaceAll('@', '').split(RegExp(r'[\s:._]')).where((s) => s.isNotEmpty).take(2).map((s) => s[0].toUpperCase()).join();
 
+  // ---- annotation on a shared screen ----
+  bool annotating = false; Color annColour = Colors.red; final strokes = <(List<Offset>, Color)>[]; List<Offset>? _stroke; Size _annSize = const Size(1, 1);
+  Offset _norm(Offset o) => Offset((o.dx / _annSize.width).clamp(0, 1), (o.dy / _annSize.height).clamp(0, 1));
+  bool _sharing(Participant p) => p.videoTrackPublications.any((x) => x.source == TrackSource.screenShareVideo && !x.muted);
+
   Widget _videos(List<Participant> people, bool wide) {
-    final focus = people.where((p) => p.identity == (spotlightId ?? pinnedId)).firstOrNull;
-    if ((!grid || focus != null) && people.length > 1) {
+    final sharer = people.where(_sharing).firstOrNull;            // someone is sharing: their screen takes the stage (Teams)
+    final focus = sharer ?? people.where((p) => p.identity == (spotlightId ?? pinnedId)).firstOrNull;
+    if ((!grid || focus != null) && (people.length > 1 || sharer != null)) {
       final main = focus ?? people.firstWhere((p) => p is! LocalParticipant && p.isSpeaking, orElse: () => people.firstWhere((p) => p is! LocalParticipant, orElse: () => people.first));
       return Column(children: [
-        Expanded(child: Padding(padding: const EdgeInsets.all(8), child: _tile(main))),
+        Expanded(child: Padding(padding: const EdgeInsets.all(8), child: sharer == null ? _tile(main) : Stack(fit: StackFit.expand, children: [
+          _tile(main),
+          // Annotation on the shared screen: everyone sees the strokes; draw when Annotate is on (end-to-end encrypted data messages).
+          IgnorePointer(ignoring: !annotating, child: GestureDetector(
+            onPanStart: (d) => setState(() => _stroke = [_norm(d.localPosition)]),
+            onPanUpdate: (d) => setState(() => _stroke?.add(_norm(d.localPosition))),
+            onPanEnd: (_) { final st = _stroke; if (st != null && st.length > 1) { strokes.add((st, annColour)); _send({'t': 'ann', 'op': 'stroke', 'c': annColour.toARGB32(), 'p': [for (final o in st) [double.parse(o.dx.toStringAsFixed(4)), double.parse(o.dy.toStringAsFixed(4))]]}); } setState(() => _stroke = null); },
+            child: LayoutBuilder(builder: (_, k) { _annSize = k.biggest; return CustomPaint(painter: _AnnPainter([...strokes, if (_stroke != null) (_stroke!, annColour)]), size: k.biggest); }))),
+          if (annotating || strokes.isNotEmpty) Positioned(top: 8, right: 8, child: Material(borderRadius: BorderRadius.circular(20), color: Theme.of(context).colorScheme.surface.withValues(alpha: .9), child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (final col in const [Colors.red, Colors.amber, Colors.green, Colors.blue]) IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() { annotating = true; annColour = col; }), icon: Icon(Icons.circle, color: col, size: annColour == col && annotating ? 22 : 16)),
+            IconButton(tooltip: 'Clear drawings', icon: const Icon(Icons.layers_clear), onPressed: () { setState(() => strokes.clear()); _send({'t': 'ann', 'op': 'clear'}); }),
+            IconButton(tooltip: annotating ? 'Stop drawing' : 'Draw', icon: Icon(annotating ? Icons.edit_off : Icons.edit), onPressed: () => setState(() => annotating = !annotating)),
+          ]))),
+        ]))),
         SizedBox(height: 110, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8),
           children: [for (final p in people.where((p) => p != main)) Padding(padding: const EdgeInsets.only(right: 8), child: SizedBox(width: 150, child: _tile(p)))])),
       ]);
@@ -1050,4 +1084,19 @@ class _S extends State<CallScreen> {
     if (t.toLowerCase().startsWith('/park ')) { await _park(t.substring(6)); return; }
     await room.sendTextEvent(t);
   }
+}
+
+
+/// Draws annotation strokes (normalised 0..1 coordinates) over the shared screen.
+class _AnnPainter extends CustomPainter {
+  _AnnPainter(this.strokes); final List<(List<Offset>, Color)> strokes;
+  @override void paint(Canvas c, Size s) {
+    for (final (pts, col) in strokes) {
+      final p = Paint()..color = col..strokeWidth = 4..strokeCap = StrokeCap.round..style = PaintingStyle.stroke;
+      final path = Path();
+      for (var i = 0; i < pts.length; i++) { final o = Offset(pts[i].dx * s.width, pts[i].dy * s.height); i == 0 ? path.moveTo(o.dx, o.dy) : path.lineTo(o.dx, o.dy); }
+      c.drawPath(path, p);
+    }
+  }
+  @override bool shouldRepaint(covariant _AnnPainter old) => true;
 }

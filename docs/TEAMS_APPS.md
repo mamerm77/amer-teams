@@ -27,7 +27,7 @@ Already in Amer Teams before this: Approvals, Shifts, Walkie-talkie, Whiteboard,
 ## Channels (Teams parity)
 - **Private channels**: invite-only, and visible only to the people chosen. Adding members to the team does not add them to private channels. Private channels show a lock.
 - **Favourites and hidden channels**: per person, kept in account data. Favourites sort to the top; hidden channels move into a "Hidden channels" section with a Show button.
-- **Moderation**: the owner or an admin can switch it on. Then only moderators start new posts, and everyone can still reply. This is enforced in the app (the posting box is hidden for everyone else), not by the server.
+- **Moderation**: the owner or an admin can switch it on. Then only moderators start new posts, and everyone can still reply. The server enforces it: our Synapse module refuses a new top-level post from anyone who is not a moderator. It reads only the unencrypted thread link, so it works in encrypted channels; replies, reactions and edits still go through (`tests/moderation_test.py`, 4 checks).
 - **Channel meetings**: the channel menu has "Schedule a channel meeting". The meeting is posted in the channel and appears in every member's calendar.
 - **Tabs**: "+" adds Planner, Lists, Notes, Forms, Milestones, Goals, Updates or Praise as a tab next to Posts and Files, for everyone in the channel.
 

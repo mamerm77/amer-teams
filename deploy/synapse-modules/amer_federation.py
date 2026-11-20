@@ -86,8 +86,29 @@ class AmerFederation:
         h = await self.holds()
         return getattr(event, "room_id", "") in h["rooms"] or (getattr(event, "sender", "") in h["users"] and t == "m.room.redaction")
 
+    @staticmethod
+    def _moderated_refusal(event, state_events) -> bool:
+        """Channel moderation (Teams parity, docs/TEAM_SETTINGS.md): in a channel whose com.amerteams.channel state has
+        moderated=true, only moderators (power 50+ or listed) start new posts. Replies, reactions and edits carry
+        m.relates_to (unencrypted even in encrypted rooms), so they still go through. Nothing is decrypted."""
+        if getattr(event, "type", "") not in ("m.room.message", "m.room.encrypted"): return False
+        st = state_events or {}
+        ch = st.get(("com.amerteams.channel", ""))
+        conf = getattr(ch, "content", {}) if ch is not None else {}
+        if not conf.get("moderated"): return False
+        if (getattr(event, "content", {}) or {}).get("m.relates_to"): return False
+        sender = getattr(event, "sender", "")
+        if sender in (conf.get("moderators") or []): return False
+        pl_ev = st.get(("m.room.power_levels", ""))
+        pl = getattr(pl_ev, "content", {}) if pl_ev is not None else {}
+        level = (pl.get("users") or {}).get(sender, pl.get("users_default", 0))
+        create = st.get(("m.room.create", ""))
+        if create is not None and getattr(create, "sender", "") == sender: return False   # the creator (room v12 owner)
+        return level < 50
+
     async def check_event_allowed(self, event, state_events):
         if await self._held(event): return False, None
+        if self._moderated_refusal(event, state_events): return False, None
         sender = getattr(event, "sender", "") or ""
         origin = sender.split(":", 1)[1] if ":" in sender else ""
         if not origin or origin == self.server: return True, None
