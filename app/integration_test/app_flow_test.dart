@@ -531,6 +531,27 @@ void main() {
       expectFound(await waitFor(find.textContaining('The link works once'), secs: 5), 'steps shown');
       await shot('help-guide');
     });
+    await step('Calendar: new repeating meeting, then cancel one occurrence', () async {
+      await home(); await tap(find.text('Calendar'), 'Calendar tab');
+      await tap(find.text('New meeting'), 'New meeting');
+      await t.enterText(find.widgetWithText(TextField, 'Add title'), 'Design review'); await wait(1);
+      await tap(find.text('Does not repeat'), 'Repeat'); await tap(find.text('Every weekday (Mon–Fri)').last, 'every weekday');
+      await tap(find.text('Send'), 'Send'); await wait(4);
+      await tap(find.text('List'), 'List view');
+      expectFound(await waitFor(find.text('Design review'), secs: 20), 'meeting in the calendar');
+      await tap(find.text('Design review').first, 'open meeting');
+      expectFound(await waitFor(find.textContaining('repeats weekdays'), secs: 10), 'repeats every weekday');
+      await tap(find.text('Cancel meeting'), 'Cancel meeting'); await tap(find.text('This occurrence'), 'this occurrence');
+      await tap(find.widgetWithText(FilledButton, 'Cancel meeting'), 'confirm cancel'); await wait(4);
+      await shot('calendar-cancel-occurrence');
+    });
+    await step('Team settings open for the owner', () async {
+      await home(); await tap(find.text('Teams'), 'Teams tab');
+      if (find.text('Optical').evaluate().isEmpty) return;      // no team yet in this run: covered by the server test
+      await tap(find.text('Optical').first, 'team'); await tap(find.byType(PopupMenuButton<String>).first, 'team menu'); await tap(find.text('Team settings'), 'Team settings');
+      expectFound(await waitFor(find.text('Members can create channels'), secs: 10), 'member permissions');
+      await t.pageBack(); await wait(1);
+    });
     String? recoveryKey;
     await step('Set up encrypted key backup', () async {
       await home(); await openApp('Security and devices');

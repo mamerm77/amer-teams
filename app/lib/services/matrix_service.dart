@@ -191,27 +191,71 @@ class MatrixService extends ChangeNotifier {
   }
 
   // ---------- Meetings: encrypted timeline events, aggregated into the calendar ----------
-  Future<void> sendMeeting(Room room, {required String title, required DateTime start, required int minutes, String? txid}) =>
+  /// A meeting (docs/CALENDAR.md): an encrypted event in a chat. Changes are separate events
+  /// (`com.amerteams.meeting.update`) for the whole series or one occurrence: reschedule, rename, cancel. The newest
+  /// change wins. RSVPs (`com.amerteams.meeting.rsvp`) are per person, for one occurrence or the series.
+  Future<void> sendMeeting(Room room, {required String title, required DateTime start, required int minutes, String? txid,
+      String recurrence = 'none', List<String> optional = const [], String showAs = 'busy', String description = ''}) =>
       room.sendEvent({'meeting_id': txid ?? DateTime.now().microsecondsSinceEpoch.toRadixString(36), 'title': title,
-          'start': start.toUtc().toIso8601String(), 'duration_min': minutes, 'body': '📅 $title'}, type: 'com.amerteams.meeting', txid: txid);
+          'start': start.toUtc().toIso8601String(), 'duration_min': minutes, 'recurrence': recurrence, if (optional.isNotEmpty) 'optional': optional,
+          'show_as': showAs, if (description.isNotEmpty) 'description': description, 'body': '📅 $title'}, type: kMeeting, txid: txid);
+
+  static const kMeeting = 'com.amerteams.meeting', kMeetingUpdate = 'com.amerteams.meeting.update', kRsvp = 'com.amerteams.meeting.rsvp';
+
+  /// Organiser: change or cancel the series, or one occurrence ([occurrence] = its original start).
+  Future<void> updateMeeting(Room room, String meetingId, {DateTime? occurrence, String? title, DateTime? start, int? minutes, bool cancel = false}) =>
+      room.sendEvent({'meeting_id': meetingId, 'scope': occurrence == null ? 'series' : 'occurrence', if (occurrence != null) 'occurrence': occurrence.toUtc().toIso8601String(),
+        if (title != null) 'title': title, if (start != null) 'start': start.toUtc().toIso8601String(), if (minutes != null) 'duration_min': minutes, if (cancel) 'cancelled': true,
+        'body': cancel ? '🚫 Meeting cancelled${occurrence != null ? ' (one occurrence)' : ''}' : '✏️ Meeting updated'}, type: kMeetingUpdate);
+
+  /// Accept / tentative / decline, optionally with a note, for one occurrence or the whole series.
+  Future<void> rsvp(Room room, String meetingId, String response, {DateTime? occurrence, String note = ''}) async {
+    await room.sendEvent({'meeting_id': meetingId, 'response': response, if (occurrence != null) 'occurrence': occurrence.toUtc().toIso8601String(), if (note.isNotEmpty) 'note': note,
+      'body': '${{'yes': '✅ Accepted', 'maybe': '❔ Tentative', 'no': '❌ Declined'}[response]}${note.isEmpty ? '' : ': $note'}'}, type: kRsvp);
+  }
+
+  static DateTime _next(DateTime t, String rec) => switch (rec) {
+    'daily' => t.add(const Duration(days: 1)),
+    'weekdays' => t.add(Duration(days: t.weekday == DateTime.friday ? 3 : t.weekday == DateTime.saturday ? 2 : 1)),
+    'weekly' => t.add(const Duration(days: 7)), 'monthly' => DateTime(t.year, t.month + 1, t.day, t.hour, t.minute), _ => DateTime(9999) };
 
   Future<List<Meeting>> meetings() async {
-    final out = <Meeting>[];
+    final out = <Meeting>[]; final horizon = DateTime.now().add(const Duration(days: 120)); final me = userId;
     for (final r in chats) {
-      final tl = await r.getTimeline();
-      for (final e in tl.events.where((e) => e.type == 'com.amerteams.meeting')) {
-        final st = DateTime.tryParse(e.content['start'] as String? ?? '');
-        if (st == null) continue;
-        final title = e.content['title'] as String? ?? 'Meeting', mins = (e.content['duration_min'] as num?)?.toInt() ?? 30;
+      final tl = await r.getTimeline(limit: 2000);
+      final evs = tl.events.toList(); tl.cancelSubscriptions();
+      final updates = evs.where((e) => e.type == kMeetingUpdate).toList()..sort((a, b) => a.originServerTs.compareTo(b.originServerTs));
+      final rsvps = evs.where((e) => e.type == kRsvp).toList()..sort((a, b) => a.originServerTs.compareTo(b.originServerTs));
+      for (final e in evs.where((e) => e.type == kMeeting)) {
+        final id = '${e.content['meeting_id'] ?? e.eventId}';
+        var title = e.content['title'] as String? ?? 'Meeting'; var mins = (e.content['duration_min'] as num?)?.toInt() ?? 30;
+        var st = DateTime.tryParse(e.content['start'] as String? ?? ''); if (st == null) continue;
+        var cancelled = false;
+        final occ = <String, Event>{};                                     // occurrence (original start, UTC ISO) -> newest change
+        for (final u in updates.where((u) => u.content['meeting_id'] == id && u.senderId == e.senderId)) {   // only the organiser can change it
+          if (u.content['scope'] == 'occurrence') { occ['${u.content['occurrence']}'] = u; continue; }
+          if (u.content['cancelled'] == true) cancelled = true;
+          title = u.content['title'] as String? ?? title; mins = (u.content['duration_min'] as num?)?.toInt() ?? mins;
+          st = DateTime.tryParse(u.content['start'] as String? ?? '') ?? st;
+        }
+        if (cancelled) continue;
         final rec = e.content['recurrence'] as String? ?? 'none';
-        var t = st.toLocal(); final horizon = DateTime.now().add(const Duration(days: 60));
-        for (var n = 0; n < (rec == 'none' ? 1 : 30) && t.isBefore(horizon); n++) {      // expand repeats for the next 60 days
-          out.add(Meeting(rec == 'none' ? title : '$title ↻', t, mins, r));
-          t = switch (rec) { 'daily' => t.add(const Duration(days: 1)), 'weekly' => t.add(const Duration(days: 7)),
-              'monthly' => DateTime(t.year, t.month + 1, t.day, t.hour, t.minute), _ => horizon };
+        var t = st!.toUtc();
+        for (var n = 0; n < (rec == 'none' ? 1 : 200) && t.toLocal().isBefore(horizon); n++, t = _next(t, rec).toUtc()) {
+          final key = t.toIso8601String(); final ch = occ[key];
+          if (ch?.content['cancelled'] == true) continue;
+          final start = DateTime.tryParse(ch?.content['start'] as String? ?? '') ?? t;
+          String? my; String note = ''; final responses = <String, String>{};
+          for (final x in rsvps.where((x) => x.content['meeting_id'] == id && (x.content['occurrence'] == null || x.content['occurrence'] == key))) {
+            responses[x.senderId] = '${x.content['response']}';
+            if (x.senderId == me) { my = '${x.content['response']}'; note = '${x.content['note'] ?? ''}'; }
+          }
+          out.add(Meeting(ch?.content['title'] as String? ?? title, start.toLocal(), (ch?.content['duration_min'] as num?)?.toInt() ?? mins, r,
+            id: id, occurrence: rec == 'none' ? null : t, organiser: e.senderId, recurrence: rec, myResponse: my, myNote: note, responses: responses,
+            optional: ((e.content['optional'] as List?) ?? const []).map((x) => '$x').toList(), showAs: '${e.content['show_as'] ?? 'busy'}',
+            description: '${e.content['description'] ?? ''}', changed: ch != null));
         }
       }
-      tl.cancelSubscriptions();
     }
     out.sort((a, b) => a.start.compareTo(b.start));
     return out;
@@ -224,6 +268,11 @@ class MatrixService extends ChangeNotifier {
 }
 
 class Meeting {
-  Meeting(this.title, this.start, this.minutes, this.room);
+  Meeting(this.title, this.start, this.minutes, this.room, {this.id = '', this.occurrence, this.organiser = '', this.recurrence = 'none', this.myResponse, this.myNote = '',
+      this.responses = const {}, this.optional = const [], this.showAs = 'busy', this.description = '', this.changed = false});
   final String title; final DateTime start; final int minutes; final Room room;
+  final String id, organiser, recurrence, myNote, showAs, description; final DateTime? occurrence; final String? myResponse;
+  final Map<String, String> responses; final List<String> optional; final bool changed;
+  bool get repeats => recurrence != 'none';
+  bool isOrganiser(String me) => organiser == me;
 }

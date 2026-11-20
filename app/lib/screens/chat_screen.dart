@@ -985,9 +985,10 @@ class _S extends State<ChatScreen> {
       final st = DateTime.tryParse(e.content['start'] as String? ?? '')?.toLocal();
       final rsvps = <String, String>{};
       for (final x in (tl?.events ?? []).reversed) {
-        if (x.type == 'com.amerteams.meeting.rsvp' && x.content['meeting_id'] == (id ?? e.eventId)) rsvps[x.senderId] = x.content['response'] as String? ?? '';
+        if (x.type == 'com.amerteams.meeting.rsvp' && x.content['meeting_id'] == (id ?? e.eventId) && x.content['occurrence'] == null) rsvps[x.senderId] = x.content['response'] as String? ?? '';
       }
       final count = (String k) => rsvps.values.where((v) => v == k).length;
+      final cancelled = (tl?.events ?? []).any((x) => x.type == 'com.amerteams.meeting.update' && x.content['meeting_id'] == (id ?? e.eventId) && x.content['scope'] == 'series' && x.content['cancelled'] == true && x.senderId == e.senderId);
       Widget rsvp(String k, String label, IconData i) => ChoiceChip(avatar: Icon(i, size: 16), label: Text('$label ${count(k)}'), selected: rsvps[me] == k,
           onSelected: (_) => room.sendEvent({'meeting_id': id ?? e.eventId, 'response': k, 'body': '${{'yes': '✅', 'maybe': '❔', 'no': '❌'}[k]} $label'}, type: 'com.amerteams.meeting.rsvp'));
       return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: Column(children: [ListTile(leading: const Icon(Icons.event),
@@ -996,7 +997,8 @@ class _S extends State<ChatScreen> {
         isThreeLine: id != null,
         trailing: FilledButton(child: Text(L.t(context, 'Join')), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: id != null))))),
         Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 10), child: Wrap(spacing: 6, children: [
-          rsvp('yes', 'Accept', Icons.check), rsvp('maybe', 'Maybe', Icons.help_outline), rsvp('no', 'Decline', Icons.close)])),
+          if (cancelled) Chip(avatar: const Icon(Icons.event_busy, size: 16, color: Colors.red), label: const Text('Cancelled by the organiser'))
+          else ...[rsvp('yes', 'Accept', Icons.check), rsvp('maybe', 'Tentative', Icons.help_outline), rsvp('no', 'Decline', Icons.close)]])),
       ]));
     }
     if (e.type == PollEventContent.startType && tl != null) {
