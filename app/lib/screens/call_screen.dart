@@ -48,7 +48,7 @@ enum _Panel { none, people, chat }
 class _S extends State<CallScreen> {
   SecureCall? call; String? err;
   CallController? ctl; bool _closing = false; CallManager? cm;
-  bool mic = true, cam = true, sharing = false, captions = false, amerNotes = false, myHand = false, grid = true, front = true;
+  bool mic = true, cam = true, sharing = false, captions = false, amerNotes = false, myHand = false, grid = true, front = true, together = false;
   _Panel panel = _Panel.none;
   final hands = <String>{}; final floating = <(String, String, DateTime)>[];
   final stt = SpeechToText(); final transcript = StringBuffer(); String liveCaption = '';
@@ -883,6 +883,7 @@ class _S extends State<CallScreen> {
               case 'net': _netDialog();
               case 'end': _host('end');
               case 'interp': _interpreter();
+              case 'together': setState(() => together = !together);
               case 'annotate': setState(() => annotating = true);
               case 'options': Navigator.push(context, MaterialPageRoute(builder: (_) => MeetingOptionsScreen(roomId: widget.roomId))).then((_) => setState(() {}));
             }
@@ -904,6 +905,7 @@ class _S extends State<CallScreen> {
             if (isHost && widget.meeting) const PopupMenuItem(value: 'webinarreg', child: ListTile(leading: Icon(Icons.how_to_reg), title: Text('Webinar registration page'))),
             PopupMenuItem(value: 'net', child: ListTile(leading: Icon(net == 'normal' ? Icons.network_check : Icons.signal_cellular_connected_no_internet_4_bar), title: Text('Network: ${{'normal': 'full quality', 'saver': 'data saver', 'audio': 'audio only'}[net]}${netAutoSwitched ? ' (automatic)' : ''}'))),
             PopupMenuItem(value: 'tcap', child: ListTile(leading: const Icon(Icons.translate), title: Text(capLang == null ? 'Translated captions' : 'Captions in $capLang'))),
+            PopupMenuItem(value: 'together', child: ListTile(leading: const Icon(Icons.theaters_outlined), title: Text(together ? 'Leave Together mode' : 'Together mode'))),
             const PopupMenuItem(value: 'annotate', child: ListTile(leading: Icon(Icons.draw_outlined), title: Text('Annotate the shared screen'))),
             PopupMenuItem(value: 'interp', child: ListTile(leading: const Icon(Icons.record_voice_over), title: Text(speakTr ? 'Interpreter: on' : 'Interpreter (hear others in your language)'))),
             if (widget.meeting && meetingOptionsOf(room)['qa'] != false) const PopupMenuItem(value: 'qa', child: ListTile(leading: Icon(Icons.question_answer), title: Text('Q&A'))),
@@ -1003,6 +1005,22 @@ class _S extends State<CallScreen> {
   // ---- annotation on a shared screen ----
   bool annotating = false; Color annColour = Colors.red; final strokes = <(List<Offset>, Color)>[]; List<Offset>? _stroke; Size _annSize = const Size(1, 1);
   Offset _norm(Offset o) => Offset((o.dx / _annSize.width).clamp(0, 1), (o.dy / _annSize.height).clamp(0, 1));
+  /// Together mode (Teams): everyone seated in one shared auditorium scene, each video cut out as a seat. A local view; nobody else's layout changes.
+  Widget _together(List<Participant> people) {
+    final perRow = people.length <= 4 ? people.length : people.length <= 9 ? 3 : 5;
+    final rows = <List<Participant>>[for (var i = 0; i < people.length; i += perRow) people.sublist(i, (i + perRow).clamp(0, people.length))];
+    return Container(margin: const EdgeInsets.all(8), decoration: BoxDecoration(borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF2B2F4A), Color(0xFF5B4A3A)])),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        for (var r = 0; r < rows.length; r++) Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 24.0 + r * 12), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          for (final p in rows[r]) Expanded(child: Padding(padding: const EdgeInsets.all(6), child: Column(children: [
+            Expanded(child: AspectRatio(aspectRatio: 1, child: ClipOval(child: _tile(p)))),
+            Container(height: 10, decoration: BoxDecoration(color: const Color(0xFF8B6B4A), borderRadius: BorderRadius.circular(4))),   // the seat back
+          ]))),
+        ]))),
+      ]));
+  }
+
   bool _sharing(Participant p) => p.videoTrackPublications.any((x) => x.source == TrackSource.screenShareVideo && !x.muted);
 
   Widget _videos(List<Participant> people, bool wide) {
@@ -1029,6 +1047,7 @@ class _S extends State<CallScreen> {
           children: [for (final p in people.where((p) => p != main)) Padding(padding: const EdgeInsets.only(right: 8), child: SizedBox(width: 150, child: _tile(p)))])),
       ]);
     }
+    if (together && people.length > 1) return _together(people);
     final n = people.length; final cols = n <= 1 ? 1 : n <= 4 ? 2 : wide ? 4 : 3;
     return GridView.count(crossAxisCount: cols, padding: const EdgeInsets.all(8), mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 16 / 11,
         children: [for (final p in people) _tile(p)]);
