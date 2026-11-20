@@ -233,10 +233,10 @@ class MatrixService extends ChangeNotifier {
   /// (`com.amerteams.meeting.update`) for the whole series or one occurrence: reschedule, rename, cancel. The newest
   /// change wins. RSVPs (`com.amerteams.meeting.rsvp`) are per person, for one occurrence or the series.
   Future<void> sendMeeting(Room room, {required String title, required DateTime start, required int minutes, String? txid,
-      String recurrence = 'none', List<String> optional = const [], String showAs = 'busy', String description = ''}) =>
+      String recurrence = 'none', List<String> optional = const [], String showAs = 'busy', String description = '', String category = ''}) =>
       room.sendEvent({'meeting_id': txid ?? DateTime.now().microsecondsSinceEpoch.toRadixString(36), 'title': title,
           'start': start.toUtc().toIso8601String(), 'duration_min': minutes, 'recurrence': recurrence, if (optional.isNotEmpty) 'optional': optional,
-          'show_as': showAs, if (description.isNotEmpty) 'description': description, 'body': '📅 $title'}, type: kMeeting, txid: txid);
+          'show_as': showAs, if (description.isNotEmpty) 'description': description, if (category.isNotEmpty) 'category': category, 'body': '📅 $title'}, type: kMeeting, txid: txid);
 
   static const kMeeting = 'com.amerteams.meeting', kMeetingUpdate = 'com.amerteams.meeting.update', kRsvp = 'com.amerteams.meeting.rsvp';
 
@@ -291,7 +291,7 @@ class MatrixService extends ChangeNotifier {
           out.add(Meeting(ch?.content['title'] as String? ?? title, start.toLocal(), (ch?.content['duration_min'] as num?)?.toInt() ?? mins, r,
             id: id, occurrence: rec == 'none' ? null : t, organiser: e.senderId, recurrence: rec, myResponse: my, myNote: note, responses: responses,
             optional: ((e.content['optional'] as List?) ?? const []).map((x) => '$x').toList(), showAs: '${e.content['show_as'] ?? 'busy'}',
-            description: '${e.content['description'] ?? ''}', changed: ch != null));
+            description: '${e.content['description'] ?? ''}', category: '${e.content['category'] ?? ''}', changed: ch != null));
         }
       }
     }
@@ -307,9 +307,9 @@ class MatrixService extends ChangeNotifier {
 
 class Meeting {
   Meeting(this.title, this.start, this.minutes, this.room, {this.id = '', this.occurrence, this.organiser = '', this.recurrence = 'none', this.myResponse, this.myNote = '',
-      this.responses = const {}, this.optional = const [], this.showAs = 'busy', this.description = '', this.changed = false});
+      this.responses = const {}, this.optional = const [], this.showAs = 'busy', this.description = '', this.category = '', this.changed = false});
   final String title; final DateTime start; final int minutes; final Room room;
-  final String id, organiser, recurrence, myNote, showAs, description; final DateTime? occurrence; final String? myResponse;
+  final String id, organiser, recurrence, myNote, showAs, description, category; final DateTime? occurrence; final String? myResponse;
   final Map<String, String> responses; final List<String> optional; final bool changed;
   bool get repeats => recurrence != 'none';
   bool isOrganiser(String me) => organiser == me;

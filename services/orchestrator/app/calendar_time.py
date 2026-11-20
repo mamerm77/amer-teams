@@ -157,3 +157,22 @@ async def find_time(req: FindReq, user=Depends(auth.matrix_user)):
     slots = find_slots(ordered, req.duration_min, s, e)
     await db.audit(user["user_id"], "calendar.find_time", f"invitees={len(people) - 1} missing={len(people) - len(ordered)} slots={len(slots)}")
     return {"slots": slots, "considered": list(ordered), "no_calendar": [u for u in people if u not in fbs]}
+
+
+class Zones(BaseModel):
+    users: list[str] = Field(default=[], max_length=300)
+    at: str | None = None                     # optional ISO time: also return each person's local time then
+
+@router.post("/v1/calendar/timezones")
+async def timezones(req: Zones, user=Depends(auth.matrix_user)):
+    """Each attendee's time zone, as their own app published it with their working hours (Teams shows attendees'
+    local times when scheduling). People who have not published one are left out."""
+    async with db.pool.connection() as c:
+        rows = await (await c.execute("SELECT user_id, data->>'tz' FROM calendar_freebusy WHERE user_id = ANY(%s)", (req.users,))).fetchall()
+    t = _parse(req.at) if req.at else None
+    out = {}
+    for u, tz in rows:
+        if not tz: continue
+        try: out[u] = {"tz": tz, **({"local": t.astimezone(ZoneInfo(tz)).strftime("%a %H:%M")} if t else {})}
+        except Exception: continue
+    return out

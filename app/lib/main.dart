@@ -20,6 +20,7 @@ final navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  navigatorKeyForVerification = navigatorKey;                  // the verification dialog reopens itself if something else closes it
   MediaKit.ensureInitialized();                                  // Stream video playback
   final matrix = MatrixService();
   await matrix.init();

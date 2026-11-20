@@ -109,6 +109,15 @@ class _S extends State<CalendarScreen> {
   List<Meeting> _on(List<Meeting> all, DateTime day) => all.where((m) => _d(m.start) == day).toList()..sort((a, b) => a.start.compareTo(b.start));
 
   static const _hour = 56.0;
+  final _gridScroll = ScrollController(initialScrollOffset: 56.0 * 7);
+  double get _gridTop { final b = _gridKey.currentContext?.findRenderObject() as RenderBox?; return b == null ? 0 : b.localToGlobal(Offset.zero).dy - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy; }
+  final _gridKey = GlobalKey();
+  Future<void> _move(BuildContext c, Meeting m, DateTime to) async {
+    if (to == m.start) return;
+    await context.read<MatrixService>().updateMeeting(m.room, m.id, occurrence: m.repeats ? m.occurrence : null, start: to);
+    await m.room.sendTextEvent('✏️ Moved: ${m.title.replaceAll(' ↻', '')} — now ${DateFormat('EEE d MMM, HH:mm').format(to)}');
+    _reload();
+  }
   Widget _grid(BuildContext c, List<Meeting> all) {
     final days = _days, now = DateTime.now(), cs = Theme.of(c).colorScheme;
     return Column(children: [
@@ -119,17 +128,29 @@ class _S extends State<CalendarScreen> {
           Text('${d.day}', style: TextStyle(fontSize: 20, fontWeight: _d(now) == d ? FontWeight.bold : FontWeight.normal, color: _d(now) == d ? cs.primary : null)),
         ]))))]),
       const Divider(height: 1),
-      Expanded(child: SingleChildScrollView(controller: ScrollController(initialScrollOffset: _hour * 7), child: SizedBox(height: _hour * 24, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: SingleChildScrollView(key: _gridKey, controller: _gridScroll, child: SizedBox(height: _hour * 24, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(width: 52, child: Stack(children: [for (var h = 1; h < 24; h++) Positioned(top: h * _hour - 7, right: 6, child: Text('${h.toString().padLeft(2, '0')}:00', style: const TextStyle(fontSize: 10)))])),
-        for (final d in days) Expanded(child: GestureDetector(
+        for (final d in days) Expanded(child: DragTarget<Meeting>(
+          // Drag a meeting you organise to a new time (Teams): snaps to 15 minutes; a repeating meeting moves one occurrence.
+          onWillAcceptWithDetails: (x) => x.data.isOrganiser(context.read<MatrixService>().userId),
+          onAcceptWithDetails: (x) {
+            final box = context.findRenderObject() as RenderBox?; if (box == null) return;
+            final y = (x.offset.dy - box.localToGlobal(Offset.zero).dy - _gridTop + _gridScroll.offset).clamp(0, _hour * 24 - 1);
+            final mins = ((y / _hour) * 4).round() * 15;
+            _move(c, x.data, d.add(Duration(minutes: mins)));
+          },
+          builder: (_, __, ___) => GestureDetector(
           onTapUp: (e) => _newManual(at: d.add(Duration(minutes: ((e.localPosition.dy / _hour) * 2).floor() * 30))),
           child: Container(decoration: BoxDecoration(border: Border(left: BorderSide(color: cs.outlineVariant))), child: Stack(children: [
             for (var h = 0; h < 24; h++) Positioned(top: h * _hour, left: 0, right: 0, child: Divider(height: 1, color: cs.outlineVariant.withValues(alpha: .5))),
             if (_d(now) == d) Positioned(top: (now.hour + now.minute / 60) * _hour, left: 0, right: 0, child: Container(height: 2, color: Colors.red)),
             for (final m in _on(all, d)) Positioned(
               top: (m.start.hour + m.start.minute / 60) * _hour + 1, left: 2, right: 2, height: (m.minutes / 60 * _hour).clamp(22, _hour * 24) - 2,
-              child: _block(c, m)),
-          ])))),
+              child: m.isOrganiser(context.read<MatrixService>().userId)
+                ? LongPressDraggable<Meeting>(data: m, feedback: Material(elevation: 6, borderRadius: BorderRadius.circular(6), child: SizedBox(width: 160, height: (m.minutes / 60 * _hour).clamp(22, 400).toDouble(), child: _block(c, m))),
+                    childWhenDragging: Opacity(opacity: .3, child: _block(c, m)), child: _block(c, m))
+                : _block(c, m)),
+          ]))))),
       ])))),
     ]);
   }
@@ -137,7 +158,8 @@ class _S extends State<CalendarScreen> {
   Widget _block(BuildContext c, Meeting m) {
     final cs = Theme.of(c).colorScheme;
     final declined = m.myResponse == 'no', tentative = m.myResponse == 'maybe' || m.showAs == 'tentative';
-    return Opacity(opacity: declined ? .45 : 1, child: Material(color: tentative ? cs.primaryContainer.withValues(alpha: .45) : m.showAs == 'free' ? cs.surfaceContainerHigh : cs.primaryContainer, borderRadius: BorderRadius.circular(6), child: InkWell(borderRadius: BorderRadius.circular(6), onTap: () => _details(c, m),
+    final cat = kCategories[m.category];
+    return Opacity(opacity: declined ? .45 : 1, child: Material(color: cat != null ? cat.withValues(alpha: tentative ? .18 : .32) : tentative ? cs.primaryContainer.withValues(alpha: .45) : m.showAs == 'free' ? cs.surfaceContainerHigh : cs.primaryContainer, borderRadius: BorderRadius.circular(6), child: InkWell(borderRadius: BorderRadius.circular(6), onTap: () => _details(c, m),
       child: Container(padding: const EdgeInsets.fromLTRB(6, 3, 4, 2), decoration: BoxDecoration(border: Border(left: BorderSide(color: cs.primary, width: 3))),
         child: Text('${m.title}\n${DateFormat('HH:mm').format(m.start)} · ${m.room.getLocalizedDisplayname()}', overflow: TextOverflow.fade, style: TextStyle(fontSize: 11, color: cs.onPrimaryContainer, decoration: declined ? TextDecoration.lineThrough : null))))));
   }
@@ -185,7 +207,17 @@ class _S extends State<CalendarScreen> {
       Text('${DateFormat('EEEE d MMMM y').format(m.start)} · ${DateFormat('HH:mm').format(m.start)}–${DateFormat('HH:mm').format(m.start.add(Duration(minutes: m.minutes)))}${m.repeats ? ' · repeats ${m.recurrence}' : ''}${m.changed ? ' · this occurrence was changed' : ''}'),
       Text('In ${m.room.getLocalizedDisplayname()} · organiser ${org ? 'you' : name(m.organiser)} · shows as ${m.showAs}'),
       if (m.optional.isNotEmpty) Text('Optional: ${m.optional.map(name).join(', ')}'),
+      if (m.category.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Row(children: [Icon(Icons.circle, size: 12, color: kCategories[m.category]), const SizedBox(width: 6), Text(m.category)])),
       if (m.description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text(m.description)),
+      FutureBuilder<Map<String, dynamic>>(   // attendees in other time zones: their local time for this meeting (Teams shows this when scheduling)
+        future: context.read<ApiService>().postMap('/v1/calendar/timezones', {'users': [for (final u in m.room.getParticipants()) u.id], 'at': m.start.toUtc().toIso8601String()}),
+        builder: (_, z) {
+          final mine = DateTime.now().timeZoneName;
+          final other = (z.data ?? const {}).entries.where((e) => e.value is Map && '${(e.value as Map)['local']}' != DateFormat('EEE HH:mm').format(m.start)).toList();
+          if (other.isEmpty) return const SizedBox.shrink();
+          return Padding(padding: const EdgeInsets.only(top: 8), child: Text('Local times: ${other.map((e) => '${name(e.key)} ${(e.value as Map)['local']} (${'${(e.value as Map)['tz']}'.split('/').last.replaceAll('_', ' ')})').join(' · ')} · yours is $mine',
+            style: Theme.of(c).textTheme.bodySmall));
+        }),
       const SizedBox(height: 8),
       Text('Accepted ${count['yes']} · Tentative ${count['maybe']} · Declined ${count['no']} · No response ${(m.room.summary.mJoinedMemberCount ?? 1) - m.responses.length}', style: Theme.of(c).textTheme.bodySmall),
       for (final e in m.responses.entries) Text('  ${name(e.key)}: ${{'yes': 'accepted', 'maybe': 'tentative', 'no': 'declined'}[e.value]}', style: Theme.of(c).textTheme.bodySmall),
@@ -270,7 +302,7 @@ class _S extends State<CalendarScreen> {
     final mx = context.read<MatrixService>(); final rooms = mx.chats; if (rooms.isEmpty) return;
     final title = TextEditingController(); var room = rooms.first;
     var start = at ?? DateTime.now().add(Duration(minutes: 30 - DateTime.now().minute % 30)); var minutes = 30;
-    var repeat = 'none', showAs = 'busy'; final optional = <String>{}; final desc = TextEditingController();
+    var repeat = 'none', showAs = 'busy', category = ''; final optional = <String>{}; final desc = TextEditingController();
     final ok = await showDialog<bool>(context: context, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(
       title: const Text('New meeting'),
       content: SizedBox(width: 420, child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -304,12 +336,20 @@ class _S extends State<CalendarScreen> {
             FilterChip(label: Text(u.calcDisplayname()), selected: optional.contains(u.id), onSelected: (v) => set(() => v ? optional.add(u.id) : optional.remove(u.id))),
         ])),
         TextField(controller: desc, maxLines: 3, decoration: const InputDecoration(labelText: 'Details (agenda, links)')),
+        DropdownButtonFormField<String>(value: category, decoration: const InputDecoration(labelText: 'Category'), items: [
+          const DropdownMenuItem(value: '', child: Text('None')),
+          for (final e in kCategories.entries) DropdownMenuItem(value: e.key, child: Row(children: [Icon(Icons.circle, size: 12, color: e.value), const SizedBox(width: 6), Text(e.key)]))],
+          onChanged: (v) => set(() => category = v ?? '')),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: Text(L.t(context, 'Cancel'))), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Send'))])));
     if (ok != true || title.text.trim().isEmpty) return;
-    await mx.sendMeeting(room, title: title.text.trim(), start: start, minutes: minutes, recurrence: repeat, optional: optional.toList(), showAs: showAs, description: desc.text.trim());
+    await mx.sendMeeting(room, title: title.text.trim(), start: start, minutes: minutes, recurrence: repeat, optional: optional.toList(), showAs: showAs, description: desc.text.trim(), category: category);
     _reload();
   }
 }
 
 enum CalView { day, workWeek, week, month, list }
+
+/// Teams' colour categories (Outlook names), shown as the meeting block's colour.
+const kCategories = {'Red category': Colors.red, 'Orange category': Colors.orange, 'Yellow category': Colors.amber, 'Green category': Colors.green,
+  'Blue category': Colors.blue, 'Purple category': Colors.purple};

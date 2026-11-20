@@ -12,7 +12,7 @@ const kMeetingSettings = 'com.amerteams.meeting.settings';
 Map<String, Object?> meetingOptionsOf(Room r) => Map<String, Object?>.from(r.getState(kMeetingSettings)?.content ?? {});
 bool optAllowMic(Room r, String me) => meetingOptionsOf(r)['allow_mic'] != false || r.getPowerLevelByUserId(me).level >= 50 || isPresenter(r, me);
 bool optAllowCamera(Room r, String me) => meetingOptionsOf(r)['allow_camera'] != false || r.getPowerLevelByUserId(me).level >= 50 || isPresenter(r, me);
-bool optChat(Room r, String me) { final v = meetingOptionsOf(r)['chat'] ?? 'on'; return v == 'on' || (v == 'organisers' && r.getPowerLevelByUserId(me).level >= 50); }
+bool optChat(Room r, String me) { final v = meetingOptionsOf(r)['chat'] ?? 'on'; return v == 'on' || v == 'during' || r.getPowerLevelByUserId(me).level >= 50; }   // in a meeting: 'during' is open
 bool optReactions(Room r) => meetingOptionsOf(r)['reactions'] != false;
 bool isPresenter(Room r, String me) => ((meetingOptionsOf(r)['presenters'] as List?) ?? const []).contains(me);
 
@@ -74,7 +74,7 @@ class _S extends State<MeetingOptionsScreen> {
         const _H('Attendees'),
         _switch('allow_mic', 'Allow mic for attendees', 'When off, only organisers and presenters can unmute'),
         _switch('allow_camera', 'Allow camera for attendees', 'When off, only organisers and presenters can turn on video'),
-        _choice('chat', 'Meeting chat', 'Messages in the meeting', const [('on', 'On'), ('organisers', 'Only organisers can send'), ('off', 'Off')], 'on'),
+        _choice('chat', 'Meeting chat', 'Who can send in this chat\'s meeting chat. Enforced by the app', const [('on', 'Anytime'), ('during', 'During the meeting only'), ('organisers', 'Only organisers can send'), ('off', 'Off')], 'on'),
         _switch('reactions', 'Allow reactions', 'Live emoji reactions during the meeting'),
         _switch('qa', 'Q&A', 'Attendees can ask questions; organisers mark them answered'),
         SwitchListTile(title: const Text('Hide attendee names'), subtitle: const Text('Attendees see each other as "Attendee"; organisers and presenters still see names'),

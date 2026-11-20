@@ -114,7 +114,7 @@ class _S extends State<ChatScreen> {
       _markRead(); setState(() {});
     });
   }
-  @override void dispose() { if (widget.threadRootId == null && !widget.filesOnly && editing == null) Drafts.instance.set(room.id, input.text); tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) _safeTyping(false); outbox.dispose(); _rec.dispose(); _player.dispose(); super.dispose(); }
+  @override void dispose() { _liveTimer?.cancel(); if (widget.threadRootId == null && !widget.filesOnly && editing == null) Drafts.instance.set(room.id, input.text); tl?.cancelSubscriptions(); typingOff?.cancel(); if (typing) _safeTyping(false); outbox.dispose(); _rec.dispose(); _player.dispose(); super.dispose(); }
 
   // ---------- voice messages ----------
   Future<void> _toggleRecord() async {
@@ -501,6 +501,19 @@ class _S extends State<ChatScreen> {
           trailing: Text(dur(p['seconds'] as num)))]),
     ])));
   }
+  // Meeting option "Meeting chat: during the meeting only" (Teams): outside a live meeting only organisers can send.
+  bool? _meetingLive; Timer? _liveTimer;
+  bool get _chatClosed {
+    final v = meetingOptionsOf(room)['chat'] ?? 'on';
+    if (room.getPowerLevelByUserId(me).level >= 50 || v == 'on') return false;
+    if (v == 'off' || v == 'organisers') return true;
+    _liveTimer ??= Timer.periodic(const Duration(seconds: 30), (_) => _checkLive()); if (_meetingLive == null) _checkLive();
+    return _meetingLive != true;
+  }
+  Future<void> _checkLive() async {
+    try { final r = await context.read<ApiService>().getMap('/v1/meetings/presence?room_id=${Uri.encodeQueryComponent(room.id)}&call_id=${Uri.encodeQueryComponent('meet-${room.id}')}');
+      if (mounted) setState(() => _meetingLive = ((r['count'] as num?) ?? 0) > 0); } catch (_) {}
+  }
   final selected = <String>{};
   /// Enter key: send (default) or new line, as in Teams' compose settings; kept in account data.
   bool get enterSends => room.client.accountData['com.amerteams.compose']?.content['enter_sends'] != false;
@@ -778,7 +791,9 @@ class _S extends State<ChatScreen> {
           Text('${selected.length} selected · tap messages to add or remove'), const Spacer(),
           FilledButton.icon(icon: const Icon(Icons.shortcut), label: const Text('Forward'), onPressed: () => _forwardMany([for (final e in tl?.events ?? const <Event>[]) if (selected.contains(e.eventId)) e])),
           const SizedBox(width: 8)])),
-        if (widget.filesOnly) const SizedBox.shrink() else
+        if (widget.filesOnly) const SizedBox.shrink() else if (widget.threadRootId == null && _chatClosed) SafeArea(child: Padding(padding: const EdgeInsets.all(14), child: Row(children: [
+          const Icon(Icons.lock_clock_outlined, size: 18), const SizedBox(width: 8),
+          Expanded(child: Text((meetingOptionsOf(room)['chat'] ?? 'on') == 'during' ? 'The organiser set this chat to open during the meeting only. It opens when the meeting starts.' : 'The organiser has limited who can send in this chat (Meeting options).'))]))) else
         SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: _recStart != null
           ? Row(children: [
               IconButton(tooltip: 'Cancel', icon: const Icon(Icons.delete_outline), onPressed: _cancelRecord),

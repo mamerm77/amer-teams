@@ -171,15 +171,28 @@ class _S extends State<SecurityScreen> {
   }
 }
 
-/// Emoji verification dialog, used for both directions.
-Future<void> showVerification(BuildContext context, KeyVerification v) async {
+/// Emoji verification dialog, used for both directions. If something else closes it while the verification is still
+/// running (a route change, a rebuild), it opens again, so the person can always finish or cancel it themselves.
+Future<void> showVerification(BuildContext context, KeyVerification v, {int reopened = 0}) async {
+  var closedByUser = false;
+  await _verificationDialog(context, v, () => closedByUser = true);
+  final running = !{KeyVerificationState.done, KeyVerificationState.error}.contains(v.state);
+  debugPrint('VERIFY dialog closed: state=${v.state.name} byUser=$closedByUser reopened=$reopened\n${StackTrace.current.toString().split('\n').take(8).join('\n')}');
+  if (!closedByUser && reopened < 5) {
+    final ctx = navigatorKeyForVerification?.currentContext ?? (context.mounted ? context : null);
+    if (ctx != null && (running || v.state == KeyVerificationState.done)) await showVerification(ctx, v, reopened: reopened + 1);
+  }
+}
+GlobalKey<NavigatorState>? navigatorKeyForVerification;
+
+Future<void> _verificationDialog(BuildContext context, KeyVerification v, void Function() userClosed) async {
   await showDialog(context: context, barrierDismissible: false, builder: (d) => StatefulBuilder(builder: (d, set) {
     v.onUpdate = () {
       // diagnostics for the in-use test: the inputs both devices must agree on (no secrets)
       debugPrint('VERIFY state=${v.state.name} txid=${v.transactionId} other=${v.userId}/${v.deviceId} started_by_me=${v.startedVerification} last=${v.lastStep}');
       if (d.mounted) set(() {});
     };
-    final close = () => Navigator.of(d).pop();
+    final close = () { userClosed(); Navigator.of(d).pop(); };
     Widget body; List<Widget> actions;
     switch (v.state) {
       case KeyVerificationState.askAccept:
