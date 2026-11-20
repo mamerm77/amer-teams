@@ -31,6 +31,14 @@ def _check_commitment(self, key):
     return self.commitment in (base64.b64encode(d).decode().rstrip("="), d.hex())
 Sas._check_commitment = _check_commitment
 
+# matrix-nio on vodozemac: `bytes(info).emoji_indices` already returns the 7 spec indices (0-63), but nio re-reads them
+# as raw bytes and re-slices them into 6-bit groups, so it shows the wrong emoji against every spec-compliant client.
+def _generate_emoji(self, extra_info):
+    idx = list(self.established_sas.bytes(extra_info).emoji_indices)
+    if len(idx) != 7: raise ValueError(f"unexpected emoji indices {idx}")
+    return [self.emoji[i] for i in idx]
+Sas._generate_emoji = _generate_emoji
+
 HS = os.getenv("HS", "http://localhost"); SERVER = os.getenv("SERVER_NAME", "amer.test")
 ME = f"@moh:{SERVER}"; OUT = os.getenv("OUT", "moh2.json")
 state = {"stage": "start", "emoji": [], "verified": False}
