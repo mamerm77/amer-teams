@@ -456,6 +456,40 @@ class _S extends State<ChatScreen> {
       Text(r['answer']), const SizedBox(height: 8), Text(g.where, style: const TextStyle(fontSize: 12))]))));
   }
 
+  final selected = <String>{};
+  /// Enter key: send (default) or new line, as in Teams' compose settings; kept in account data.
+  bool get enterSends => room.client.accountData['com.amerteams.compose']?.content['enter_sends'] != false;
+  Future<void> _toggleEnter() async { await room.client.setAccountData(room.client.userID!, 'com.amerteams.compose', {'enter_sends': !enterSends}); if (mounted) setState(() {}); }
+  /// Forward one or several messages (Teams forwards up to five at once; here up to 20), in their original order.
+  Future<void> _forwardMany(List<Event> evs) async {
+    final rooms = context.read<MatrixService>().chats;
+    final to = await showDialog<Room>(context: context, builder: (d) => SimpleDialog(title: Text(evs.length == 1 ? 'Forward to' : 'Forward ${evs.length} messages to'), children: [
+      for (final r in rooms) SimpleDialogOption(onPressed: () => Navigator.pop(d, r), child: Text(r.getLocalizedDisplayname()))]));
+    if (to == null) return;
+    var sent = 0;
+    for (final e in evs..sort((a, b) => a.originServerTs.compareTo(b.originServerTs))) {
+      final block = forwardBlock(e, to);
+      if (block != null) { _snack(block); continue; }
+      final content = Map<String, Object?>.from(e.content)..remove('m.relates_to')..remove('m.new_content');
+      final l = labelOfEvent(e); if (l != null) content[kLabelKey] = l;          // the label travels with it
+      await to.sendEvent(content, type: e.type == EventTypes.Encrypted ? EventTypes.Message : e.type);   // file keys travel inside, re-encrypted
+      sent++;
+    }
+    if (sent > 0) _snack(sent == 1 ? 'Forwarded to ${to.getLocalizedDisplayname()}' : 'Forwarded $sent messages to ${to.getLocalizedDisplayname()}');
+    if (mounted) setState(() => selected.clear());
+  }
+
+  /// Full-screen image viewer (lightbox): zoom, save, back to the conversation.
+  Future<void> _lightbox(Event e) async {
+    Navigator.push(context, MaterialPageRoute(fullscreenDialog: true, builder: (c) => Scaffold(backgroundColor: Colors.black,
+      appBar: AppBar(backgroundColor: Colors.black, foregroundColor: Colors.white, title: Text('${e.senderFromMemoryOrFallback.calcDisplayname()} · ${DateFormat('d MMM HH:mm').format(e.originServerTs)}', style: const TextStyle(fontSize: 14)),
+        actions: [IconButton(tooltip: 'Save', icon: const Icon(Icons.download), onPressed: () => download(e)),
+          IconButton(tooltip: 'Forward', icon: const Icon(Icons.shortcut), onPressed: () { Navigator.pop(c); _forwardMany([e]); })]),
+      body: FutureBuilder(future: e.downloadAndDecryptAttachment(), builder: (_, s) => s.data == null
+          ? Center(child: s.hasError ? Text('Could not open: ${s.error}', style: const TextStyle(color: Colors.white)) : const CircularProgressIndicator())
+          : InteractiveViewer(maxScale: 6, child: Center(child: Image.memory(s.data!.bytes)))))));
+  }
+
   Future<void> _actions(Event e) async {
     final mine = e.senderId == me;
     // Rules (docs/FEATURE_LOGIC.md): edit own text within 24 h; delete own within 2 days; moderators (power >= 50) any message.
@@ -469,6 +503,7 @@ class _S extends State<ChatScreen> {
       ListTile(leading: const Icon(Icons.reply), title: const Text('Reply'), onTap: () => Navigator.pop(s, 'reply')),
       if (widget.threadRootId == null) ListTile(leading: const Icon(Icons.forum_outlined), title: const Text('Reply in thread'), onTap: () => Navigator.pop(s, 'thread')),
       ListTile(leading: const Icon(Icons.shortcut), title: const Text('Forward'), onTap: () => Navigator.pop(s, 'forward')),
+      ListTile(leading: const Icon(Icons.checklist), title: const Text('Select messages (forward several)'), onTap: () => Navigator.pop(s, 'select')),
       ListTile(leading: Icon(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? Icons.bookmark_remove : Icons.bookmark_add_outlined),
         title: Text(StarService(context.read<MatrixService>()).isStarred(room.id, e.eventId) ? 'Remove from saved' : 'Save'), onTap: () => Navigator.pop(s, 'star')),
       if (e.messageType == MessageTypes.Text) ListTile(leading: const Icon(Icons.translate), title: const Text('Translate (Amer)'), onTap: () => Navigator.pop(s, 'translate')),
@@ -499,7 +534,9 @@ class _S extends State<ChatScreen> {
     if (a == 'delete') await room.redactEvent(e.eventId);
     if (a == 'thread' && mounted) _openThread(e.eventId);
     if (a == 'star' && mounted) { await StarService(context.read<MatrixService>()).toggle(room.id, e.eventId); _snack('Saved messages updated'); }
-    if (a == 'forward' && mounted) {
+    if (a == 'select') { setState(() => selected.add(e.eventId)); return; }
+    if (a == 'forward' && mounted) { await _forwardMany([e]); return; }
+    if (a == '_old_forward' && mounted) {
       final rooms = context.read<MatrixService>().chats;
       final to = await showDialog<Room>(context: context, builder: (d) => SimpleDialog(title: const Text('Forward to'), children: [
         for (final r in rooms) SimpleDialogOption(onPressed: () => Navigator.pop(d, r), child: Text(r.getLocalizedDisplayname()))]));
@@ -570,7 +607,7 @@ class _S extends State<ChatScreen> {
                   final away = switch (av) { Avail.busy => 'Busy', Avail.dnd => 'Do not disturb', Avail.brb => 'Be right back', Avail.away when seen != null => 'Away · last seen ${_lastSeen(seen)}', _ => seen == null ? 'Offline' : 'Last seen ${_lastSeen(seen)}' };
                   final line = typers.isNotEmpty ? '${typers.join(', ')} ${typers.length == 1 ? 'is' : 'are'} typing…'
                       : room.isDirectChat && _peerInvitedOnly ? 'Invited · hasn\'t signed in yet · 🔒 encrypted'
-                      : room.isDirectChat ? '${online && av == Avail.available ? 'Online' : away}${status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
+                      : room.isDirectChat ? '${room.directChatMatrixID != null && room.directChatMatrixID!.split(':').last != me.split(':').last ? 'External (${room.directChatMatrixID!.split(':').last}) · ' : ''}${online && av == Avail.available ? 'Online' : away}${status.isNotEmpty ? ' · $status' : ''} · 🔒 encrypted'
                       : '🔒 End-to-end encrypted · $members member${members == 1 ? '' : 's'}';
                   return Text(line, style: Theme.of(c).textTheme.labelSmall?.copyWith(color: typers.isNotEmpty || online ? cs.primary : null));
                 }),
@@ -684,6 +721,11 @@ class _S extends State<ChatScreen> {
         ])),
         if (!widget.filesOnly && ScheduledSender.instance.forRoom(room.id).isNotEmpty) Align(alignment: Alignment.centerLeft, child: Padding(padding: const EdgeInsets.only(left: 8),
           child: ActionChip(avatar: const Icon(Icons.schedule_send, size: 18), label: Text('${ScheduledSender.instance.forRoom(room.id).length} scheduled'), onPressed: _scheduledList))),
+        if (selected.isNotEmpty) Material(color: Theme.of(c).colorScheme.secondaryContainer, child: Row(children: [
+          IconButton(tooltip: 'Cancel selection', icon: const Icon(Icons.close), onPressed: () => setState(() => selected.clear())),
+          Text('${selected.length} selected · tap messages to add or remove'), const Spacer(),
+          FilledButton.icon(icon: const Icon(Icons.shortcut), label: const Text('Forward'), onPressed: () => _forwardMany([for (final e in tl?.events ?? const <Event>[]) if (selected.contains(e.eventId)) e])),
+          const SizedBox(width: 8)])),
         if (widget.filesOnly) const SizedBox.shrink() else
         SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: _recStart != null
           ? Row(children: [
@@ -693,13 +735,14 @@ class _S extends State<ChatScreen> {
               IconButton.filled(icon: const Icon(Icons.send), onPressed: _toggleRecord)])
           : Row(children: [
               IconButton(tooltip: 'Photo, file, poll or checklist', icon: const Icon(Icons.add_circle_outline), onPressed: _attachMenu),
-              PopupMenuButton<String>(tooltip: 'Set delivery options', initialValue: priority, onSelected: (v) => setState(() => priority = v),
+              PopupMenuButton<String>(tooltip: 'Set delivery options', initialValue: priority, onSelected: (v) { if (v == 'enter') { _toggleEnter(); return; } setState(() => priority = v); },
                 icon: Icon(priority == 'standard' ? Icons.priority_high_outlined : Icons.priority_high, color: priority == 'standard' ? null : Colors.red),
                 itemBuilder: (_) => const [PopupMenuItem(value: 'standard', child: Text('Standard')), PopupMenuItem(value: 'important', child: Text('Important')),
-                  PopupMenuItem(value: 'urgent', child: Text('Urgent: tell them now and again until they read it'))]),
+                  PopupMenuItem(value: 'urgent', child: Text('Urgent: tell them now and again until they read it')),
+                  PopupMenuDivider(), PopupMenuItem(value: 'enter', child: Text('Switch what the Enter key does'))]),
               IconButton(tooltip: 'Formatting', icon: Icon(Icons.text_format, color: _format ? Theme.of(c).colorScheme.primary : null), onPressed: () => setState(() => _format = !_format)),
-              Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: (t) { _onTyping(t); setState(() {}); }, textInputAction: TextInputAction.send,
-                  decoration: const InputDecoration(hintText: 'Message', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => send())),
+              Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: (t) { _onTyping(t); setState(() {}); }, textInputAction: enterSends ? TextInputAction.send : TextInputAction.newline,
+                  decoration: InputDecoration(hintText: enterSends ? 'Message' : 'Message (Enter adds a new line; use the send button)', border: const OutlineInputBorder(), isDense: true), onSubmitted: (_) { if (enterSends) send(); })),
               input.text.trim().isEmpty && editing == null
                   ? IconButton.filledTonal(tooltip: 'Record voice message', icon: const Icon(Icons.mic), onPressed: _toggleRecord)
                   : GestureDetector(onLongPress: editing == null ? _sendLater : null,
@@ -961,7 +1004,7 @@ class _S extends State<ChatScreen> {
     } else if (e.messageType == MessageTypes.Image) {
       body = FutureBuilder<Uint8List?>(future: _thumb(e), builder: (_, s) => s.data == null
           ? const SizedBox(width: 220, height: 160, child: Center(child: CircularProgressIndicator()))
-          : GestureDetector(onTap: () => download(e), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(s.data!, width: 260, fit: BoxFit.cover))));
+          : GestureDetector(onTap: () => _lightbox(e), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.memory(s.data!, width: 260, fit: BoxFit.cover))));
     } else if (e.messageType == MessageTypes.Audio) {
       final ms = (e.content.tryGetMap<String, Object?>('info')?['duration'] as num?)?.toInt() ?? 0;
       body = Row(mainAxisSize: MainAxisSize.min, children: [
@@ -987,7 +1030,9 @@ class _S extends State<ChatScreen> {
 
     return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: GestureDetector(
       onLongPress: () => _actions(e), onSecondaryTap: () => _actions(e),
+      onTap: selected.isEmpty ? null : () => setState(() => selected.contains(e.eventId) ? selected.remove(e.eventId) : (selected.length < 20 ? selected.add(e.eventId) : null)),
       child: Container(
+        foregroundDecoration: selected.contains(e.eventId) ? BoxDecoration(color: Theme.of(context).colorScheme.primary.withValues(alpha: .18), borderRadius: BorderRadius.circular(12)) : null,
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3), padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
         constraints: const BoxConstraints(maxWidth: 520),
         decoration: BoxDecoration(color: mine ? cs.primaryContainer : cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
