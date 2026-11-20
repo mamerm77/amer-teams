@@ -15,8 +15,10 @@ class SearchIndex {
   Database? _db; Client? c; StreamSubscription? _sub;
   bool backfilling = false; int indexed = 0;
 
-  Future<void> start(Client client) async {
-    if (_db != null) return; c = client;
+  Client? _owner; Future<void>? _opening;
+  Future<void> start(Client client) { _owner = client; if (_db != null && c == client) return Future.value(); return _opening ??= _open(client).whenComplete(() => _opening = null); }
+  Future<void> _open(Client client) async {
+    if (_db != null) stop(); c = client;
     final dir = await getApplicationSupportDirectory();
     final factory = (Platform.isAndroid || Platform.isIOS) ? sqflite.databaseFactory : databaseFactoryFfi;
     _db = await factory.openDatabase('${dir.path}/search_${client.userID.hashCode}.sqlite', options: OpenDatabaseOptions(version: 1, onCreate: (db, _) async {
@@ -25,7 +27,9 @@ class SearchIndex {
     _sub = client.onTimelineEvent.stream.listen((e) { _index(e); });
     unawaited(_backfill());
   }
-  void stop() { _sub?.cancel(); _db?.close(); _db = null; c = null; }
+  /// Closes the index. A screen being disposed passes its client: if another screen has already (re)started the
+  /// index for the same signed-in client, it stays open (the old screen's dispose runs after the new one's start).
+  void stop([Client? client]) { if (client != null && identical(client, _owner) && client.isLogged()) return; _sub?.cancel(); _db?.close(); _db = null; c = null; }
 
   Future<void> _index(Event e) async {
     final db = _db; if (db == null || e.roomId == null) return;
@@ -80,6 +84,7 @@ class SearchIndex {
 
   /// Full-text search with optional filters. Words are matched as prefixes ("vend" finds "vendor").
   Future<List<Map<String, Object?>>> search(String q, {String? roomId, String? sender, String? kind, DateTime? since}) async {
+    if (_db == null && _owner != null && _owner!.isLogged()) await start(_owner!);
     var r = await _query(q, roomId: roomId, sender: sender, kind: kind, since: since);
     // Messages that arrived still encrypted are indexed once decrypted: on a miss, catch up from the decrypted
     // timelines and ask again (bounded: the recent history of each chat).

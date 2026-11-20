@@ -1,3 +1,4 @@
+import 'package:matrix/matrix.dart' show Client;
 import '../services/accessibility.dart';
 import 'notifications_screen.dart';
 import 'search_screen.dart';
@@ -50,7 +51,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
-    SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
+    _searchClient = m.client; SearchIndex.instance.start(m.client);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
@@ -66,7 +67,8 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
       TextButton(onPressed: sm.hideCurrentMaterialBanner, child: Text(L.t(context, 'Not now'))),
       FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: Text(L.t(context, 'Move it here')))]));
   }
-  @override void dispose() { _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(); super.dispose(); }
+  Client? _searchClient;
+  @override void dispose() { _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(_searchClient); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }
