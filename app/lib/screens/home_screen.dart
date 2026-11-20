@@ -1,3 +1,4 @@
+import '../services/urgent.dart';
 import '../services/availability.dart';
 import 'package:matrix/matrix.dart' show Client;
 import '../services/accessibility.dart';
@@ -52,7 +53,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
-    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client);                          // on-device index of decrypted messages
+    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client); Urgent.instance.start(m.client); Urgent.instance.pending.addListener(_urgent);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
@@ -69,7 +70,17 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
       FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: Text(L.t(context, 'Move it here')))]));
   }
   Client? _searchClient;
-  @override void dispose() { _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(_searchClient); super.dispose(); }
+  void _urgent() {
+    if (!mounted) return;
+    final sm = ScaffoldMessenger.of(context); sm.hideCurrentMaterialBanner();
+    final p = Urgent.instance.pending.value; if (p.isEmpty) return;
+    final e = p.first;
+    sm.showMaterialBanner(MaterialBanner(backgroundColor: Colors.red.shade50, leading: const Icon(Icons.notification_important, color: Colors.red),
+      content: Text('Urgent from ${e.senderFromMemoryOrFallback.calcDisplayname()} in ${e.room.getLocalizedDisplayname()}: ${e.body.substring(8)}', maxLines: 2, overflow: TextOverflow.ellipsis),
+      actions: [TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Urgent.instance.dismiss(e); openChat(context, e.roomId!); }, child: const Text('Open')),
+        TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Urgent.instance.dismiss(e); }, child: const Text('Dismiss'))]));
+  }
+  @override void dispose() { Urgent.instance.pending.removeListener(_urgent); _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(_searchClient); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

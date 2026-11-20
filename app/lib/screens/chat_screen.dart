@@ -274,6 +274,7 @@ class _S extends State<ChatScreen> {
   List<Event> privateNotes = [];
   Future<void> _loadPrivate() async { final n = await PrivateNotes.forRoom(room.client, room.id); if (mounted) setState(() => privateNotes = n); }
 
+  String priority = 'standard';   // Teams delivery options: standard, important, urgent
   Future<void> send() async {
     final t = input.text.trim(); if (t.isEmpty) return;
     if (editing == null && t.startsWith('/') && !t.startsWith('//')) { input.clear(); setState(() {}); await _command(t); return; }   // '//' sends a literal slash
@@ -298,7 +299,8 @@ class _S extends State<ChatScreen> {
     if (_list.hasClients && _list.offset > 0) _list.jumpTo(0);   // sending takes you back to the newest messages
     typing = false; _safeTyping(false);
     if (!room.encrypted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This chat is not encrypted; sending is refused'))); return; }
-    var text = t;
+    var text = editing == null && priority != 'standard' ? '${priority == 'urgent' ? _urgent : _important}$t' : t;
+    if (editing == null) priority = 'standard';
     _mentions.forEach((name, id) => text = text.replaceAll('@$name', mentionMarkdown(name, id)));   // @Name -> pill
     final pl = room.getState(EventTypes.RoomPowerLevels)?.content;
     final group = expandGroupMentions(text, me: me, myPower: room.getPowerLevelByUserId(me).level, notifyLevel: roomNotifyLevel(pl),
@@ -691,6 +693,10 @@ class _S extends State<ChatScreen> {
               IconButton.filled(icon: const Icon(Icons.send), onPressed: _toggleRecord)])
           : Row(children: [
               IconButton(tooltip: 'Photo, file, poll or checklist', icon: const Icon(Icons.add_circle_outline), onPressed: _attachMenu),
+              PopupMenuButton<String>(tooltip: 'Set delivery options', initialValue: priority, onSelected: (v) => setState(() => priority = v),
+                icon: Icon(priority == 'standard' ? Icons.priority_high_outlined : Icons.priority_high, color: priority == 'standard' ? null : Colors.red),
+                itemBuilder: (_) => const [PopupMenuItem(value: 'standard', child: Text('Standard')), PopupMenuItem(value: 'important', child: Text('Important')),
+                  PopupMenuItem(value: 'urgent', child: Text('Urgent: tell them now and again until they read it'))]),
               IconButton(tooltip: 'Formatting', icon: Icon(Icons.text_format, color: _format ? Theme.of(c).colorScheme.primary : null), onPressed: () => setState(() => _format = !_format)),
               Expanded(child: TextField(controller: input, minLines: 1, maxLines: 5, onChanged: (t) { _onTyping(t); setState(() {}); }, textInputAction: TextInputAction.send,
                   decoration: const InputDecoration(hintText: 'Message', border: OutlineInputBorder(), isDense: true), onSubmitted: (_) => send())),
@@ -757,7 +763,14 @@ class _S extends State<ChatScreen> {
   }
 
   /// Text with ``` code blocks rendered monospace with a copy button (Markdown is also sent as formatted_body by the SDK).
+  static const _important = 'IMPORTANT! ', _urgent = 'URGENT! ';
   Widget _rich(BuildContext c, String t) {
+    // Delivery options (Teams): the label travels as plain text so every client shows it.
+    for (final (tag, col, ic) in [(_urgent, Colors.red, Icons.notification_important), (_important, Colors.red, Icons.priority_high)]) {
+      if (t.startsWith(tag)) return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [Icon(ic, size: 14, color: col), const SizedBox(width: 2), Text(tag.trim(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: col))]),
+        _rich(c, t.substring(tag.length))]);
+    }
     if (!t.contains('```')) return Text(t);
     final parts = t.split('```'); final cs = Theme.of(c).colorScheme;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -770,7 +783,10 @@ class _S extends State<ChatScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [Text(lang.isEmpty ? 'code' : lang, style: TextStyle(fontSize: 11, color: cs.outline)), const Spacer(),
                 IconButton(tooltip: 'Copy code', visualDensity: VisualDensity.compact, icon: const Icon(Icons.copy, size: 16), onPressed: () { Clipboard.setData(ClipboardData(text: code)); _snack('Code copied'); })]),
-              SingleChildScrollView(scrollDirection: Axis.horizontal, child: SelectableText(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 13))),
+              SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text([for (var n = 1; n <= '\n'.allMatches(code).length + 1; n++) '$n'].join('\n'), textAlign: TextAlign.right, style: TextStyle(fontFamily: 'monospace', fontSize: 13, color: cs.outline)),
+                const SizedBox(width: 10),
+                SelectableText(code, style: const TextStyle(fontFamily: 'monospace', fontSize: 13))])),
             ]));
         }()
         else if (parts[i].trim().isNotEmpty) Text(parts[i].trim()),
