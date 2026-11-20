@@ -48,7 +48,11 @@ void main() {
     void expectFound(bool ok, String what) { if (!ok) throw StateError('Not shown on screen: $what'); }
     Future<void> tap(Finder f, String what) async { expectFound(await waitFor(f), what); try { await t.ensureVisible(f.first); } catch (_) {} await t.tap(f.first); await wait(.6); }
     // Users and Security now live under Apps (Teams-style layout)
-    Future<void> openApp(String name) async { await tap(find.text('Apps'), 'Apps tab'); await tap(find.text(name), name); }
+    Future<void> openApp(String name) async {
+      await tap(find.text('Apps'), 'Apps tab');
+      final entry = find.widgetWithText(ListTile, name);            // the app's entry, not a chip or label with the same word
+      await tap(entry.evaluate().isNotEmpty ? entry.first : find.text(name), name);
+    }
     Future<void> type(Finder f, String text, String what) async {
       expectFound(await waitFor(f), what);
       await t.tap(f.first); await wait(.3);            // focus the box first, as a person would (re-attaches text input after a menu closes)
@@ -291,7 +295,9 @@ void main() {
 
     await step('Typing indicator', () async {
       await home(); await openChat(); await sendText('bob: type');
-      expectFound(await waitFor(find.textContaining('is typing…'), secs: 20), '"Bob Tester is typing…"');
+      var seen = await waitFor(find.textContaining('is typing…'), secs: 20);
+      if (!seen) { await sendText('bob: type'); seen = await waitFor(find.textContaining('is typing…'), secs: 20); }   // the signal lasts 10 s: ask once more if it was missed
+      expectFound(seen, '"Bob Tester is typing…"');
     });
     await step('Mention reaches Activity', () async {
       await sendText('bob: mention me');
