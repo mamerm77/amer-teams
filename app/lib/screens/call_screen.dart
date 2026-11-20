@@ -62,6 +62,20 @@ class _S extends State<CallScreen> {
     'Retrospective': [('What went well', 10), ('What to improve', 10), ('Actions', 10)]};
   Map<String, Object?>? get agenda { final a = room.getState(_agState)?.content; return a != null && a['call_id'] == callId && a['items'] is List ? Map<String, Object?>.from(a) : null; }
   final _parkedLocal = <String>[];
+  static const _spotType = 'com.amerteams.meeting.spotlight';
+  String? pinnedId;                                                       // "Pin for me": only on this device
+  /// "Spotlight for everyone" (host): the latest spotlight event of this call, or null when cleared.
+  String? get spotlightId { final e = (_parkTl?.events ?? const <mx.Event>[]).where((e) => e.type == _spotType && e.content['call_id'] == callId).firstOrNull; final id = e?.content['identity']; return id is String && id.isNotEmpty ? id : null; }
+  Future<void> _spotlight(String? identity) async { await room.sendEvent({'call_id': callId, 'identity': identity ?? '', 'body': identity == null ? 'Spotlight ended' : 'Spotlight on ${_nameOf(identity)}'}, type: _spotType); if (mounted) setState(() {}); }
+  String _nameOf(String identity) { final p = _everyone.where((p) => p.identity == identity).firstOrNull; return p == null ? identity : (p.name.isEmpty ? p.identity : p.name); }
+  List<Participant> get _everyone { final lk = call?.lk; if (lk == null) return const []; return [if (lk.localParticipant != null) lk.localParticipant!, ...lk.remoteParticipants.values]; }
+  void _tileMenu(Participant p) => showModalBottomSheet(context: context, builder: (s) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    ListTile(title: Text(p is LocalParticipant ? 'You' : _nameOf(p.identity), style: Theme.of(context).textTheme.titleMedium)),
+    ListTile(leading: Icon(pinnedId == p.identity ? Icons.push_pin : Icons.push_pin_outlined), title: Text(pinnedId == p.identity ? 'Unpin' : 'Pin for me'),
+      onTap: () { Navigator.pop(s); setState(() => pinnedId = pinnedId == p.identity ? null : p.identity); }),
+    if (isHost) ListTile(leading: const Icon(Icons.highlight), title: Text(spotlightId == p.identity ? 'Stop spotlighting' : 'Spotlight for everyone'),
+      onTap: () { Navigator.pop(s); _spotlight(spotlightId == p.identity ? null : p.identity); }),
+  ])));
   List<String> get parking { final fromTl = [for (final e in (_parkTl?.events ?? const <mx.Event>[]).where((e) => e.type == _parkType && e.content['call_id'] == callId).toList().reversed) '${e.content['text']}']; return [...fromTl, for (final t in _parkedLocal) if (!fromTl.contains(t)) t]; }
   mx.Timeline? _parkTl;
   Future<void> _setAgenda(List<(String, int)> items) => room.client.setRoomStateWithKey(room.id, _agState, '', {'call_id': callId,
@@ -177,7 +191,7 @@ class _S extends State<CallScreen> {
     _snack('Breakout rooms opened');
   }
   void _onRoomEvent(mx.Event e) async {
-    if (e.roomId == widget.roomId && (e.type == _aiState || e.type == _agState || e.type == _parkType)) { if (mounted) setState(() {}); return; }
+    if (e.roomId == widget.roomId && (e.type == _aiState || e.type == _agState || e.type == _parkType || e.type == _spotType)) { if (mounted) setState(() {}); return; }
     if (e.roomId != widget.roomId || e.type != 'com.amerteams.breakout' || e.senderId == me) return;
     final mine = ((e.content['rooms'] as List?) ?? []).cast<Map>().where((r) => (r['members'] as List).contains(me)).firstOrNull;
     if (mine == null || !mounted) return;
@@ -908,7 +922,7 @@ class _S extends State<CallScreen> {
   Widget _tile(Participant p) {
     final vt = p.videoTrackPublications.where((x) => !x.muted).map((x) => x.track).whereType<VideoTrack>().firstOrNull;
     final cs = Theme.of(context).colorScheme;
-    return AnimatedContainer(duration: const Duration(milliseconds: 200),
+    return GestureDetector(onLongPress: () => _tileMenu(p), onSecondaryTap: () => _tileMenu(p), child: AnimatedContainer(duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(14),
           border: Border.all(color: p.isSpeaking ? cs.primary : Colors.transparent, width: 3)),
       clipBehavior: Clip.antiAlias,
@@ -922,14 +936,19 @@ class _S extends State<CallScreen> {
             const SizedBox(width: 4),
             if (p.isMuted) const Icon(Icons.mic_off, size: 14), const SizedBox(width: 4),
             Text(p is LocalParticipant ? 'You' : (p.name.isEmpty ? p.identity : p.name)),
+            if (spotlightId == p.identity) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.highlight, size: 14)),
+            if (pinnedId == p.identity) const Padding(padding: EdgeInsets.only(left: 4), child: Icon(Icons.push_pin, size: 14)),
           ]))),
-      ]));
+        Positioned(right: 4, top: 4, child: IconButton(tooltip: 'Participant options', iconSize: 18, visualDensity: VisualDensity.compact,
+          style: IconButton.styleFrom(backgroundColor: cs.surface.withValues(alpha: .7)), icon: const Icon(Icons.more_horiz), onPressed: () => _tileMenu(p))),
+      ])));
   }
   static String _initials(String n) => n.replaceAll('@', '').split(RegExp(r'[\s:._]')).where((s) => s.isNotEmpty).take(2).map((s) => s[0].toUpperCase()).join();
 
   Widget _videos(List<Participant> people, bool wide) {
-    if (!grid && people.length > 1) {
-      final main = people.firstWhere((p) => p is! LocalParticipant && p.isSpeaking, orElse: () => people.firstWhere((p) => p is! LocalParticipant, orElse: () => people.first));
+    final focus = people.where((p) => p.identity == (spotlightId ?? pinnedId)).firstOrNull;
+    if ((!grid || focus != null) && people.length > 1) {
+      final main = focus ?? people.firstWhere((p) => p is! LocalParticipant && p.isSpeaking, orElse: () => people.firstWhere((p) => p is! LocalParticipant, orElse: () => people.first));
       return Column(children: [
         Expanded(child: Padding(padding: const EdgeInsets.all(8), child: _tile(main))),
         SizedBox(height: 110, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8),
