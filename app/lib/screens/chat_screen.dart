@@ -456,6 +456,26 @@ class _S extends State<ChatScreen> {
       Text(r['answer']), const SizedBox(height: 8), Text(g.where, style: const TextStyle(fontSize: 12))]))));
   }
 
+  /// Attendance report of this chat's meetings (organisers only), from the media server's join/leave records.
+  Future<void> _attendance() async {
+    Map<String, dynamic> r;
+    try { r = await context.read<ApiService>().getMap('/v1/meetings/attendance/${Uri.encodeComponent(room.id)}'); } catch (e) { _snack('$e'.replaceFirst('Exception: ', '')); return; }
+    if (!mounted) return;
+    String dur(num s) => s >= 3600 ? '${s ~/ 3600} h ${(s % 3600) ~/ 60} min' : s >= 60 ? '${s ~/ 60} min ${s % 60} s' : '$s s';
+    String hm(num t) => DateFormat('HH:mm:ss').format(DateTime.fromMillisecondsSinceEpoch(t.toInt() * 1000));
+    final ms = (r['meetings'] as List? ?? const []).cast<Map>();
+    showModalBottomSheet(context: context, isScrollControlled: true, builder: (s) => DraggableScrollableSheet(expand: false, initialChildSize: .8, builder: (_, sc) => ListView(controller: sc, padding: const EdgeInsets.all(16), children: [
+      Text('Attendance', style: Theme.of(s).textTheme.titleLarge),
+      if (ms.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No meetings recorded in this chat yet.')),
+      for (final m in ms) ExpansionTile(initiallyExpanded: m == ms.first,
+        title: Text(DateFormat('EEE d MMM y, HH:mm').format(DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt() * 1000))),
+        subtitle: Text('${m['attendees']} attended · ${dur((m['end'] as num) - (m['start'] as num))}'),
+        children: [for (final p in (m['people'] as List).cast<Map>()) ListTile(dense: true,
+          title: Text(room.unsafeGetUserFromMemoryOrFallback('${p['user_id']}').calcDisplayname()),
+          subtitle: Text('Joined ${hm(p['first_join'])}${p['last_leave'] != null ? ' · left ${hm(p['last_leave'])}' : ''}${(p['joins'] as num) > 1 ? ' · rejoined ${(p['joins'] as num) - 1}×' : ''}'),
+          trailing: Text(dur(p['seconds'] as num)))]),
+    ])));
+  }
   final selected = <String>{};
   /// Enter key: send (default) or new line, as in Teams' compose settings; kept in account data.
   bool get enterSends => room.client.accountData['com.amerteams.compose']?.content['enter_sends'] != false;
@@ -631,11 +651,13 @@ class _S extends State<ChatScreen> {
             if (v == 'connectors') Navigator.push(c, MaterialPageRoute(builder: (_) => ConnectorsScreen(room: room)));
             if (v == 'twin') Navigator.push(c, MaterialPageRoute(builder: (_) => MeetingTwinScreen(room: room)));
             if (v == 'shifts') Navigator.push(c, MaterialPageRoute(builder: (_) => ShiftsScreen(room: room)));
+            if (v == 'attendance') _attendance();
             if (v == 'ptt') Navigator.push(c, MaterialPageRoute(builder: (_) => WalkieTalkieScreen(room: room)));
           }, itemBuilder: (_) => [
             const PopupMenuItem(value: 'twin', child: Text('Meeting twin')),
             if (room.encrypted) const PopupMenuItem(value: 'connectors', child: Text('Connectors')),
             const PopupMenuItem(value: 'shifts', child: Text('Shifts')),
+            if (room.getPowerLevelByUserId(me).level >= 50) const PopupMenuItem(value: 'attendance', child: Text('Meeting attendance report')),
             if (room.encrypted) const PopupMenuItem(value: 'ptt', child: Text('Walkie-talkie')),
             if (Flags.instance.on('decisions')) const PopupMenuItem(value: 'tasks', child: Text('Tasks')),
             if (Flags.instance.on('find_time')) const PopupMenuItem(value: 'time', child: Text('Find a time')),

@@ -118,3 +118,37 @@ async def recording_trail(recording_id: str, room_id: str, user=Depends(auth.mat
         rows = await (await c.execute("SELECT user_id, action, extract(epoch from ts)::bigint FROM audit_log WHERE action LIKE 'recording.%%' AND detail LIKE %s ORDER BY id",
                                       (f"%|{recording_id}",))).fetchall()
     return [{"user": a, "event": x.split(".", 1)[1], "at": t} for a, x, t in rows]
+
+
+# ---------- attendance report (Teams parity): from the media server's own join/leave webhooks ----------
+@router.get("/attendance/{room_id}")
+async def attendance(room_id: str, user=Depends(auth.matrix_user)):
+    """Who attended the meetings of this chat, when they joined and left, and for how long. Organisers (hosts) only,
+    as in Teams. Built from LiveKit's signed webhooks, so it records presence in the call, never content."""
+    if await power_level(user, room_id) < HOST_LEVEL: raise HTTPException(403, "Only meeting organisers see the attendance report")
+    import hashlib as _h
+    rh = _h.sha256(room_id.encode()).hexdigest()
+    async with db.pool.connection() as c:
+        rows = await (await c.execute(
+            "SELECT e.call_id, e.user_id, e.event, extract(epoch from e.ts)::bigint FROM call_events e "
+            "WHERE e.source='media' AND e.event IN ('participant_joined','participant_left') AND e.user_id IS NOT NULL "
+            "AND e.call_id IN (SELECT DISTINCT call_id FROM call_sessions WHERE room_hash=%s) ORDER BY e.ts, e.id", (rh,))).fetchall()
+    meetings: dict[str, dict] = {}
+    for call, who, ev, ts in rows:
+        m = meetings.setdefault(call, {"call_id": call, "start": ts, "end": ts, "people": {}})
+        m["end"] = max(m["end"], ts); m["start"] = min(m["start"], ts)
+        p = m["people"].setdefault(who, {"user_id": who, "first_join": ts, "last_leave": None, "seconds": 0, "_open": None, "joins": 0})
+        if ev == "participant_joined":
+            p["joins"] += 1
+            if p["_open"] is None: p["_open"] = ts
+        elif p["_open"] is not None:
+            p["seconds"] += ts - p["_open"]; p["_open"] = None; p["last_leave"] = ts
+    out = []
+    for m in sorted(meetings.values(), key=lambda m: -m["start"]):
+        people = []
+        for p in m["people"].values():
+            if p["_open"] is not None: p["seconds"] += m["end"] - p["_open"]   # still in, or the leave was not reported
+            p.pop("_open"); people.append(p)
+        out.append({"call_id": m["call_id"], "start": m["start"], "end": m["end"], "attendees": len(people),
+                    "people": sorted(people, key=lambda p: p["first_join"])})
+    return {"meetings": out[:50]}
