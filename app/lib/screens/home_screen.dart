@@ -1,3 +1,4 @@
+import 'people_screen.dart' show addJoinedInvitees;
 import '../services/urgent.dart';
 import '../services/availability.dart';
 import 'package:matrix/matrix.dart' show Client;
@@ -53,7 +54,8 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     CalendarPrefs.publish(m, ApiService(m)).catchError((_) {});    // free/busy only, for find-a-time
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
-    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client); Urgent.instance.start(m.client); Urgent.instance.pending.addListener(_urgent);                          // on-device index of decrypted messages
+    _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client); Urgent.instance.start(m.client);
+    _people = Timer.periodic(const Duration(minutes: 2), (_) => _invitees()); Future.delayed(const Duration(seconds: 5), _invitees); Urgent.instance.pending.addListener(_urgent);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
@@ -69,7 +71,12 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
       TextButton(onPressed: sm.hideCurrentMaterialBanner, child: Text(L.t(context, 'Not now'))),
       FilledButton(onPressed: () { sm.hideCurrentMaterialBanner(); Navigator.of(context).push(MaterialPageRoute(builder: (_) => CallScreen(roomId: h['room_id'], callId: h['call_id'], meeting: h['meeting'] == true))); }, child: Text(L.t(context, 'Move it here')))]));
   }
-  Client? _searchClient;
+  Client? _searchClient; Timer? _people;
+  Future<void> _invitees() async {
+    if (!mounted) return;
+    final n = await addJoinedInvitees(context.read<MatrixService>(), ApiService(context.read<MatrixService>()));
+    if (n > 0 && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$n ${n == 1 ? 'person you invited has' : 'people you invited have'} joined and been added to your teams and chats')));
+  }
   void _urgent() {
     if (!mounted) return;
     final sm = ScaffoldMessenger.of(context); sm.hideCurrentMaterialBanner();
@@ -80,7 +87,7 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
       actions: [TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Urgent.instance.dismiss(e); openChat(context, e.roomId!); }, child: const Text('Open')),
         TextButton(onPressed: () { sm.hideCurrentMaterialBanner(); Urgent.instance.dismiss(e); }, child: const Text('Dismiss'))]));
   }
-  @override void dispose() { Urgent.instance.pending.removeListener(_urgent); _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(_searchClient); super.dispose(); }
+  @override void dispose() { _people?.cancel(); Urgent.instance.pending.removeListener(_urgent); _handoffSub?.cancel(); Reminders.instance.due.removeListener(_reminder); WidgetsBinding.instance.removeObserver(this); ComplianceService.instance.stop(); WorkflowRunner.instance.stop(); GlassBox.instance.stop(); OutOfOffice.instance.stop(); SearchIndex.instance.stop(_searchClient); super.dispose(); }
   @override void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.resumed) { _checkAway(); } else if (s == AppLifecycleState.paused || s == AppLifecycleState.inactive) { CatchUp.markActive(); }
   }

@@ -14,6 +14,12 @@
 	handle /join* {
 		reverse_proxy orchestrator:8080
 	}
+	handle /welcome* {
+		reverse_proxy orchestrator:8080
+	}
+	handle /v1/welcome/* {
+		reverse_proxy orchestrator:8080
+	}
 	handle_path /api/* {
 		reverse_proxy orchestrator:8080
 	}

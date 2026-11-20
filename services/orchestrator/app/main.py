@@ -39,6 +39,9 @@ app.include_router(connectors.router)
 app.include_router(office.router)
 app.include_router(agentops_router)
 app.include_router(personal_router)
+from . import people
+app.include_router(people.router)
+app.include_router(people.public)
 
 @app.on_event("startup")
 async def _start():

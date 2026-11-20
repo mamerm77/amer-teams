@@ -91,7 +91,7 @@ class _S extends State<ChatInfoScreen> {
       if (dm == null) ...[
         ListTile(title: Text('${members.length} members', style: Theme.of(c).textTheme.titleSmall),
           trailing: room.canInvite ? TextButton.icon(icon: const Icon(Icons.person_add), label: Text(L.t(context, 'Add')), onPressed: () async {
-            final p = await pickPeople(c, multiple: true, title: 'Add members');
+            final p = await pickPeople(c, multiple: true, title: 'Add members', inviteRooms: [room.id]);
             for (final x in p ?? []) { await room.invite(x.userId); }
             setState(() {});
           }) : null),

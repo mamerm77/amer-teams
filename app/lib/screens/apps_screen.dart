@@ -1,3 +1,4 @@
+import 'people_screen.dart';
 import '../services/app_store.dart' show AppHost;
 import 'teams_apps.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,7 @@ class AppItem {
 
 const _sections = <(String, List<AppItem>)>[
   ('Team apps (like Microsoft Teams)', [
+    AppItem(Icons.contacts_outlined, 'People', 'Your contacts and contact groups, invite someone new by email or phone, and your own contact card', open: _people),
     AppItem(Icons.view_kanban_outlined, 'Planner', 'A board of a chat\'s tasks: To do, In progress, Blocked, Done; assign and set due dates', open: _planner),
     AppItem(Icons.table_rows_outlined, 'Lists', 'Track issues, assets or risks in a shared table with typed columns, filters and sorting', open: _lists),
     AppItem(Icons.assignment_outlined, 'Forms', 'Surveys and quizzes with choice, text and rating questions; live results', open: _forms),
@@ -102,6 +104,7 @@ Widget _skills() => const SkillsScreen(); Widget _workflows() => const Workflows
 Widget _health() => const OpsScreen(); Widget _control() => const ControlScreen(); Widget _trace() => const CallTraceScreen(); Widget _users() => const AdminScreen();
 Widget _analytics() => const AnalyticsScreen(); Widget _guests() => const GuestAccountsScreen(); Widget _partners() => const PartnersScreen(); Widget _flags() => const FlagsScreen();
 Widget _office() => const OfficeScreen();
+Widget _people() => const PeopleScreen();
 Widget _planner() => AppHost(title: 'Planner', icon: Icons.view_kanban_outlined, about: 'Plan a chat\'s work on a board. Tasks are the same ones you create from messages.', builder: (_, r) => PlannerApp(room: r));
 Widget _lists() => AppHost(title: 'Lists', icon: Icons.table_rows_outlined, about: 'Shared tables with typed columns: issue trackers, asset registers, risk registers.', builder: (_, r) => ListsApp(room: r));
 Widget _forms() => AppHost(title: 'Forms', icon: Icons.assignment_outlined, about: 'Surveys, quizzes and registrations for the people in a chat.', builder: (_, r) => FormsApp(room: r));

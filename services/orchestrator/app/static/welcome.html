@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Join Amer Teams</title>
+<style>body{font-family:system-ui,sans-serif;background:#f4f7f9;margin:0;display:grid;place-items:center;min-height:100vh;color:#1b1f23}
+.card{background:#fff;max-width:420px;width:calc(100% - 32px);padding:28px;border-radius:14px;box-shadow:0 4px 20px #0001}
+h1{font-size:22px;margin:0 0 6px}label{display:block;font-size:13px;margin:14px 0 4px}input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #c9d1d8;border-radius:8px;font-size:15px}
+button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:8px;background:#0b6b7a;color:#fff;font-size:15px;cursor:pointer}.muted{color:#5c6770;font-size:13px}.err{color:#b3261e;font-size:14px;margin-top:10px}</style></head>
+<body><div class="card" id="c"><h1>Join Amer Teams</h1><p class="muted" id="who">Checking your invitation…</p></div>
+<script>
+const token = location.hash.slice(1), c = document.getElementById('c');
+const esc = s => String(s).replace(/[&<>"]/g, x => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[x]));
+fetch('/v1/welcome/' + encodeURIComponent(token)).then(r => r.ok ? r.json() : r.json().then(j => Promise.reject(j.detail))).then(i => {
+  c.innerHTML = `<h1>Welcome, ${esc(i.name)}</h1><p class="muted">${esc(i.invited_by)} invited you. Create your account on ${esc(i.server)}.</p>
+  <label>Your name</label><input id="n" value="${esc(i.name)}"><label>Username</label><input id="u" value="${esc(i.suggested_username)}" autocapitalize="none">
+  <label>Password (at least 10 characters, letters and numbers)</label><input id="p" type="password"><button id="b">Create my account</button><div class="err" id="e"></div>`;
+  document.getElementById('b').onclick = async () => {
+    const r = await fetch('/v1/welcome/' + encodeURIComponent(token), {method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({username: u.value, password: p.value, display_name: n.value})});
+    const j = await r.json();
+    if (!r.ok) { document.getElementById('e').textContent = j.detail || 'Something went wrong'; return; }
+    c.innerHTML = `<h1>You're in</h1><p>Your account is <b>${esc(j.user_id)}</b>.</p><p class="muted">Install Amer Teams, choose server <b>${esc(j.server)}</b>, and sign in with your username and password. ${esc(j.invited_by)} will add you to their teams and chats.</p>`;
+  };
+}).catch(m => { c.innerHTML = `<h1>Invitation not valid</h1><p class="muted">${esc(m || 'This link was already used, has expired or was cancelled.')}</p>`; });
+</script></body></html>

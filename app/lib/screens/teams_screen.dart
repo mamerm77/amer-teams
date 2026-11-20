@@ -120,7 +120,7 @@ class TeamScreen extends StatelessWidget {
           FilledButton.icon(icon: const Icon(Icons.video_call), label: const Text('Meet now'), onPressed: channels.isEmpty ? null :
             () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: channels.first.id, meeting: true)))),
           if (canManage) OutlinedButton.icon(icon: const Icon(Icons.person_add), label: const Text('Add members'), onPressed: () async {
-            final p = await pickPeople(c, multiple: true, title: 'Add members to ${t.getLocalizedDisplayname()}');
+            final p = await pickPeople(c, multiple: true, title: 'Add members to ${t.getLocalizedDisplayname()}', inviteRooms: [t.id]);
             if (p != null && p.isNotEmpty) { await m.addTeamMembers(t, p.map((x) => x.userId).toList());
               if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Invited ${p.length} to the team and its channels'))); }
           }),
