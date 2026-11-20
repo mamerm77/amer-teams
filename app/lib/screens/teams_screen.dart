@@ -1,3 +1,4 @@
+import 'teams_apps.dart';
 import '../services/locale.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -89,6 +90,12 @@ class _DS extends State<_Discover> {
   }
 }
 
+/// Apps that can be added to a channel as tabs, as in Teams (docs/TEAMS_APPS.md).
+final kChannelTabs = <String, Widget Function(Room)>{
+  'Planner': (r) => PlannerApp(room: r), 'Lists': (r) => ListsApp(room: r), 'Notes': (r) => NotesApp(room: r), 'Forms': (r) => FormsApp(room: r),
+  'Milestones': (r) => MilestonesApp(room: r), 'Goals': (r) => GoalsApp(room: r), 'Updates': (r) => UpdatesApp(room: r), 'Praise': (r) => PraiseApp(room: r),
+};
+
 /// One team: channels, members, meet, leave.
 class TeamScreen extends StatelessWidget {
   const TeamScreen({super.key, required this.teamId}); final String teamId;
@@ -118,28 +125,52 @@ class TeamScreen extends StatelessWidget {
               if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text('Invited ${p.length} to the team and its channels'))); }
           }),
           if (canManage) OutlinedButton.icon(icon: const Icon(Icons.add), label: const Text('Add channel'), onPressed: () async {
-            final n = TextEditingController(), d = TextEditingController();
-            final ok = await showDialog<bool>(context: c, builder: (x) => AlertDialog(title: const Text('New channel'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+            final n = TextEditingController(), d = TextEditingController(); var private = false;
+            final ok = await showDialog<bool>(context: c, builder: (x) => StatefulBuilder(builder: (x, set) => AlertDialog(title: const Text('New channel'), content: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: n, autofocus: true, decoration: const InputDecoration(labelText: 'Channel name')),
-              TextField(controller: d, decoration: const InputDecoration(labelText: 'Description (optional)'))]),
-              actions: [TextButton(onPressed: () => Navigator.pop(x, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(x, true), child: const Text('Create'))]));
-            if (ok == true && n.text.trim().isNotEmpty) await m.createChannel(t.id, n.text.trim(), description: d.text.trim());
+              TextField(controller: d, decoration: const InputDecoration(labelText: 'Description (optional)')),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(segments: const [ButtonSegment(value: false, label: Text('Standard'), icon: Icon(Icons.tag)), ButtonSegment(value: true, label: Text('Private'), icon: Icon(Icons.lock))],
+                selected: {private}, onSelectionChanged: (v) => set(() => private = v.first)),
+              Padding(padding: const EdgeInsets.only(top: 6), child: Text(private ? 'Only the people you choose can see it.' : 'Everyone in the team can see it.', style: Theme.of(x).textTheme.bodySmall)),
+            ]),
+              actions: [TextButton(onPressed: () => Navigator.pop(x, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(x, true), child: const Text('Create'))])));
+            if (ok != true || n.text.trim().isEmpty || !c.mounted) return;
+            List<String>? who;
+            if (private) { final p = await pickPeople(c, multiple: true, title: 'Who can see ${n.text.trim()}?'); if (p == null) return; who = p.map((x) => x.userId).toList(); }
+            await m.createChannel(t.id, n.text.trim(), description: d.text.trim(), members: who);
           }),
         ]),
         const SizedBox(height: 12),
         Text('Channels', style: Theme.of(c).textTheme.titleSmall),
-        for (final ch in channels) Card(child: ListTile(
-          leading: Icon(Icons.tag, color: cs.primary),
+        for (final ch in [...channels.where((x) => m.isFavourite(x) && !m.isHidden(x)), ...channels.where((x) => !m.isFavourite(x) && !m.isHidden(x))]) Card(child: ListTile(
+          leading: Icon(m.channelSettings(ch)['private'] == true ? Icons.lock : Icons.tag, color: cs.primary),
           title: Text(ch.getLocalizedDisplayname(), style: TextStyle(fontWeight: ch.notificationCount > 0 ? FontWeight.w700 : null)),
           subtitle: ch.topic.isEmpty ? null : Text(ch.topic, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (ch.notificationCount > 0) Badge(label: Text('${ch.notificationCount}')), const SizedBox(width: 6), const Icon(Icons.lock, size: 14)]),
+            if (m.isFavourite(ch)) const Icon(Icons.star, size: 16, color: Colors.amber),
+            if (m.channelSettings(ch)['moderated'] == true) const Tooltip(message: 'Moderated: only moderators start posts', child: Icon(Icons.shield_outlined, size: 16)),
+            if (ch.notificationCount > 0) Badge(label: Text('${ch.notificationCount}')),
+            PopupMenuButton<String>(tooltip: 'Channel options', onSelected: (v) async {
+              if (v == 'fav') await m.toggleChannelPref(ch, 'favourite');
+              if (v == 'hide') await m.toggleChannelPref(ch, 'hidden');
+              if (v == 'mod') await m.setChannelSettings(ch, {'moderated': m.channelSettings(ch)['moderated'] != true});
+              if (v == 'members' && c.mounted) { final p = await pickPeople(c, multiple: true, title: 'Add people to ${ch.getLocalizedDisplayname()}'); for (final u in p ?? const []) { try { await ch.invite(u.userId); } catch (_) {} } }
+            }, itemBuilder: (_) => [
+              PopupMenuItem(value: 'fav', child: Text(m.isFavourite(ch) ? 'Remove from favourites' : 'Add to favourites')),
+              const PopupMenuItem(value: 'hide', child: Text('Hide')),
+              if (ch.getPowerLevelByUserId(m.userId).level >= 50) PopupMenuItem(value: 'mod', child: Text(m.channelSettings(ch)['moderated'] == true ? 'Turn off moderation' : 'Moderate: only moderators start posts')),
+              if (m.channelSettings(ch)['private'] == true && ch.canInvite) const PopupMenuItem(value: 'members', child: Text('Add people to this private channel')),
+            ])]),
           onTap: () async {
             if (ch.membership != Membership.join) { try { await ch.join(); } catch (_) {} }
             if (c.mounted) Navigator.push(c, MaterialPageRoute(builder: (_) => ChannelScreen(roomId: ch.id, teamName: t.getLocalizedDisplayname())));
           })),
+        if (channels.any(m.isHidden)) ExpansionTile(leading: const Icon(Icons.visibility_off_outlined), title: Text('Hidden channels (${channels.where(m.isHidden).length})'), children: [
+          for (final ch in channels.where(m.isHidden)) ListTile(dense: true, leading: const Icon(Icons.tag), title: Text(ch.getLocalizedDisplayname()), trailing: TextButton(onPressed: () => m.toggleChannelPref(ch, 'hidden'), child: const Text('Show')))]),
         for (final cid in t.spaceChildren.map((x) => x.roomId).whereType<String>().where((id) => m.client.getRoomById(id) == null))
-          Card(child: ListTile(leading: const Icon(Icons.tag), title: const Text('Channel you have not joined yet'), trailing: TextButton(child: const Text('Join'), onPressed: () => m.client.joinRoom(cid)))),
+          Card(child: ListTile(leading: const Icon(Icons.tag), title: const Text('Channel you have not joined'), subtitle: const Text('Private channels need an invitation'), trailing: TextButton(child: const Text('Join'), onPressed: () async {
+            try { await m.client.joinRoom(cid); } catch (_) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('This is a private channel. Ask its owner to add you.'))); } }))),
         const SizedBox(height: 12),
         Text('Members (${members.length})', style: Theme.of(c).textTheme.titleSmall),
         for (final u in members) ListTile(dense: true, leading: CircleAvatar(radius: 16, child: Text(_initials(u.calcDisplayname()), style: const TextStyle(fontSize: 12))),
@@ -160,6 +191,24 @@ class _CS extends State<ChannelScreen> {
   @override void initState() { super.initState(); WidgetsBinding.instance.addPostFrameCallback((_) async { tl = await room.getTimeline(onUpdate: () { if (mounted) setState(() {}); }); if (mounted) setState(() {}); }); }
   @override void dispose() { tl?.cancelSubscriptions(); super.dispose(); }
 
+  Future<void> _schedule(BuildContext c) async {
+    final title = TextEditingController(); var start = DateTime.now().add(Duration(minutes: 60 - DateTime.now().minute)); var minutes = 30;
+    final ok = await showDialog<bool>(context: c, builder: (d) => StatefulBuilder(builder: (d, set) => AlertDialog(title: const Text('Channel meeting'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: title, autofocus: true, decoration: const InputDecoration(labelText: 'Title')),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(icon: const Icon(Icons.event), label: Text(DateFormat('EEE d MMM, HH:mm').format(start)), onPressed: () async {
+          final dd = await showDatePicker(context: d, initialDate: start, firstDate: DateTime.now().subtract(const Duration(days: 1)), lastDate: DateTime.now().add(const Duration(days: 730)));
+          if (dd == null || !d.mounted) return; final tt = await showTimePicker(context: d, initialTime: TimeOfDay.fromDateTime(start));
+          if (tt != null) set(() => start = DateTime(dd.year, dd.month, dd.day, tt.hour, tt.minute)); }),
+        DropdownButton<int>(value: minutes, items: [for (final n in const [15, 30, 45, 60, 90]) DropdownMenuItem(value: n, child: Text('$n min'))], onChanged: (v) => set(() => minutes = v ?? 30)),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Schedule'))])));
+    if (ok != true || title.text.trim().isEmpty || !c.mounted) return;
+    await c.read<MatrixService>().sendMeeting(room, title: title.text.trim(), start: start, minutes: minutes);
+    if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Meeting posted in the channel and added to everyone\'s calendar')));
+  }
+
   String? _thread(Event e) { final r = e.content.tryGetMap<String, Object?>('m.relates_to'); return r?['rel_type'] == 'm.thread' ? r!['event_id'] as String? : null; }
 
   @override Widget build(BuildContext c) {
@@ -167,10 +216,20 @@ class _CS extends State<ChannelScreen> {
     final posts = evs.where((e) => e.type == EventTypes.Message && _thread(e) == null && e.relationshipType != RelationshipTypes.edit && !e.redacted).toList();
     final replies = <String, List<Event>>{};
     for (final e in evs) { final t = _thread(e); if (t != null && e.type == EventTypes.Message) (replies[t] ??= []).add(e); }
-    return DefaultTabController(length: 2, child: Scaffold(
+    final m = context.watch<MatrixService>();
+    final tabs = ((m.channelSettings(room)['tabs'] as List?) ?? const []).map((x) => '$x').where(kChannelTabs.containsKey).toList();
+    final canPost = m.canStartPost(room);
+    return DefaultTabController(length: 2 + tabs.length, child: Scaffold(
       appBar: AppBar(title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(room.getLocalizedDisplayname()), Text(widget.teamName, style: Theme.of(c).textTheme.labelSmall)]),
-        actions: [IconButton(tooltip: 'Meet in this channel', icon: const Icon(Icons.video_call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: true))))],
-        bottom: const TabBar(tabs: [Tab(text: 'Posts'), Tab(text: 'Files')])),
+        actions: [
+          IconButton(tooltip: 'Meet in this channel', icon: const Icon(Icons.video_call), onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => CallScreen(roomId: room.id, meeting: true)))),
+          IconButton(tooltip: 'Schedule a channel meeting', icon: const Icon(Icons.event), onPressed: () => _schedule(c)),
+          PopupMenuButton<String>(tooltip: 'Add a tab', icon: const Icon(Icons.add_box_outlined), onSelected: (k) async {
+            final cur = [...tabs]; cur.contains(k) ? cur.remove(k) : cur.add(k);
+            try { await m.setChannelSettings(room, {'tabs': cur}); } catch (_) { if (c.mounted) ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content: Text('Only channel owners can change tabs'))); }
+          }, itemBuilder: (_) => [for (final e in kChannelTabs.entries) CheckedPopupMenuItem(value: e.key, checked: tabs.contains(e.key), child: Text(e.key))]),
+        ],
+        bottom: TabBar(isScrollable: true, tabs: [const Tab(text: 'Posts'), const Tab(text: 'Files'), for (final t in tabs) Tab(text: t)])),
       body: TabBarView(children: [
         Column(children: [
           Expanded(child: tl == null ? const Center(child: CircularProgressIndicator())
@@ -188,12 +247,15 @@ class _CS extends State<ChannelScreen> {
                     onPressed: () => Navigator.push(c, MaterialPageRoute(builder: (_) => ChatScreen(roomId: room.id, threadRootId: p.eventId))))),
                 ])));
               })),
-          SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
+          if (!canPost) const SafeArea(child: Padding(padding: EdgeInsets.all(12), child: Row(children: [Icon(Icons.shield_outlined, size: 18), SizedBox(width: 8),
+            Expanded(child: Text('This channel is moderated: only moderators start new posts. You can reply to any post.'))]))),
+          if (canPost) SafeArea(child: Padding(padding: const EdgeInsets.all(8), child: Row(children: [
             Expanded(child: TextField(controller: post, minLines: 1, maxLines: 5, decoration: const InputDecoration(hintText: 'Start a new post (encrypted)', border: OutlineInputBorder()))),
             const SizedBox(width: 8),
             FilledButton(onPressed: () async { final t = post.text.trim(); if (t.isEmpty) return; post.clear(); await room.sendTextEvent(t); }, child: Text(L.t(context, 'Post')))]))),
         ]),
         ChatScreen(roomId: room.id, filesOnly: true),
+        for (final t in tabs) kChannelTabs[t]!(room),
       ])));
   }
 }

@@ -119,26 +119,46 @@ class MatrixService extends ChangeNotifier {
     return id;
   }
 
-  Future<String> createChannel(String teamId, String name, {String description = ''}) async {
+  /// [members]: a private channel (Teams parity) — invite only, visible only to the people chosen.
+  Future<String> createChannel(String teamId, String name, {String description = '', List<String>? members}) async {
     final team = client.getRoomById(teamId)!;
-    final invite = team.getParticipants().where((u) => u.membership == Membership.join || u.membership == Membership.invite)
+    final private = members != null;
+    final invite = private ? members.where((u) => u != userId).toList() : team.getParticipants().where((u) => u.membership == Membership.join || u.membership == Membership.invite)
         .map((u) => u.id).where((u) => u != userId).toList();
     final id = await client.createRoom(name: name, topic: description.isEmpty ? null : description, invite: invite,
         preset: CreateRoomPreset.privateChat,
         initialState: [
           StateEvent(type: EventTypes.Encryption, stateKey: '', content: {'algorithm': AlgorithmTypes.megolmV1AesSha2}),
-          StateEvent(type: EventTypes.RoomJoinRules, stateKey: '', content: {'join_rule': 'restricted',
+          if (private) StateEvent(type: EventTypes.RoomJoinRules, stateKey: '', content: {'join_rule': 'invite'})
+          else StateEvent(type: EventTypes.RoomJoinRules, stateKey: '', content: {'join_rule': 'restricted',
             'allow': [{'type': 'm.room_membership', 'room_id': teamId}]}),
+          if (private) StateEvent(type: kChannelSettings, stateKey: '', content: {'private': true}),
         ]);
     await team.setSpaceChild(id);
     return id;
+  }
+
+  /// Channel settings (state): private, moderated (only moderators start posts; everyone can reply), tabs.
+  static const kChannelSettings = 'com.amerteams.channel';
+  Map<String, Object?> channelSettings(Room ch) => ch.getState(kChannelSettings)?.content ?? const {};
+  Future<void> setChannelSettings(Room ch, Map<String, Object?> patch) => client.setRoomStateWithKey(ch.id, kChannelSettings, '', {...channelSettings(ch), ...patch});
+  bool canStartPost(Room ch) { final s = channelSettings(ch); if (s['moderated'] != true) return true;
+    return ch.getPowerLevelByUserId(userId).level >= 50 || ((s['moderators'] as List?)?.contains(userId) ?? false); }
+  /// My own favourites and hidden channels (account data, follows me across devices).
+  Map<String, Object?> get channelPrefs => client.accountData['com.amerteams.channel_prefs']?.content ?? const {};
+  List<String> _pref(String k) => ((channelPrefs[k] as List?) ?? const []).map((x) => '$x').toList();
+  bool isFavourite(Room ch) => _pref('favourite').contains(ch.id);
+  bool isHidden(Room ch) => _pref('hidden').contains(ch.id);
+  Future<void> toggleChannelPref(Room ch, String k) async {
+    final l = _pref(k); l.contains(ch.id) ? l.remove(ch.id) : l.add(ch.id);
+    await client.setAccountData(userId, 'com.amerteams.channel_prefs', {...channelPrefs, k: l}); notifyListeners();
   }
 
   /// Adds people to a team and invites them to every channel.
   Future<void> addTeamMembers(Room team, List<String> users) async {
     for (final u in users) {
       try { await team.invite(u); } catch (_) {}
-      for (final ch in channelsOf(team)) { try { await ch.invite(u); } catch (_) {} }
+      for (final ch in channelsOf(team).where((ch) => channelSettings(ch)['private'] != true)) { try { await ch.invite(u); } catch (_) {} }
     }
   }
 
