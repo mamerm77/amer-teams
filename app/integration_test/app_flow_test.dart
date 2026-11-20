@@ -509,6 +509,28 @@ void main() {
       if (moh2()['verified'] != true) throw StateError('second device did not mark the app verified: ${moh2()}');
       try { if (find.text('Done').evaluate().isNotEmpty) await tap(find.text('Done'), 'Done'); } catch (_) {}   // the dialog may close on its own as both sides finish
     });
+    await step('People: my contact details, add a contact, a contact group, invite someone new', () async {
+      await home(); await openApp('People');
+      await tap(find.text('My contact details'), 'My contact details');
+      await t.enterText(find.widgetWithText(TextField, 'Job title'), 'Optical strategy manager'); await tap(find.text('Save'), 'Save'); await wait(2);
+      await tap(find.text('Add contacts'), 'Add contacts');
+      await t.enterText(find.byType(TextField).first, 'Bob'); await wait(3);
+      await tap(find.text('Bob Tester').first, 'Bob in results'); await tap(find.textContaining('Add ('), 'Add'); await wait(3);
+      expectFound(await waitFor(find.text('Bob Tester'), secs: 15), 'Bob in contacts');
+      await tap(find.textContaining('Invite someone new'), 'Invite someone new');
+      await t.enterText(find.widgetWithText(TextField, 'Their name'), 'Sara Khalid'); await t.enterText(find.widgetWithText(TextField, 'Email'), 'sara.ci@example.ae');
+      await tap(find.text('Create invitation'), 'Create invitation');
+      expectFound(await waitFor(find.textContaining('/welcome#'), secs: 15), 'sign-up link to share');
+      await shot('people-invitation');
+      await tap(find.text('Done'), 'Done');
+    });
+    await step('Help and guide explains how to do things', () async {
+      await home(); await tap(find.byTooltip('Your profile and settings'), 'profile menu'); await tap(find.text('Help and guide'), 'Help and guide');
+      await t.enterText(find.byType(TextField).first, 'invite'); await wait(1);
+      await tap(find.text('Invite someone who is not on Amer Teams'), 'guide');
+      expectFound(await waitFor(find.textContaining('The link works once'), secs: 5), 'steps shown');
+      await shot('help-guide');
+    });
     String? recoveryKey;
     await step('Set up encrypted key backup', () async {
       await home(); await openApp('Security and devices');

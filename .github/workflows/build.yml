@@ -243,7 +243,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/shots
           pulseaudio --start --exit-idle-time=-1 && pactl load-module module-null-sink sink_name=virt && pactl load-module module-virtual-source source_name=mic master=virt.monitor || true
           dbus-run-session -- bash -c "echo amer | gnome-keyring-daemon --unlock --components=secrets >/dev/null; \
-            SHOTS=$GITHUB_WORKSPACE/shots xvfb-run -a -s '-screen 0 1440x900x24' flutter test integration_test/app_flow_test.dart -d linux \
+            SHOTS=$GITHUB_WORKSPACE/shots xvfb-run -a -s '-screen 0 1440x900x24' flutter test integration_test/app_flow_test.dart -d linux --dart-define=IN_USE_TEST=true \
             --dart-define=BUILD_ID=${{ github.run_number }} --dart-define=ENCLAVE_MEASUREMENT=${{ env.ENCLAVE_MEASUREMENT }} --dart-define=BUILD_DATE=${{ github.event.head_commit.timestamp }}" 2>&1 | tee $GITHUB_WORKSPACE/shots/flutter.log || true
           grep -E "^(PASS|FAIL)|IN-USE RESULT" $GITHUB_WORKSPACE/shots/flutter.log || true
           # a test that did not compile or never ran must not look green (individual step failures are reported above)

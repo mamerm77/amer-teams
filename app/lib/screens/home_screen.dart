@@ -1,4 +1,5 @@
-import 'people_screen.dart' show addJoinedInvitees;
+import 'people_screen.dart';
+import 'help_screen.dart';
 import '../services/urgent.dart';
 import '../services/availability.dart';
 import 'package:matrix/matrix.dart' show Client;
@@ -55,7 +56,13 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
     OutOfOffice.instance.start(m.client); CalendarConnector.instance.start();
     FocusGuard.instance.attach(m.client, ApiService(m)); FocusGuard.instance.ended.addListener(_focusEnded);
     _searchClient = m.client; SearchIndex.instance.start(m.client); Availability.instance.start(m.client); Urgent.instance.start(m.client);
-    _people = Timer.periodic(const Duration(minutes: 2), (_) => _invitees()); Future.delayed(const Duration(seconds: 5), _invitees); Urgent.instance.pending.addListener(_urgent);                          // on-device index of decrypted messages
+    _people = Timer.periodic(const Duration(minutes: 2), (_) => _invitees()); Future.delayed(const Duration(seconds: 5), _invitees);
+    Future.delayed(const Duration(seconds: 2), () async {          // first launch on this account: the welcome tour, once
+      if (!mounted) return; final cl = context.read<MatrixService>().client;
+      if (cl.accountData['com.amerteams.welcomed'] != null || const bool.fromEnvironment('IN_USE_TEST')) return;
+      try { await cl.setAccountData(cl.userID!, 'com.amerteams.welcomed', {'at': DateTime.now().millisecondsSinceEpoch}); } catch (_) {}
+      if (mounted) showWelcomeTour(context);
+    }); Urgent.instance.pending.addListener(_urgent);                          // on-device index of decrypted messages
     Flags.instance.load(ApiService(m)).then((_) => EnclaveClient.instance.check(ApiService(m), unattestedAllowed: Flags.instance.on('ai_unattested_enclave')));
     Reminders.instance.due.addListener(_reminder);
     _checkAway();
@@ -150,11 +157,15 @@ class _S extends State<HomeScreen> with WidgetsBindingObserver {
             if (v == 'notify') Navigator.push(c, MaterialPageRoute(builder: (_) => const NotificationsScreen()));
             if (v == 'out') confirmSignOut(c);
             if (v == 'status') showAvailability(c);
+            if (v == 'help') Navigator.push(c, MaterialPageRoute(builder: (_) => const HelpScreen()));
+            if (v == 'people') Navigator.push(c, MaterialPageRoute(builder: (_) => const PeopleScreen()));
           },
           itemBuilder: (_) => [
             PopupMenuItem(enabled: false, child: Text(me)),
             PopupMenuItem(value: 'status', child: ValueListenableBuilder(valueListenable: Availability.instance.state, builder: (_, v, __) => ListTile(
               leading: Icon(Availability.icon(v.$1), color: Availability.colour(v.$1)), title: Text(Availability.label(v.$1)), subtitle: Text(v.$2.isEmpty ? 'Set status message' : v.$2)))),
+            const PopupMenuItem(value: 'people', child: ListTile(leading: Icon(Icons.contacts_outlined), title: Text('People and contacts'))),
+            const PopupMenuItem(value: 'help', child: ListTile(leading: Icon(Icons.help_outline), title: Text('Help and guide'))),
             PopupMenuItem(value: 'notify', child: ListTile(leading: const Icon(Icons.notifications_active_outlined), title: Text(L.t(c, 'Notifications')))),
             PopupMenuItem(value: 'security', child: ListTile(leading: const Icon(Icons.security), title: Text(L.t(c, 'Security')))),
             PopupMenuItem(value: 'a11y', child: ListTile(leading: const Icon(Icons.accessibility_new), title: Text(L.t(c, 'Accessibility')))),
